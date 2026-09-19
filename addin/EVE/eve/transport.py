@@ -1,0 +1,226 @@
+"""Small, thread-safe JSON-RPC transport for a local Codex app-server."""
+import json
+import os
+from pathlib import Path
+import queue
+import subprocess
+import threading
+import time
+
+VERSION = "0.153.4"
+
+
+class RuntimeUnavailable(RuntimeError):
+    pass
+
+
+def data_home():
+    return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "EVE"
+
+
+def runtime_command(root=None):
+    root = Path(root) if root else Path(__file__).resolve().parents[1] / "runtime"
+    manifest = root / "eve-runtime.json"
+    executable = root / "bin" / "codex-app-server.exe"
+    if not manifest.is_file() or not executable.is_file():
+        raise RuntimeUnavailable("Codex is missing from EVE. Install or repair EVE using the complete Windows package.")
+    if not (root / "bin" / "codex-code-mode-host.exe").is_file():
+        raise RuntimeUnavailable("Codex is incomplete: its Code Mode host is missing. Repair EVE with the complete package.")
+    if not (root / "codex-resources").is_dir() or not (root / "codex-package.json").is_file():
+        raise RuntimeUnavailable("Codex's supporting resources are missing. Repair EVE with the complete package.")
+    try:
+        version = json.loads(manifest.read_text(encoding="utf-8")).get("version")
+        package_version = json.loads((root / "codex-package.json").read_text(encoding="utf-8")).get("version")
+    except (OSError, ValueError, AttributeError) as exc:
+        raise RuntimeUnavailable("Codex's package metadata is damaged. Repair EVE with the complete package.") from exc
+    if version != VERSION or package_version != VERSION:
+        raise RuntimeUnavailable("This Codex runtime is incompatible with EVE. Repair EVE with the complete package.")
+    return [str(executable), "--listen", "stdio://"]
+
+
+def runtime_environment(home):
+    env = dict(os.environ)
+    for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CHATGPT_API_KEY"):
+        env.pop(name, None)
+    env["CODEX_HOME"] = str(home / "codex")
+    env["RUST_LOG"] = "error"
+    return env
+
+
+class Transport:
+    def __init__(self, on_event, command=None, home=None, on_request=None):
+        self.on_event = on_event
+        self.on_request = on_request
+        self.debug = None
+        self.command = command
+        self.home = home or data_home()
+        self.process = None
+        self._pending = {}
+        self._lock = threading.RLock()
+        self._write_lock = threading.Lock()
+        self._next_id = 0
+        self._closed = False
+        self._incoming = set()
+
+    @property
+    def alive(self):
+        return self.process is not None and self.process.poll() is None and not self._closed
+
+    def start(self):
+        self.home.mkdir(parents=True, exist_ok=True)
+        (self.home / "codex").mkdir(exist_ok=True)
+        (self.home / "workspace").mkdir(exist_ok=True)
+        try:
+            self.process = subprocess.Popen(
+                self.command or runtime_command(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
+                cwd=self.home / "workspace", env=runtime_environment(self.home),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except OSError as exc:
+            raise RuntimeUnavailable("Codex could not start. Repair EVE's runtime, then try again.") from exc
+        self._reader = threading.Thread(target=self._read, name="EVE-Codex", daemon=True)
+        self._stderr_reader = threading.Thread(target=self._read_stderr, name="EVE-Codex-errors", daemon=True)
+        self._stderr_reader.start()
+        self._reader.start()
+        self._log("runtime.started")
+        try:
+            self.request("initialize", {"clientInfo": {"name": "eve", "title": "EVE", "version": "0.1.0"},
+                                        "capabilities": {"experimentalApi": True}})
+            self.notify("initialized", {})
+        except Exception:
+            self.close()
+            raise
+
+    def _send(self, payload):
+        with self._write_lock:
+            if not self.alive:
+                raise RuntimeError("Codex disconnected. Reconnect EVE to continue.")
+            self.process.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            self.process.stdin.flush()
+
+    def request(self, method, params=None, timeout=30):
+        started = time.monotonic()
+        mailbox = queue.Queue(maxsize=1)
+        with self._lock:
+            self._next_id += 1
+            request_id = self._next_id
+            self._pending[request_id] = mailbox
+        try:
+            self._send({"id": request_id, "method": method, "params": params or {}})
+            try:
+                response = mailbox.get(timeout=timeout)
+            except queue.Empty:
+                raise TimeoutError(f"Codex took too long to respond to {method}. Try reconnecting.") from None
+            if "error" in response:
+                raise RuntimeError(response["error"].get("message", "Codex request failed."))
+            return response.get("result", {})
+        except Exception as exc:
+            self._log("rpc.error", method=method, error=type(exc).__name__ if method.startswith("account/") else str(exc))
+            raise
+        finally:
+            self._log("rpc.completed", method=method, durationMs=round((time.monotonic() - started) * 1000))
+            with self._lock:
+                self._pending.pop(request_id, None)
+
+    def notify(self, method, params):
+        self._send({"method": method, "params": params})
+
+    def _log(self, event, **details):
+        if self.debug:
+            self.debug.record(event, **details)
+
+    def _read_stderr(self):
+        try:
+            while True:
+                line = self.process.stderr.readline(16000)
+                if not line:
+                    break
+                self._log("runtime.stderr", message=line.rstrip())
+        except (OSError, ValueError):
+            pass
+
+    def reply(self, request_id, result=None, error=None):
+        with self._lock:
+            if self._closed or request_id not in self._incoming:
+                return
+            self._incoming.remove(request_id)
+        try:
+            self._send({"id": request_id, **({"error": error} if error else {"result": result})})
+        except (RuntimeError, OSError, ValueError):
+            if not self._closed:
+                raise
+
+    def _read(self):
+        reason = "Codex disconnected. Reconnect EVE to continue."
+        try:
+            for line in self.process.stdout:
+                message = json.loads(line)
+                if "method" in message:
+                    if "id" in message:
+                        request_id = message["id"]
+                        with self._lock:
+                            if request_id in self._incoming:
+                                continue
+                            self._incoming.add(request_id)
+                        if self.on_request:
+                            try:
+                                # Handler enqueues work; it must not wait for Fusion here.
+                                self.on_request(request_id, message["method"], message.get("params") or {})
+                            except Exception as exc:
+                                self.reply(request_id, error={"code": -32603, "message": str(exc)})
+                        else:
+                            self.reply(request_id, error={"code": -32601, "message": "Unsupported server request."})
+                    else:
+                        self.on_event(message["method"], message.get("params") or {})
+                else:
+                    with self._lock:
+                        mailbox = self._pending.get(message.get("id"))
+                    if mailbox:
+                        mailbox.put_nowait(message)
+        except Exception as exc:
+            self._log("runtime.read_error", error=type(exc).__name__)
+            reason = "The Codex connection stopped unexpectedly. Reconnect EVE to continue."
+        finally:
+            self._fail_pending(reason)
+            if not self._closed:
+                self.on_event("eve/disconnected", {"message": reason})
+
+    def _fail_pending(self, message):
+        with self._lock:
+            for mailbox in self._pending.values():
+                try:
+                    mailbox.put_nowait({"error": {"message": message}})
+                except queue.Full:
+                    pass
+
+    def close(self):
+        self._closed = True
+        self._incoming.clear()
+        self._fail_pending("EVE is shutting down.")
+        process = self.process
+        if process:
+            if process.poll() is None:
+                # EOF lets app-server dispose its Code Mode companion before exiting.
+                with self._write_lock:
+                    try:
+                        if not process.stdin.closed:
+                            process.stdin.close()
+                    except (OSError, ValueError):
+                        pass
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
+                    else:
+                        process.kill()
+                    process.wait(timeout=2)
+            if hasattr(self, "_stderr_reader"):
+                self._stderr_reader.join(timeout=2)
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream:
+                    stream.close()
+        self._log("runtime.stopped")

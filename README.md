@@ -1,0 +1,140 @@
+# EVE
+
+### Engineering & Visualization Expert
+
+**Describe what you want. Build it inside Autodesk Fusion.**
+
+EVE is an AI engineering assistant that lives in Fusion. Ask it to create a parametric part, inspect an assembly, work with your CAM setup, or find an existing design to build around. Share a reference image, point to geometry, and keep the conversation going while EVE works.
+
+EVE writes and runs Python through Fusion's installed API. It can inspect your actual document, make changes, and check the result through queries and viewport images. Its reach includes sketches, solid modeling, assemblies, parameters, manufacturing, and other capabilities exposed by Autodesk's API.
+
+Sign in with your **ChatGPT account** to use its Codex access. The Windows package includes the runtime, so you can get started without a separate Python, Node.js, or Codex installation. No API key or separate EVE account is required.
+
+> **Windows preview · 0.1.0.** Sign-in and streaming chat have been reported working in Fusion. The execution bridge and newer features pass automated checks; live validation is ongoing. See [verification status](docs/VERIFICATION.md) for what has been tested.
+
+## What EVE can do
+
+### Build and inspect across Fusion
+
+- **Create and modify with Python.** Turn a request into complete operations through Fusion's installed API: sketches, features, components, parameters, assemblies, and supported manufacturing workflows.
+- **Query your actual design.** Inspect geometry, measure entities, examine parameters, and verify changes. A dedicated query tool makes reading the document the default when you ask a question.
+- **Work with CAM context.** Inspect setups, assigned machines, document tools, and accessible local or cloud tool libraries before choosing how to approach an operation.
+- **Find and assemble existing designs.** Search projects and folders accessible through your Autodesk session, identify matching files, and insert selected designs into assemblies through Fusion's API.
+- **Read the right documentation.** Discover classes, methods, and signatures from your installed Fusion API, with live web search available for public documentation and examples.
+
+### Show EVE what you mean
+
+- **Selection context, automatically.** Select a face, body, sketch, or component and ask about “this.” Each request includes a snapshot of the selection and Data Panel scope.
+- **Paste reference images.** Use **Ctrl+V** in the message box or **Attach images** to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
+- **Images during a task.** Send an image with text, on its own, or as a correction while EVE is already working. Up to four PNG, JPEG, or WebP images can accompany each message.
+- **Visual verification.** EVE can capture the model viewport and inspect the image alongside API results to check what it has made.
+
+### Stay in control of the conversation
+
+- **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
+- **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
+- **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
+- **Return to old chats.** Browse and search local conversation history, reopen a previous session, and continue where you left off.
+- **Choose the model and effort.** Pick from your account's available models and their supported reasoning levels. EVE remembers your model and a separate effort preference for each model across restarts.
+- **Recover failed messages.** Unconfirmed delivery stays visible. **Reuse message** restores the text and image attachments for an explicit retry.
+
+### Built to feel at home in Fusion
+
+EVE has a dockable dark interface, readable Markdown and code blocks, and incremental streaming that preserves existing message elements as text arrives. Open it from Fusion's **Quick Access toolbar** across workspaces, or through Design **Utilities > Add-ins** and command search.
+
+The account menu includes a remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
+
+## Try asking
+
+> “Create a mounting bracket with adjustable plate thickness and hole spacing.”
+
+> “Inspect this sketch and explain why it is underconstrained.”
+
+> “Use this reference image to help model the enclosure. Ask me for any missing dimensions.”
+
+> “Which machines and tools are available for this CAM setup?”
+
+> “Find the matching housing in this project and insert it into this assembly.”
+
+> “Actually, use 8 mm holes and keep the existing spacing.”
+
+## Install the Windows preview
+
+Get the complete Windows package from [EVE Releases](https://github.com/10-X-eng/EVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
+
+With an `EVE-0.1.0-windows-x64.zip` package:
+
+1. Extract the entire zip into a folder.
+2. Save your work and close Fusion.
+3. Double-click **Install EVE.exe**, then choose **Install EVE**.
+4. Open Fusion. In **Scripts and Add-ins**, enable EVE if it has not started automatically.
+5. Open **EVE** from the **Quick Access toolbar**.
+6. Choose **Sign in with ChatGPT**, complete sign-in in your browser, and return to EVE.
+
+See the [installation guide](docs/INSTALL.md) for first-use instructions, updates, troubleshooting, and uninstalling. The package also includes `INSTALL.md` and `START HERE.txt`.
+
+EVE checks for a saved sign-in before opening a new login. A device-code option is also available. Model availability and usage limits depend on your ChatGPT account's Codex access. [OpenAI authentication documentation](https://learn.chatgpt.com/docs/auth)
+
+The preview supports **Windows x64** and requires Fusion and an internet connection. The installer is currently unsigned. It installs per user, preserves the previous managed installation during updates, and refuses to replace an EVE folder it did not install.
+
+Startup checks the bundled Codex runtime and supporting files. Missing or incompatible components produce setup help with EVE repair instructions and the official Codex setup link. Repair the complete EVE package to restore its bundled runtime.
+
+To reload an updated development add-in, **Stop EVE, then Run it again** in Scripts and Add-ins. Start a **New conversation** after changes to tool definitions.
+
+## How EVE works
+
+```text
+Your request, selection, and reference images
+                    ↓
+EVE's dockable panel inside Fusion
+                    ↓
+Local Codex app-server with Code Mode
+                    ↓
+Fusion inspection, API help, Python operations, and viewport capture
+                    ↓
+Results returned to the conversation
+```
+
+Codex handles ChatGPT authentication, model access, inference, and persistent conversations. EVE connects that conversation to five Fusion tools: document inspection, Python queries, Python execution, installed API help, and viewport capture. Runtime communication stays off Fusion's main thread; document operations run on the main thread through Autodesk's supported event mechanism.
+
+Modeling commands request grouped Undo through Fusion's command transactions. Errors return concrete recovery guidance, and oversized results return bounded previews so the model can narrow a query without repeating a modifying operation just to recover its output. The bridge also includes cancellation and document-target checks.
+
+See the [execution bridge](docs/FUSION_EXECUTION.md) for tool contracts, Undo behavior, and safeguards.
+
+## Your account and data
+
+Conversation content, attached images, and requested Fusion tool results travel through the local Codex runtime to OpenAI. EVE does not operate an AI proxy or manage separate AI billing. Codex manages authentication locally; EVE does not copy credentials from another installation or inherit API keys from the environment.
+
+History, preferences, image caches, and optional logs live under the current Windows user's `%LOCALAPPDATA%\EVE` directory. History is local to EVE and does not sync with the ChatGPT website. Signing out hides conversations without deleting local files. Debug logs may contain design details and are never automatically uploaded by EVE.
+
+Attached images are prepared locally before sending, with a maximum longest edge of 2,048 pixels and compression when needed to stay under 1 MiB per image. They are sent only when you press Send. Image previews load separately from streaming text updates. Saved chats show previews when their native history includes the image data.
+
+Closing and reopening the panel keeps the conversation. Restarting EVE or reconnecting opens a blank chat while retaining saved sign-in and history; use **Chat history** to resume a previous session.
+
+## Preview boundaries
+
+EVE's coverage follows Autodesk's installed Python API; some Fusion UI features have no exposed API. Generated code runs with Fusion's process privileges. Save your work before trying changes: command grouping and recovery guidance cannot guarantee rollback or prevent every native Fusion failure.
+
+Fusion API calls share its main thread. Long native calculations can block the UI and cannot be forcibly interrupted by EVE's Stop button. A task waits while another document is active; it does not continuously model in a background document. There is currently one active conversation across the Fusion instance, rather than independent sessions per document.
+
+Live testing of image paste, generated modeling and CAM operations, Undo, document switching, and clean-machine installation is still underway. See [verification status](docs/VERIFICATION.md).
+
+## Development and contributions
+
+See [development setup](docs/DEVELOPMENT.md) for runtime download, Fusion loading, testing, packaging, and the browser preview.
+
+```powershell
+py -3.13 scripts/fetch_runtime.py
+py -3.13 -m unittest discover -s tests -v
+node tests/test_panel.cjs
+node tests/test_images.cjs
+py -3.13 scripts/smoke_runtime.py
+py -3.13 scripts/build_package.py
+py -3.13 scripts/verify_package.py
+```
+
+The bundled runtime is version-pinned and verified against its SHA-256 digest. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+
+Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
+
+EVE is an independent project and is not affiliated with or endorsed by Autodesk or OpenAI.

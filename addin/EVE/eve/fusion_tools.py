@@ -1,0 +1,440 @@
+"""Main-thread execution bridge for the full installed Autodesk Python API."""
+import importlib
+import copy
+import base64
+import inspect
+import json
+from pathlib import Path
+import pkgutil
+import queue
+from uuid import uuid4
+
+import adsk.core
+import adsk.fusion
+import adsk.cam
+
+from .python_runner import run_python
+from .cam_guard import protect_cam_values
+from .tool_protocol import ToolError, tool_failure
+from .transport import data_home
+
+EVENT_ID = "10X_EVE_Tool"
+COMMAND_ID = "10X_EVE_ExecutePython"
+
+
+def items(collection, limit=100):
+    return [collection.item(index) for index in range(min(collection.count, limit))]
+
+
+def optional_property(obj, name):
+    try:
+        return getattr(obj, name, None)
+    except (AttributeError, RuntimeError):
+        return None
+
+
+class EventHandler(adsk.core.CustomEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        self.owner.drain()
+
+
+class DocumentWake(adsk.core.DocumentEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        self.owner.wake()
+
+
+class CommandWake(adsk.core.ApplicationCommandEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        self.owner.wake()
+
+
+class CreatedHandler(adsk.core.CommandCreatedEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        command = args.command
+        command.isAutoExecute = True
+        command.isExecutedWhenPreEmpted = False
+        self.owner.bind(command.execute, ExecuteHandler(self.owner), self.owner.command_handlers)
+        self.owner.bind(command.destroy, DestroyHandler(self.owner), self.owner.command_handlers)
+
+
+class ExecuteHandler(adsk.core.CommandEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        owner = self.owner
+        job = owner.active
+        if job is None:
+            args.executeFailed = True
+            return
+        if (owner.task and not job["cancelled"]() and owner.document is not None
+                and owner.app.activeDocument != owner.document
+                and optional_property(owner.document, "isValid") is not False):
+            # The tab can change after execute() queues the command but before
+            # this callback. No generated code has run, so it is safe to defer.
+            job["deferredBeforeExecution"] = True
+            args.executeFailed = True
+            args.executeFailedMessage = "Waiting for the task document."
+            return
+        try:
+            owner.check_target(job)
+            job["result"] = owner.run_script(job)
+        except Exception as exc:
+            job["result"] = tool_failure(exc)
+        if not job["result"]["ok"]:
+            args.executeFailed = True
+            args.executeFailedMessage = job["result"]["error"][:500]
+            job["result"]["transactionAborted"] = True
+
+
+class DestroyHandler(adsk.core.CommandEventHandler):
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def notify(self, args):
+        owner = self.owner
+        job, owner.active = owner.active, None
+        # Command owns the event objects until destroy returns; keep handlers alive
+        # in this local list during callbacks, then release them.
+        handlers, owner.command_handlers = owner.command_handlers, []
+        if job:
+            if job.pop("deferredBeforeExecution", False):
+                owner.waiting = job
+                owner.on_wait("Waiting for " + (owner.task["snapshot"]["name"] or "the task document"), owner.task_label())
+                return
+            result = job.get("result") or tool_failure(ToolError("cancelled", "Fusion cancelled the command before execution."))
+            result["executionMode"] = "command"
+            completed = args.terminationReason == adsk.core.CommandTerminationReason.CompletedTerminationReason
+            result["commandCompleted"] = completed
+            if result["ok"] and not completed:
+                result.update(tool_failure(ToolError("command_incomplete", "Python returned, but Fusion did not complete the command."), execution_started=True))
+            try:
+                result["document"] = owner.inspect_document()
+            except Exception as exc:
+                result["inspectionError"] = str(exc)
+            owner.finish(job, result)
+
+
+class FusionTools:
+    def __init__(self, app, home=None):
+        self.app = app
+        self.queue = queue.Queue()
+        self.active = None
+        self.waiting = None
+        self.task = None
+        self.on_wait = lambda waiting, document: None
+        self.closed = False
+        self.handlers = []
+        self.command_handlers = []
+        self.document = None
+        self.document_id = None
+        self.debug = None
+        self.capture_folder = Path(home or data_home()) / "captures"
+        self.bind(app.registerCustomEvent(EVENT_ID), EventHandler(self), self.handlers)
+        self.definition = app.userInterface.commandDefinitions.addButtonDefinition(
+            COMMAND_ID, "EVE operation", "Run a Python operation requested through EVE")
+        self.bind(self.definition.commandCreated, CreatedHandler(self), self.handlers)
+        for event in (app.documentActivated, app.documentClosed):
+            self.bind(event, DocumentWake(self), self.handlers)
+        self.bind(app.userInterface.commandTerminated, CommandWake(self), self.handlers)
+
+    def wake(self):
+        # Safe from the controller worker as well as Fusion event callbacks.
+        if not self.closed:
+            self.app.fireCustomEvent(EVENT_ID)
+
+    def task_label(self):
+        return {"id": self.document_id, "name": self.task["snapshot"]["name"]} if self.task else None
+
+    def message_context(self, action):
+        """Called on the Fusion thread only after the controller accepts Send."""
+        if action == "send":
+            self.task = None
+            snapshot = self.selection_context()
+            self.task = {"snapshot": snapshot, "product": self.app.activeProduct,
+                         "selection": [entry.entity for entry in items(self.app.userInterface.activeSelections)]}
+        if not self.task:
+            raise ToolError("inactive_request", "There is no Fusion task to steer.")
+        return copy.deepcopy({**self.task["snapshot"], "targetPinned": True})
+
+    @staticmethod
+    def bind(event, handler, collection):
+        event.add(handler)
+        collection.append((event, handler))
+
+    def run_script(self, job):
+        script_id = str(uuid4())
+        def record(event, **details):
+            if self.debug:
+                self.debug.record(event, scriptId=script_id, title=job["arguments"]["title"], **details)
+        record("python.started", code=job["arguments"]["code"], crashGuard="cam-probe-v1")
+        with protect_cam_values(getattr(adsk.cam, "CAMParameter", None), record):
+            result = run_python(job["arguments"]["code"], self.context(), job["cancelled"],
+                                diagnostic=record if self.debug and self.debug.enabled else None)
+        if (self.task and job["arguments"].get("execution_mode") == "application"
+                and self.app.activeDocument != self.document):
+            # An application-mode script can intentionally create/open a document.
+            # No UI event pumping occurs during execution; capture its resulting target.
+            self.message_context("send")
+            self.on_wait("", self.task_label())
+        record("python.completed", ok=result["ok"])
+        return result
+
+    def submit(self, tool, arguments, complete, cancelled):
+        # Called from the transport reader. fireCustomEvent is the only Fusion
+        # API call permitted here. All document/API access occurs in drain().
+        if self.closed:
+            complete(tool_failure(ToolError("cancelled", "EVE is shutting down.")))
+            return
+        job = {"tool": tool, "arguments": arguments, "complete": complete, "cancelled": cancelled}
+        self.queue.put(job)
+        try:
+            self.app.fireCustomEvent(EVENT_ID)
+        except Exception:
+            job["cancelled"] = lambda: True
+            raise
+
+    def finish(self, job, result):
+        if job.get("finished"):
+            return
+        job["finished"] = True
+        try:
+            job["complete"](result)
+        finally:
+            if not self.closed and not self.queue.empty():
+                self.app.fireCustomEvent(EVENT_ID)
+
+    def context(self):
+        document = self.document if self.task else self.app.activeDocument
+        if document is not None and optional_property(document, "isValid") is False:
+            raise ToolError("target_document_closed", "The task's document is no longer available.")
+        products = {product.productType: product for product in items(document.products)} if document else {}
+        design = adsk.fusion.Design.cast(products.get("DesignProductType"))
+        selection = self.task["selection"] if self.task else [entry.entity for entry in items(self.app.userInterface.activeSelections)]
+        valid_selection = [entity for entity in selection if optional_property(entity, "isValid") is not False]
+        return {"app": self.app, "data": optional_property(self.app, "data"),
+                "targetPinned": bool(self.task), "dataPanel": copy.deepcopy(self.task["snapshot"]["dataPanel"]) if self.task else self.data_context(),
+                "ui": self.app.userInterface, "document": document,
+                "product": self.task["product"] if self.task else self.app.activeProduct,
+                "products": products, "design": design,
+                "root": design.rootComponent if design else None,
+                "units": design.unitsManager if design else None,
+                "selection": valid_selection, "selectionInvalidCount": len(selection) - len(valid_selection),
+                "selectionCount": self.task["snapshot"]["selectionCount"] if self.task else self.app.userInterface.activeSelections.count}
+
+    def selection_context(self):
+        """Capture a small, serializable snapshot on Fusion's main thread at Send."""
+        if self.task:
+            return copy.deepcopy({**self.task["snapshot"], "targetPinned": True})
+        document = self.app.activeDocument
+        if self.document_id is None or document != self.document:
+            self.document, self.document_id = document, str(uuid4())
+        ui = self.app.userInterface
+        selections = ui.activeSelections
+        selected, size = [], 0
+        for index, selection in enumerate(items(selections, 12)):
+            entity = selection.entity
+            entry = {"index": index, "type": entity.objectType, "name": str(optional_property(entity, "name") or "")[:200]}
+            for field, source, attribute in (("entityToken", entity, "entityToken"),
+                    ("body", optional_property(entity, "body"), "name"),
+                    ("occurrence", optional_property(entity, "assemblyContext"), "fullPathName")):
+                try:
+                    value = getattr(source, attribute, None)
+                    if isinstance(value, str) and len(value) <= (2048 if field == "entityToken" else 200):
+                        entry[field] = value
+                except (AttributeError, RuntimeError):
+                    pass
+            size += len(json.dumps(entry, ensure_ascii=False))
+            if size > 10000:
+                break
+            selected.append(entry)
+        workspace = ui.activeWorkspace
+        product = self.app.activeProduct
+        return {"document_id": self.document_id, "name": document.name if document else None,
+                "workspace": workspace.id if workspace else None,
+                "activeProduct": product.productType if product else None,
+                "selectionCount": selections.count, "selection": selected,
+                "selectionTruncated": len(selected) < selections.count,
+                "dataPanel": self.data_context()}
+
+    def data_context(self):
+        """Identify the current Data Panel scope without enumerating cloud libraries."""
+        data = optional_property(self.app, "data")
+        result = {"available": data is not None}
+        if data is not None:
+            for label, attribute in (("hub", "activeHub"), ("project", "activeProject"),
+                                     ("folder", "activeFolder")):
+                value = optional_property(data, attribute)
+                if value is not None:
+                    result[label] = {"name": str(optional_property(value, "name") or "")[:200],
+                                     "id": str(optional_property(value, "id") or "")[:2048]}
+        return result
+
+    def capture_viewport(self, job):
+        self.check_target(job)
+        viewport = self.app.activeViewport
+        if viewport is None or self.app.activeDocument is None:
+            raise ToolError("viewport_unavailable", "There is no active document viewport to capture.")
+        scale = min(1.0, 1280 / max(1, viewport.width, viewport.height))
+        width, height = max(1, round(viewport.width * scale)), max(1, round(viewport.height * scale))
+        self.capture_folder.mkdir(parents=True, exist_ok=True)
+        path = self.capture_folder / (str(uuid4()) + ".png")
+        try:
+            viewport.refresh()
+            if not viewport.saveAsImageFile(str(path), width, height):
+                raise ToolError("viewport_capture_failed", "Fusion could not render the viewport image.")
+            if path.stat().st_size > 8 * 1024 * 1024:
+                raise ToolError("viewport_capture_failed", "The viewport image exceeded the capture size limit.")
+            data = path.read_bytes()
+            if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+                raise ToolError("viewport_capture_failed", "Fusion did not return a valid PNG image.")
+            return {"ok": True, "document_id": self.document_id, "width": width, "height": height,
+                    "imageUrl": "data:image/png;base64," + base64.b64encode(data).decode("ascii")}
+        finally:
+            path.unlink(missing_ok=True)
+
+    def inspect_document(self):
+        context = self.context()
+        result = {**self.selection_context(), "products": list(context["products"]),
+                  "apiNamespaces": self.namespaces(), "design": None}
+        design = context["design"]
+        if design:
+            result["design"] = {"units": design.unitsManager.defaultLengthUnits,
+                "componentCount": design.allComponents.count,
+                "components": [{"name": component.name, "bodyCount": component.bRepBodies.count,
+                                "bodies": [body.name for body in items(component.bRepBodies, 30)],
+                                "sketchCount": component.sketches.count,
+                                "sketches": [{"name": sketch.name, "curves": sketch.sketchCurves.count,
+                                              "profiles": sketch.profiles.count} for sketch in items(component.sketches, 30)]}
+                               for component in items(design.allComponents, 30)],
+                "parameters": [{"name": parameter.name, "expression": parameter.expression,
+                                "unit": parameter.unit} for parameter in items(design.userParameters, 60)]}
+        return result
+
+    @staticmethod
+    def namespaces():
+        return sorted("adsk." + module.name for module in pkgutil.iter_modules(adsk.__path__)
+                      if not module.name.startswith("_"))
+
+    def api_help(self, path):
+        parts = path.split(".")
+        if path == "adsk":
+            return {"ok": True, "namespaces": self.namespaces()}
+        namespace = ".".join(parts[:2])
+        if namespace not in self.namespaces():
+            raise ToolError("api_namespace_unavailable", "That Autodesk namespace is not installed.")
+        value = importlib.import_module(namespace)
+        for part in parts[2:]:
+            value = getattr(value, part)
+        try:
+            signature = str(inspect.signature(value))
+        except (ValueError, TypeError):
+            signature = None
+        return {"ok": True, "path": path, "signature": signature,
+                "documentation": (inspect.getdoc(value) or "")[:18000],
+                "members": [name for name in dir(value) if not name.startswith("_")][:250]}
+
+    def check_target(self, job):
+        if self.closed or job["cancelled"]():
+            raise ToolError("cancelled", "Operation cancelled before execution.")
+        if self.task and self.document is not None and optional_property(self.document, "isValid") is False:
+            raise ToolError("target_document_closed", "The task's original document was closed.")
+        if job["arguments"].get("document_id", self.document_id) != self.document_id or self.app.activeDocument != self.document:
+            raise ToolError("document_changed", "The active document changed.")
+
+    def drain(self):
+        if self.closed or self.active is not None:
+            return
+        try:
+            job = self.waiting or self.queue.get_nowait()
+            self.waiting = None
+        except queue.Empty:
+            return
+        try:
+            if job["cancelled"]():
+                raise ToolError("cancelled", "Operation cancelled before execution.")
+            if self.task and job["tool"] != "fusion_api_help":
+                if self.document is not None and optional_property(self.document, "isValid") is False:
+                    raise ToolError("target_document_closed", "The task's original document was closed.")
+                if self.document is None and self.app.activeDocument is not None:
+                    raise ToolError("document_changed", "This task started without a document. Send a new request for the newly opened document.")
+                if job["arguments"].get("document_id", self.document_id) != self.document_id:
+                    raise ToolError("document_changed", "The tool request does not match the task's pinned document.")
+                if self.app.activeDocument != self.document:
+                    self.waiting = job
+                    self.on_wait("Waiting for " + (self.task["snapshot"]["name"] or "the task document"), self.task_label())
+                    return
+                if self.app.userInterface.activeCommand not in ("SelectCommand", COMMAND_ID):
+                    self.waiting = job
+                    self.on_wait("Waiting for your Fusion command to finish", self.task_label())
+                    return
+                self.on_wait("", self.task_label())
+            if job["tool"] == "fusion_inspect_document":
+                self.finish(job, {"ok": True, **self.inspect_document()})
+            elif job["tool"] == "fusion_api_help":
+                self.finish(job, self.api_help(job["arguments"]["path"]))
+            elif job["tool"] == "fusion_capture_viewport":
+                self.finish(job, self.capture_viewport(job))
+            else:
+                self.check_target(job)
+                if self.app.userInterface.activeCommand not in ("SelectCommand", COMMAND_ID):
+                    raise ToolError("active_command", "Finish or cancel the active Fusion command, then retry this operation.")
+                querying = job["tool"] == "fusion_query_python"
+                if querying or job["arguments"].get("execution_mode", "command") == "application":
+                    result = self.run_script(job)
+                    result.update(executionMode="query" if querying else "application", undoGrouped=False)
+                    try:
+                        result["document"] = self.inspect_document()
+                    except Exception as exc:
+                        result["inspectionError"] = str(exc)
+                    self.finish(job, result)
+                    return
+                self.definition.name = "EVE: " + job["arguments"]["title"]
+                self.active = job
+                if not self.definition.execute():
+                    raise RuntimeError("Fusion could not start the operation.")
+        except Exception as exc:
+            if self.active is job:
+                self.active = None
+            self.finish(job, tool_failure(exc))
+
+    def close(self):
+        if self.closed:
+            return
+        self.closed = True
+        if self.waiting:
+            self.finish(self.waiting, tool_failure(ToolError("cancelled", "EVE is shutting down.")))
+            self.waiting = None
+        if self.active:
+            self.finish(self.active, tool_failure(ToolError("cancelled", "EVE is shutting down.")))
+            self.active = None
+        while not self.queue.empty():
+            self.finish(self.queue.get_nowait(), tool_failure(ToolError("cancelled", "EVE is shutting down.")))
+        for event, handler in self.handlers + self.command_handlers:
+            try:
+                event.remove(handler)
+            except RuntimeError:
+                pass
+        self.handlers.clear()
+        self.command_handlers.clear()
+        if self.definition.isValid:
+            self.definition.deleteMe()
+        self.app.unregisterCustomEvent(EVENT_ID)

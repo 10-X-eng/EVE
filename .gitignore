@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.cache/
+dist/
+artifacts/
+addin/EVE/runtime/
+addin/EVE/.vscode/
+.pytest_cache/

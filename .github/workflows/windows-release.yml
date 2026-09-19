@@ -1,0 +1,125 @@
+name: Windows build and release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eve-windows-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify Windows installer
+    runs-on: windows-2022
+    timeout-minutes: 25
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate release version
+        id: version
+        run: |
+          $version = (Get-Content addin/EVE/EVE.manifest -Raw | ConvertFrom-Json -AsHashtable).version
+          $packageVersion = python -c "import sys; sys.path.insert(0, 'scripts'); from build_package import VERSION; print(VERSION)"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read package version' }
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $version -ne $packageVersion) { throw 'Manifest and package versions must match' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Fetch checksum-pinned Codex runtime
+        run: python scripts/fetch_runtime.py
+      - name: Build EXE and portable package; audit source and binaries
+        run: python scripts/build_package.py
+      - name: Test Python and installer behavior
+        run: python -m unittest discover -s tests -v
+      - name: Test chat rendering
+        run: node tests/test_panel.cjs
+      - name: Test image attachments
+        run: node tests/test_images.cjs
+      - name: Check actual runtime protocol without inference
+        run: python scripts/smoke_runtime.py
+      - name: Install complete package into a fixture and verify it
+        run: python scripts/verify_package.py
+      - name: Upload verified Windows package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: EVE-${{ steps.version.outputs.version }}-windows-x64
+          path: |
+            dist/EVE-${{ steps.version.outputs.version }}-windows-x64.zip
+            dist/EVE-${{ steps.version.outputs.version }}-windows-x64.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    name: Publish verified preview
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: eve-publish-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: EVE-${{ needs.build.outputs.version }}-windows-x64
+          path: dist
+      - name: Publish ZIP and checksum from the validated commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          existing_release="$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$tag\") | .draft")"
+          if [[ "$existing_release" == 'false' ]]; then
+            echo "$tag is already published; no new release needed."
+            exit 0
+          elif [[ -n "$existing_release" ]]; then
+            echo "An unfinished release exists for $tag. Inspect it before retrying." >&2
+            exit 1
+          fi
+          main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)"
+          if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
+            echo 'Main changed during validation; the newer main build will publish.'
+            exit 0
+          fi
+          (cd dist && sha256sum --check "EVE-$RELEASE_VERSION-windows-x64.zip.sha256")
+          tag_sha="$(gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq ".[] | select(.ref == \"refs/tags/$tag\") | .object.sha")"
+          if [[ -z "$tag_sha" ]]; then
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" > /dev/null
+          elif [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+            echo "$tag already points to another commit; published versions cannot be reused." >&2
+            exit 1
+          fi
+          gh release create "$tag" \
+            "dist/EVE-$RELEASE_VERSION-windows-x64.zip" \
+            "dist/EVE-$RELEASE_VERSION-windows-x64.zip.sha256" \
+            --verify-tag --prerelease \
+            --title "EVE $RELEASE_VERSION — Windows preview" \
+            --notes-file docs/RELEASE_NOTES.md

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>EVE · Your engineering partner</title>
+  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="fusion.css?v=11">
+  <script src="images.js?v=1" defer></script>
+  <script src="panel.js?v=12" defer></script>
+</head>
+<body>
+  <div id="app" class="app signed-out">
+    <header class="topbar">
+      <div class="brand"><img src="mark.svg" alt="" width="32" height="32"><div><span class="wordmark">EVE<span class="beta">EARLY ACCESS</span></span><span class="brand-subtitle">Your engineering partner</span></div></div>
+      <div class="header-actions">
+        <button id="history-button" class="icon-button" title="Chat history" aria-label="Chat history" aria-expanded="false" aria-controls="history-panel"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6M12 7v5l3 2"/></svg></button>
+        <button id="new-chat" class="icon-button" title="New conversation" aria-label="New conversation"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button id="account-button" class="icon-button" title="Account" aria-label="Account settings" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg></button>
+      </div>
+    </header>
+    <section id="account-menu" class="account-menu" aria-label="Account settings" hidden>
+      <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
+      <button id="logout" class="secondary-button" hidden>Sign out</button>
+      <div class="debug-settings">
+        <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
+        <p id="debug-note">Off by default. When on, saves code, tool results, and errors locally. Logs may contain design details.</p>
+        <button id="open-logs" class="secondary-button">Open logs folder</button>
+      </div>
+    </section>
+    <section id="history-panel" class="history-panel" aria-label="Chat history" hidden>
+      <div class="history-heading"><div><span class="eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>Your conversations</h2></div><button id="history-close" class="icon-button" aria-label="Close chat history">×</button></div>
+      <p class="history-note">Saved on this computer</p>
+      <label class="sr-only" for="history-search">Search conversations</label><input id="history-search" class="history-search" type="search" placeholder="Find a conversation…" autocomplete="off">
+      <p id="history-empty" class="history-empty">Your conversations will appear here after your first message.</p>
+      <div id="history-list" class="history-list"></div>
+      <button id="history-more" class="secondary-button" hidden>Load older conversations</button>
+    </section>
+    <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
+    <main id="scroll-area">
+      <section id="runtime-setup" class="sign-in-card runtime-setup" hidden>
+        <span class="eyebrow">LET'S GET CONNECTED</span><h2>Codex needs attention</h2>
+        <p>EVE couldn't start its included Codex runtime. Install or repair EVE with the complete Windows package, then reconnect.</p>
+        <button id="repair-eve" class="primary-button">EVE installation guide ↗</button>
+        <button id="install-codex" class="text-button">Official Codex download &amp; setup ↗</button>
+        <span class="sign-in-note">The full EVE package includes its required runtime. Installing the desktop app alone doesn't repair EVE.</span>
+      </section>
+      <section id="welcome" class="welcome">
+        <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="crosshair crosshair-one">+</div><div class="crosshair crosshair-two">+</div><img src="mark.svg" width="74" height="74" alt=""><span class="art-label">IDEA → POSSIBILITY</span></div>
+        <span class="eyebrow hero-eyebrow">ENGINEERING & VISUALIZATION EXPERT</span>
+        <h1>Good ideas.<br>A little <em>guidance.</em></h1>
+        <p class="intro">A second set of eyes for your next idea.<br>Let's work through it, together.</p>
+        <section id="sign-in-card" class="sign-in-card">
+          <div class="card-heading"><span class="connection-dot"></span><span>Your tools. Your ChatGPT.</span></div>
+          <p>Connect your account and bring your<br class="wide-only"> thinking partner into Fusion.</p>
+          <button id="login" class="primary-button">Sign in with ChatGPT <span aria-hidden="true">↗</span></button>
+          <div id="login-wait" hidden><span class="small-spinner"></span><span>Finish signing in in your browser</span></div>
+          <div id="device-info" hidden><span>Enter this code in your browser</span><strong id="device-code"></strong></div>
+          <button id="device-login" class="text-button">Use a device code instead</button>
+          <button id="cancel-login" class="text-button" hidden>Cancel sign-in</button>
+          <button id="refresh-account" class="text-button" hidden>I've signed in — check again</button>
+          <span class="sign-in-note">Uses your subscription's Codex access</span>
+        </section>
+        <div class="suggestions">
+          <span class="eyebrow">A PLACE TO START</span>
+          <button class="suggestion" data-prompt="Create a new component with a parametric 60 mm by 40 mm plate, 5 mm thick. Add four 5 mm mounting holes with centers 8 mm from each adjacent edge. Inspect the current document first and preserve existing geometry."><span class="suggestion-icon">⌑</span><span>Make a parametric part<small>Turn an idea into geometry</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion document and summarize its products, components, parameters, and current selection."><span class="suggestion-icon">⌘</span><span>Understand this document<small>Inspect what you're working on</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion workspace and available APIs. Explain what you can do here, including modeling, assemblies, or manufacturing where supported."><span class="suggestion-icon">◇</span><span>Explore what's possible<small>Work across Fusion's tools</small></span><span class="suggestion-arrow">↗</span></button>
+        </div>
+      </section>
+      <section id="conversation" class="conversation" aria-label="Conversation" hidden></section>
+      <div id="thinking" class="thinking" role="status" hidden><span></span><span></span><span></span><label>EVE is working</label></div>
+    </main>
+    <footer class="composer-area">
+      <div id="task-target" class="task-target" role="status" hidden></div>
+      <div id="preference-notice" class="preference-notice" hidden></div>
+      <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Dismiss error">×</button></div>
+      <div id="reconnect-row" hidden><button id="reconnect" class="secondary-button">Reconnect EVE</button></div>
+      <form id="composer" class="composer">
+        <div id="image-drafts" class="image-drafts" aria-label="Attached images" hidden></div>
+        <div id="image-hint" class="sr-only" role="status" hidden></div>
+        <input id="image-files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <label class="sr-only" for="message">Message EVE</label>
+        <textarea id="message" rows="1" maxlength="32000" placeholder="What are you working on?" aria-describedby="composer-note image-hint"></textarea>
+        <div class="composer-bottom">
+          <div class="generation-options">
+            <div class="model-wrap"><span class="model-spark" aria-hidden="true">✧</span><label class="sr-only" for="model">Model</label><select id="model"><option value="">Account default</option></select></div>
+            <div class="effort-wrap"><label class="sr-only" for="effort">Reasoning effort</label><select id="effort" title="Reasoning effort"><option value="">Default</option></select></div>
+          </div>
+          <div class="composer-actions">
+            <button id="attach-images" type="button" class="attach-button" title="Attach images · Ctrl+V to paste" aria-label="Attach images"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9m-6 12 8-8"/></svg></button>
+            <button id="send" class="send-button" type="submit" title="Send message" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
+            <button id="stop" class="send-button stop-button" type="button" title="Stop response" aria-label="Stop response" hidden><span></span></button>
+          </div>
+        </div>
+      </form>
+      <div class="footer-meta"><span class="status"><span id="status-dot" class="status-dot"></span><span id="status" role="status">Starting EVE</span></span><span id="composer-note">Fusion tools <span class="info-mark" title="EVE can inspect documents and run Python through Fusion's installed APIs.">ⓘ</span></span></div>
+    </footer>
+  </div>
+  <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
+</body>
+</html>
