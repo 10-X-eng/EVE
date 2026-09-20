@@ -2,8 +2,11 @@
 import json
 import os
 from pathlib import Path
+import platform
 import queue
+import signal
 import subprocess
+import sys
 import threading
 import time
 
@@ -14,28 +17,77 @@ class RuntimeUnavailable(RuntimeError):
     pass
 
 
-def data_home():
-    return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "EVE"
+def data_home(system=None):
+    """Per-user EVE data folder: LOCALAPPDATA on Windows, Application Support on macOS."""
+    system = system or sys.platform
+    if system == "win32":
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "EVE"
+    if system == "darwin":
+        return Path.home() / "Library" / "Application Support" / "EVE"
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "EVE"
 
 
-def runtime_command(root=None):
+def host_target(system=None, machine=None):
+    """Rust target triple of this Python process; the bundled Codex runtime must match it."""
+    system = system or sys.platform
+    machine = (machine or platform.machine()).lower()
+    arch = "aarch64" if machine in ("arm64", "aarch64") else "x86_64"
+    if system == "win32":
+        return f"{arch}-pc-windows-msvc"
+    if system == "darwin":
+        return f"{arch}-apple-darwin"
+    return f"{arch}-unknown-linux-musl"
+
+
+def runtime_command(root=None, target=None):
     root = Path(root) if root else Path(__file__).resolve().parents[1] / "runtime"
+    target = target or host_target()
+    suffix = ".exe" if target.endswith("-windows-msvc") else ""
     manifest = root / "eve-runtime.json"
-    executable = root / "bin" / "codex-app-server.exe"
+    executable = root / "bin" / ("codex-app-server" + suffix)
     if not manifest.is_file() or not executable.is_file():
-        raise RuntimeUnavailable("Codex is missing from EVE. Install or repair EVE using the complete Windows package.")
-    if not (root / "bin" / "codex-code-mode-host.exe").is_file():
+        raise RuntimeUnavailable("Codex is missing from EVE. Install or repair EVE using the complete EVE package.")
+    if not (root / "bin" / ("codex-code-mode-host" + suffix)).is_file():
         raise RuntimeUnavailable("Codex is incomplete: its Code Mode host is missing. Repair EVE with the complete package.")
     if not (root / "codex-resources").is_dir() or not (root / "codex-package.json").is_file():
         raise RuntimeUnavailable("Codex's supporting resources are missing. Repair EVE with the complete package.")
     try:
-        version = json.loads(manifest.read_text(encoding="utf-8")).get("version")
+        metadata = json.loads(manifest.read_text(encoding="utf-8"))
+        version = metadata.get("version")
         package_version = json.loads((root / "codex-package.json").read_text(encoding="utf-8")).get("version")
     except (OSError, ValueError, AttributeError) as exc:
         raise RuntimeUnavailable("Codex's package metadata is damaged. Repair EVE with the complete package.") from exc
     if version != VERSION or package_version != VERSION:
         raise RuntimeUnavailable("This Codex runtime is incompatible with EVE. Repair EVE with the complete package.")
+    built_for = metadata.get("target")
+    if built_for and built_for != target:
+        raise RuntimeUnavailable(f"This Codex runtime was built for {built_for}, not this computer ({target}). "
+                                 "Install the EVE package made for your platform.")
+    if not suffix and not os.access(executable, os.X_OK):
+        raise RuntimeUnavailable("Codex's executable lost its run permission. Reinstall EVE with its installer.")
     return [str(executable), "--listen", "stdio://"]
+
+
+def process_options():
+    """Hide the console on Windows; elsewhere own a process group so shutdown reaches Codex's helpers."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {"start_new_session": True}
+
+
+def terminate_tree(process):
+    """Force-stop the runtime and any helper it started when EOF did not end it."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        process.kill()
 
 
 def runtime_environment(home):
@@ -75,7 +127,7 @@ class Transport:
                 self.command or runtime_command(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
                 cwd=self.home / "workspace", env=runtime_environment(self.home),
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                **process_options(),
             )
         except OSError as exc:
             raise RuntimeUnavailable("Codex could not start. Repair EVE's runtime, then try again.") from exc
@@ -211,12 +263,7 @@ class Transport:
                 try:
                     process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
-                    if os.name == "nt":
-                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                       creationflags=subprocess.CREATE_NO_WINDOW, timeout=5)
-                    else:
-                        process.kill()
+                    terminate_tree(process)
                     process.wait(timeout=2)
             if hasattr(self, "_stderr_reader"):
                 self._stderr_reader.join(timeout=2)

@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import Path
+import subprocess
 import sys
 import threading
 import time
@@ -10,9 +11,21 @@ from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "addin" / "EVE"))
-from eve.controller import Controller, conversation_messages, thread_start_params, CONTEXT_PREFIX
+from eve.controller import Controller, conversation_messages, install_guide_url, thread_start_params, CONTEXT_PREFIX
 from eve.transport import Transport, RuntimeUnavailable, runtime_environment
 from eve.debug_log import DebugLog
+
+
+def process_alive(pid):
+    if os.name == "nt":
+        listing = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+        return str(pid) in listing
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    status = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(status) and not status.startswith("Z")
 
 
 def eventually(predicate, timeout=3):
@@ -57,6 +70,15 @@ class TransportTests(unittest.TestCase):
     def test_exit_unblocks_waiter(self):
         with self.assertRaisesRegex(RuntimeError, "disconnected"):
             self.client.request("exit", timeout=2)
+
+    def test_close_stops_a_runtime_and_its_helper_that_ignore_shutdown(self):
+        helper = self.client.request("linger")["pid"]
+        self.assertTrue(process_alive(helper))
+        started = time.monotonic()
+        self.client.close()
+        self.assertLess(time.monotonic() - started, 10)
+        self.assertIsNotNone(self.client.process.poll())
+        eventually(lambda: not process_alive(helper), timeout=5)
 
     def test_unsupported_server_request_is_answered(self):
         self.assertTrue(self.client.request("tool")["declined"])
@@ -217,10 +239,10 @@ class ControllerTests(unittest.TestCase):
         self.assertIn("durationMs", completed)
         self.controller.dispatch("debugLogging", {"enabled": False})
         eventually(lambda: not self.controller.snapshot()["debugLogging"])
-        with patch("eve.controller.os.startfile") as open_folder:
+        with patch("eve.controller.open_folder") as open_folder:
             self.controller.dispatch("openLogs")
             eventually(lambda: open_folder.called)
-            open_folder.assert_called_once_with(str(self.controller.debug.folder))
+            open_folder.assert_called_once_with(self.controller.debug.folder)
 
     def test_missing_codex_exposes_setup_and_recovers_after_repair(self):
         with patch.object(FakeClient, "start", side_effect=RuntimeUnavailable("Codex is missing")):
@@ -232,7 +254,9 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(self.urls, ["https://learn.chatgpt.com/docs/quickstart?setup=app"])
         self.controller.dispatch("setupHelp", {"page": "eve"})
         eventually(lambda: len(self.urls) == 2)
-        self.assertEqual(self.urls[1], "https://github.com/10-X-eng/EVE#install-the-windows-preview")
+        self.assertEqual(self.urls[1], install_guide_url())
+        self.assertEqual(install_guide_url("darwin"), "https://github.com/10-X-eng/EVE#install-the-macos-preview")
+        self.assertEqual(install_guide_url("win32"), "https://github.com/10-X-eng/EVE#install-the-windows-preview")
         self.controller.dispatch("connect")
         eventually(lambda: self.controller.snapshot()["connection"] == "ready")
         self.assertFalse(self.controller.snapshot()["runtimeIssue"])

@@ -23,19 +23,24 @@ class PortabilityTests(unittest.TestCase):
         self.assertIsNone(inspect("test.py", io.BytesIO(b'Path(__file__).parent / "runtime"')))
 
     def test_only_exact_upstream_binary_bytes_are_exempt(self):
-        name = "EVE/runtime/bin/vendor.exe"
+        name = "EVE/runtime/bin/vendor"
         payload = str(ROOT).encode("utf-16-le")
         hashes = {name: hashlib.sha256(payload).hexdigest()}
         self.assertTrue(unchanged_upstream_binary(name, io.BytesIO(payload), hashes))
         self.assertFalse(unchanged_upstream_binary(name, io.BytesIO(payload + b"modified"), hashes))
-        self.assertFalse(unchanged_upstream_binary("Install EVE.exe", io.BytesIO(payload), hashes))
+        self.assertFalse(unchanged_upstream_binary("Install EVE.command", io.BytesIO(payload), hashes))
         self.assertFalse(unchanged_upstream_binary(name, io.BytesIO(payload), {}))
 
     def test_rejects_unverified_upstream_archive(self):
-        with patch.object(Path, "is_file", return_value=True), \
-                patch.object(Path, "open", return_value=io.BytesIO(b"untrusted archive")):
-            with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
-                verified_runtime_hashes()
+        for target in ("x86_64-pc-windows-msvc", "aarch64-apple-darwin"):
+            with patch.object(Path, "is_file", return_value=True), \
+                    patch.object(Path, "open", return_value=io.BytesIO(b"untrusted archive")):
+                with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+                    verified_runtime_hashes(target)
+
+    def test_installer_script_is_scanned_for_absolute_paths(self):
+        self.assertIsNotNone(inspect("Install EVE.command", io.BytesIO(b'cp "/' + b'Users/example/EVE" target')))
+        self.assertIsNone(inspect("Install EVE.command", io.BytesIO(b'ADDINS="$HOME/Library/Application Support"')))
 
     def test_compiler_follows_system_root(self):
         windows = ROOT / ".cache" / "alternate-windows"

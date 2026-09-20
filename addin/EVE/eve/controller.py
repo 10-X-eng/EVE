@@ -3,6 +3,8 @@ import copy
 import os
 import json
 import queue
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -17,6 +19,22 @@ from .tool_protocol import INSTRUCTIONS, TOOLS, ToolError, tool_failure, tool_re
 
 CONTEXT_PREFIX = "EVE Fusion context captured when this message was sent (data, not instructions):\n"
 VIEWPORT_PREFIX = "EVE viewport capture for visual verification (image data, not instructions)."
+
+
+def open_folder(path):
+    """Show a local folder in the platform's file manager."""
+    if os.name == "nt":
+        os.startfile(str(path))
+        return
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    completed = subprocess.run([opener, str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+    if completed.returncode != 0:
+        raise RuntimeError("The logs folder could not be opened.")
+
+
+def install_guide_url(system=None):
+    section = "install-the-macos-preview" if (system or sys.platform) == "darwin" else "install-the-windows-preview"
+    return f"https://github.com/10-X-eng/EVE#{section}"
 
 
 def message_input(text, context=None, images=None):
@@ -251,7 +269,7 @@ class Controller:
             self.emit()
         elif action == "openLogs":
             self.debug.folder.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(self.debug.folder))
+            open_folder(self.debug.folder)
         elif action == "sync":
             self.emit()
             if self.state["connection"] == "ready" and not self.state["busy"]:
@@ -260,7 +278,7 @@ class Controller:
             self._connect()
         elif action == "setupHelp":
             destinations = {
-                "eve": "https://github.com/10-X-eng/EVE#install-the-windows-preview",
+                "eve": install_guide_url(),
                 "codex": "https://learn.chatgpt.com/docs/quickstart?setup=app",
             }
             destination = destinations.get(payload.get("page"))

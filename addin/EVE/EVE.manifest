@@ -5,6 +5,6 @@
   "description": {"": "EVE — Engineering & Visualization Expert. Sign in with ChatGPT and work alongside your design."},
   "version": "0.1.0",
   "runOnStartup": true,
-  "supportedOS": "windows",
+  "supportedOS": "windows|mac",
   "editEnabled": true
 }
