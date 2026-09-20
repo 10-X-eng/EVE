@@ -1,6 +1,7 @@
 """A subprocess fixture exercising the real JSONL transport, not a mocked pipe."""
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 sys.stdin.reconfigure(encoding="utf-8")
@@ -12,6 +13,7 @@ def send(message):
 
 
 pending_tool = None
+linger = None
 for line in sys.stdin:
     message = json.loads(line)
     method = message.get("method")
@@ -42,5 +44,12 @@ for line in sys.stdin:
         send({"method": "test/while-tool-pending", "params": {}})
     elif method is None and request_id == "deferred":
         send({"id": pending_tool, "result": message["result"]})
+    elif method == "linger":
+        linger = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        send({"id": request_id, "result": {"pid": linger.pid}})
 
+if linger is not None:
+    # Ignore the shutdown request so the client must stop the whole process tree.
+    linger.wait()
 Path("closed-cleanly.txt").write_text("stdin EOF", encoding="utf-8")

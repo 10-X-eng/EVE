@@ -4,7 +4,7 @@ The implementation is a prototype with user-confirmed streaming in Fusion; remai
 
 ## Verified locally
 
-- Current suite: 114 Python tests, plus JavaScript checks. Image coverage verifies bounded native inputs, image-only sends, exact-turn image steering, previews excluded from streaming state, local cache/history reconstruction, invalid input rejection without stopping a running task, and recovery after failed delivery. JavaScript fixtures check clipboard types, attachment preparation/removal, send/steer routing, retained failed drafts, submit races, and separate preview caching. Live Fusion clipboard, canvas decoding, image viewer, and actual model interpretation remain unverified.
+- Current suite: 120 Python tests, plus JavaScript checks. Image coverage verifies bounded native inputs, image-only sends, exact-turn image steering, previews excluded from streaming state, local cache/history reconstruction, invalid input rejection without stopping a running task, and recovery after failed delivery. JavaScript fixtures check clipboard types, attachment preparation/removal, send/steer routing, retained failed drafts, submit races, and separate preview caching. Live Fusion clipboard, canvas decoding, image viewer, and actual model interpretation remain unverified.
 - Model/effort and document coverage verifies persisted preferences across restart, reconnect and history; unsupported choices; explicit default-effort restoration; rejected sends not repinning; pinned selection/product; tab-switch waiting and automatic resumption; user-command waiting; cancellation; closed targets; the switch-before-command-execution race; intentional document creation; and rejection of live UI targeting in generated code. UI fixtures cover effort options, disabled controls, task labels and wait status. Actual Fusion event timing and visual layout remain live checks.
 - The real bundled model catalog supplies model-specific effort levels. An unauthenticated `turn/start` schema check accepts a catalog effort and returns the expected unknown-thread error before inference. No model request is made by that check.
 
@@ -85,8 +85,21 @@ The user subsequently confirmed that Stop/Run reloads EVE and that replies strea
 
 Computer Use can list Fusion but still refuses to capture it because app approval is rejected. Live results above are explicitly attributed to the user's screenshot and report; direct agent verification remains unavailable.
 
-The first package is unsigned and Windows x64 only. A clean-machine installation has not yet been verified.
+The packages are unsigned: Windows x64 and macOS on Apple silicon. A clean-machine installation has not yet been verified on either platform.
+
+## macOS port
+
+The add-in, packaging, installer, and workflow now cover macOS on Apple silicon. Verified locally on a Mac with Fusion 2705 installed: the shared Python suite (including the platform data home, runtime target matching, executable-bit recovery, and process-group shutdown), the JavaScript suites, the runtime smoke test against the notarized `aarch64-apple-darwin` Codex 0.153.4 package, a package build with the `Install EVE.command` installer, the installer tests, and `verify_package.py` installing that zip into a fixture and starting the installed runtime. On September 20, 2026 the maintainer installed that package on the same Mac and reported EVE working inside Fusion; the itemized checks below record what has been confirmed individually.
+
+- [x] Install the macOS package and load EVE in Fusion (user report).
+- [ ] Open the palette from the Quick Access toolbar; confirm dark styling and the ⌘V paste hint.
+- [ ] Complete ChatGPT browser sign-in and receive a streamed reply.
+- [ ] Paste a screenshot from the macOS clipboard and attach an image file.
+- [ ] Run a query and an execute tool call; capture the viewport.
+- [ ] Open the logs folder from the account menu and confirm Finder shows it.
+- [ ] Stop the add-in and quit Fusion; confirm no `codex-app-server` or `codex-code-mode-host` process remains.
+- [ ] Verify the Gatekeeper path for `Install EVE.command` on a clean Mac, including the Privacy & Security approval.
 
 ## Repository delivery
 
-The source is published in the public EVE repository. The Windows build workflow performs package and installer verification on a GitHub-hosted runner before automatically publishing new versions pushed to `main`. Already-published versions are skipped. GitHub build validation does not replace the live Fusion checks listed above.
+The source is published in the public EVE repository. The build workflow performs package and installer verification on GitHub-hosted Windows and macOS runners before automatically publishing new versions pushed to `main`. Already-published versions are skipped. GitHub build validation does not replace the live Fusion checks listed above.

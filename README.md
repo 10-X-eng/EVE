@@ -8,9 +8,9 @@ EVE is an AI engineering assistant that lives in Fusion. Ask it to create a para
 
 EVE writes and runs Python through Fusion's installed API. It can inspect your actual document, make changes, and check the result through queries and viewport images. Its reach includes sketches, solid modeling, assemblies, parameters, manufacturing, and other capabilities exposed by Autodesk's API.
 
-Sign in with your **ChatGPT account** to use its Codex access. The Windows package includes the runtime, so you can get started without a separate Python, Node.js, or Codex installation. No API key or separate EVE account is required.
+Sign in with your **ChatGPT account** to use its Codex access. The Windows and macOS packages include the runtime, so you can get started without a separate Python, Node.js, or Codex installation. No API key or separate EVE account is required.
 
-> **Windows preview · 0.1.0.** Sign-in and streaming chat have been reported working in Fusion. The execution bridge and newer features pass automated checks; live validation is ongoing. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.1.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What EVE can do
 
@@ -25,7 +25,7 @@ Sign in with your **ChatGPT account** to use its Codex access. The Windows packa
 ### Show EVE what you mean
 
 - **Selection context, automatically.** Select a face, body, sketch, or component and ask about “this.” Each request includes a snapshot of the selection and Data Panel scope.
-- **Paste reference images.** Use **Ctrl+V** in the message box or **Attach images** to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
+- **Paste reference images.** Use **Ctrl+V** (Windows) or **⌘V** (macOS) in the message box, or **Attach images**, to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
 - **Images during a task.** Send an image with text, on its own, or as a correction while EVE is already working. Up to four PNG, JPEG, or WebP images can accompany each message.
 - **Visual verification.** EVE can capture the model viewport and inspect the image alongside API results to check what it has made.
 
@@ -71,11 +71,22 @@ With an `EVE-0.1.0-windows-x64.zip` package:
 5. Open **EVE** from the **Quick Access toolbar**.
 6. Choose **Sign in with ChatGPT**, complete sign-in in your browser, and return to EVE.
 
-See the [installation guide](docs/INSTALL.md) for first-use instructions, updates, troubleshooting, and uninstalling. The package also includes `INSTALL.md` and `START HERE.txt`.
+## Install the macOS preview
+
+Get `EVE-0.1.0-macos-arm64.zip` from [EVE Releases](https://github.com/10-X-eng/EVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+
+1. Double-click the zip to extract it. Keep the extracted folder together, including `Install EVE.command`, `SHA256SUMS`, and the `EVE` folder.
+2. Save your work and quit Fusion.
+3. Open Terminal, type `bash ` (with a trailing space), drag **Install EVE.command** into the window, and press Return. Double-clicking the installer also works once macOS lets you open it under **System Settings > Privacy & Security**, because this preview is not signed.
+4. Open Fusion. In **Scripts and Add-ins**, enable EVE if it has not started automatically.
+5. Open **EVE** from the **Quick Access toolbar**.
+6. Choose **Sign in with ChatGPT**, complete sign-in in your browser, and return to EVE.
+
+See the [installation guide](docs/INSTALL.md) for first-use instructions, updates, troubleshooting, and uninstalling on both platforms. Each package also includes `INSTALL.md` and `START HERE.txt`.
 
 EVE checks for a saved sign-in before opening a new login. A device-code option is also available. Model availability and usage limits depend on your ChatGPT account's Codex access. [OpenAI authentication documentation](https://learn.chatgpt.com/docs/auth)
 
-The preview supports **Windows x64** and requires Fusion and an internet connection. The installer is currently unsigned. It installs per user, preserves the previous managed installation during updates, and refuses to replace an EVE folder it did not install.
+The preview supports **Windows x64** and **macOS on Apple silicon**, and requires Fusion and an internet connection. The installers are currently unsigned. They install per user, preserve the previous managed installation during updates, and refuse to replace an EVE folder they did not install.
 
 Startup checks the bundled Codex runtime and supporting files. Missing or incompatible components produce setup help with EVE repair instructions and the official Codex setup link. Repair the complete EVE package to restore its bundled runtime.
 
@@ -105,7 +116,7 @@ See the [execution bridge](docs/FUSION_EXECUTION.md) for tool contracts, Undo be
 
 Conversation content, attached images, and requested Fusion tool results travel through the local Codex runtime to OpenAI. EVE does not operate an AI proxy or manage separate AI billing. Codex manages authentication locally; EVE does not copy credentials from another installation or inherit API keys from the environment.
 
-History, preferences, image caches, and optional logs live under the current Windows user's `%LOCALAPPDATA%\EVE` directory. History is local to EVE and does not sync with the ChatGPT website. Signing out hides conversations without deleting local files. Debug logs may contain design details and are never automatically uploaded by EVE.
+History, preferences, image caches, and optional logs live under the current user's EVE data folder: `%LOCALAPPDATA%\EVE` on Windows and `~/Library/Application Support/EVE` on macOS. History is local to EVE and does not sync with the ChatGPT website. Signing out hides conversations without deleting local files. Debug logs may contain design details and are never automatically uploaded by EVE.
 
 Attached images are prepared locally before sending, with a maximum longest edge of 2,048 pixels and compression when needed to stay under 1 MiB per image. They are sent only when you press Send. Image previews load separately from streaming text updates. Saved chats show previews when their native history includes the image data.
 
@@ -123,17 +134,17 @@ Live testing of image paste, generated modeling and CAM operations, Undo, docume
 
 See [development setup](docs/DEVELOPMENT.md) for runtime download, Fusion loading, testing, packaging, and the browser preview.
 
-```powershell
-py -3.13 scripts/fetch_runtime.py
-py -3.13 -m unittest discover -s tests -v
+```bash
+python3 scripts/fetch_runtime.py
+python3 -m unittest discover -s tests -v
 node tests/test_panel.cjs
 node tests/test_images.cjs
-py -3.13 scripts/smoke_runtime.py
-py -3.13 scripts/build_package.py
-py -3.13 scripts/verify_package.py
+python3 scripts/smoke_runtime.py
+python3 scripts/build_package.py
+python3 scripts/verify_package.py
 ```
 
-The bundled runtime is version-pinned and verified against its SHA-256 digest. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. The bundled runtime is version-pinned per platform and verified against its SHA-256 digest. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
 
 Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
 

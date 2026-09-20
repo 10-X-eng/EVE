@@ -356,6 +356,7 @@ $("message").onpaste=(event)=>{
   event.preventDefault();attachImages(files);
 };
 $("attach-images").onclick=()=>$("image-files").click();
+if(typeof navigator!=="undefined" && /Mac/.test(navigator.platform||""))$("attach-images").title="Attach images · ⌘V to paste";
 $("image-files").onchange=(event)=>{const files=Array.from(event.target.files||[]);event.target.value="";attachImages(files);};
 $("close-image").onclick=()=>$("image-viewer").close();
 $("image-viewer").onclick=(event)=>{if(event.target===$("image-viewer"))$("image-viewer").close();};

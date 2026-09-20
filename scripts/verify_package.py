@@ -8,6 +8,9 @@ from uuid import uuid4
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from eve_package import installer_command, installer_name, package_name  # noqa: E402
+from eve.transport import host_target  # noqa: E402
 
 
 def digest(path):
@@ -17,10 +20,11 @@ def digest(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("archive", nargs="?", type=Path,
-                        default=ROOT / "dist/EVE-0.1.0-windows-x64.zip")
+    parser.add_argument("archive", nargs="?", type=Path, default=None)
+    parser.add_argument("--target", default=None, help="Rust target triple; defaults to this machine's platform")
     args = parser.parse_args()
-    archive = args.archive.resolve()
+    target = args.target or host_target()
+    archive = (args.archive or ROOT / "dist" / (package_name(target) + ".zip")).resolve()
     expected = archive.with_suffix(".zip.sha256").read_text().split()[0]
     assert digest(archive) == expected, "Zip checksum mismatch"
     scratch = ROOT / ".cache/package-verification" / str(uuid4())
@@ -28,11 +32,11 @@ def main():
     package.mkdir(parents=True)
     with zipfile.ZipFile(archive) as zipped:
         assert zipped.testzip() is None, "Zip integrity check failed"
+        # Python does not restore Unix permission bits here; the installer must make the runtime executable.
         zipped.extractall(package)
     destination = scratch / "API/AddIns"
-    subprocess.run([str(package / "Install EVE.exe"), "--test-install", str(package),
-                    str(destination)], check=True, timeout=60,
-                   creationflags=subprocess.CREATE_NO_WINDOW)
+    command, options = installer_command(package / installer_name(target), package, destination, target)
+    subprocess.run(command, check=True, timeout=120, **options)
     installed = destination / "EVE"
     assert (package / "INSTALL.md").read_bytes() == (ROOT / "docs/INSTALL.md").read_bytes(), "Missing or stale installation guide"
     files = 0

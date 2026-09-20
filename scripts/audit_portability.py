@@ -1,15 +1,19 @@
 """Check distributable source or a release zip for machine-specific paths."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
+import sys
 import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "addin" / "EVE"))
 EXCLUDED = {".git", ".cache", "dist", "node_modules", ".venv", ".vscode", "__pycache__", "runtime", ".codex", ".agents"}
-TEXT_SUFFIXES = {".py", ".js", ".cjs", ".json", ".md", ".txt", ".html", ".css", ".cs", ".manifest", ".svg", ".yml", ".yaml", ".toml"}
+TEXT_SUFFIXES = {".py", ".js", ".cjs", ".json", ".md", ".txt", ".html", ".css", ".cs", ".manifest", ".svg", ".yml", ".yaml", ".toml",
+                 ".sh", ".command"}
 ABSOLUTE_PATH = re.compile(r"(?i)\b[a-z]:[\\/]|/(?:Users|home)/[\w.-]+/|file:/{3}")
 
 
@@ -47,22 +51,31 @@ def inspect(name, stream):
     return None
 
 
-def verified_runtime_hashes():
-    """Identify upstream binaries by bytes, never by an allowlisted path alone."""
-    from fetch_runtime import ARCHIVE, SHA256
-    archive = ROOT / ".cache" / ARCHIVE
+def verified_runtime_hashes(target=None):
+    """Identify upstream runtime files by bytes, never by an allowlisted path alone."""
+    from fetch_runtime import archive_digest, cached_archive
+    from eve.transport import host_target
+    target = target or host_target()
+    archive = cached_archive(target)
     if not archive.is_file():
         return {}
     with archive.open("rb") as stream:
-        if hashlib.file_digest(stream, "sha256").hexdigest() != SHA256:
+        if hashlib.file_digest(stream, "sha256").hexdigest() != archive_digest(target):
             raise RuntimeError("Upstream runtime archive checksum mismatch")
     hashes = {}
     with tarfile.open(archive) as package:
         for member in package:
-            if member.isfile() and Path(member.name).suffix.lower() == ".exe":
+            if member.isfile():
                 with package.extractfile(member) as stream:
                     hashes["EVE/runtime/" + Path(member.name).as_posix()] = hashlib.file_digest(stream, "sha256").hexdigest()
     return hashes
+
+
+def packaged_runtime_target(package):
+    try:
+        return json.loads(package.read("EVE/runtime/eve-runtime.json")).get("target")
+    except (KeyError, ValueError, AttributeError):
+        return None
 
 
 def unchanged_upstream_binary(name, stream, hashes):
@@ -83,11 +96,11 @@ def audit(archive=None):
                     failures.append(f"{entry.filename}: local debugger or bytecode artifact")
                 with package.open(entry) as stream:
                     failure = inspect(entry.filename, stream)
-                if failure and entry.filename.startswith("EVE/runtime/") and Path(entry.filename).suffix.lower() == ".exe":
+                if failure and entry.filename.startswith("EVE/runtime/"):
                     # Vendor debug strings can name the same generic CI profile.
-                    # Accept them only when the entire binary matches the pinned download.
+                    # Accept them only when the entire file matches the pinned download.
                     if upstream_hashes is None:
-                        upstream_hashes = verified_runtime_hashes()
+                        upstream_hashes = verified_runtime_hashes(packaged_runtime_target(package))
                     with package.open(entry) as stream:
                         if unchanged_upstream_binary(entry.filename, stream, upstream_hashes):
                             failure = None
