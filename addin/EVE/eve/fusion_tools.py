@@ -15,7 +15,7 @@ import adsk.cam
 
 from .python_runner import run_python
 from .cam_guard import protect_cam_values
-from .tool_protocol import ToolError, tool_failure
+from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
 
 EVENT_ID = "10X_EVE_Tool"
@@ -350,6 +350,7 @@ class FusionTools:
             signature = None
         return {"ok": True, "path": path, "signature": signature,
                 "documentation": (inspect.getdoc(value) or "")[:18000],
+                **({"guidance": API_GUIDANCE[path]} if path in API_GUIDANCE else {}),
                 "members": [name for name in dir(value) if not name.startswith("_")][:250]}
 
     def check_target(self, job):

@@ -9,12 +9,14 @@ let renderFrame = null;
 let renderedModels = "";
 let renderedEfforts = "";
 let dismissedError = "";
+let dismissedUpdate = "";
 let submitting = false;
 let renderedThread = null;
 let renderedHistory = "";
 let draftImages = [];
 let draftImageRevision = 0;
 let nextDraftImage = 0;
+let clipboardRequest = null;
 const imageCache = new Map();
 
 function escapeHTML(text) {
@@ -94,6 +96,28 @@ async function attachImages(files) {
     catch(error){draftImages=draftImages.filter(other=>other!==item);state.error=error.message;dismissedError="";}
     draftImageRevision++;renderDraftImages();render();
   }));
+}
+function pasteClipboardImage() {
+  if (clipboardRequest || submitting || !state.account || state.connection !== "ready") return;
+  if (draftImages.length >= 4) {state.error="Attach at most four images per message.";dismissedError="";render();return;}
+  const request = {id:`paste-${Date.now()}-${++nextDraftImage}`, threadId:state.threadId};
+  clipboardRequest=request;
+  request.timer=setTimeout(()=>finishClipboardImage({requestId:request.id,error:"Image paste timed out. Copy the screenshot and paste again."}),15000);
+  render();
+  bridge("clipboardImage",{requestId:request.id}).catch(error=>finishClipboardImage({requestId:request.id,error:error.message}));
+}
+async function finishClipboardImage(result) {
+  const request=clipboardRequest;
+  if (!request || request.receiving || result.requestId!==request.id) return;
+  request.receiving=true;
+  clearTimeout(request.timer);
+  try {
+    if (state.threadId!==request.threadId || !state.account || state.connection!=="ready") return;
+    if (result.error) throw new Error(result.error);
+    if (!result.image) throw new Error("No image is available on the clipboard. Copy the screenshot itself, then paste.");
+    await attachImages([EveImages.clipboardFile(result.image)]);
+  } catch(error) {state.error=error.message;dismissedError="";}
+  finally {if(clipboardRequest===request)clipboardRequest=null;render();}
 }
 function renderMessageImages(article, body, images) {
   if(!images.length)return;
@@ -198,7 +222,7 @@ function render() {
   if(threadChanged && renderedThread)imageCache.clear();
   renderedThread = state.threadId || null;
   const controls = JSON.stringify({...state, messages: undefined,
-    hasMessages: state.messages.length > 0, draft: $("message").value, draftImageRevision, submitting, dismissedError});
+    hasMessages: state.messages.length > 0, draft: $("message").value, draftImageRevision, submitting, clipboardPending:!!clipboardRequest, dismissedError});
   if (controls !== renderedControls) {
     renderControls();
     renderedControls = controls;
@@ -229,7 +253,7 @@ function renderControls() {
   $("device-code").textContent=state.device?.code||"";
   $("message").disabled=!signed || !connected;
   $("message").placeholder=signed?(state.busy?"Add a correction or steer EVE…":"What are you working on?"):"Sign in to start a conversation";
-  $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || submitting || (state.busy && !state.canSteer);
+  $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || !!clipboardRequest || submitting || (state.busy && !state.canSteer);
   $("attach-images").disabled=!signed || !connected || draftImages.length>=4;
   $("send").hidden=false;
   $("send").title=state.busy?"Steer current response":"Send message";
@@ -243,9 +267,37 @@ function renderControls() {
   $("logout").disabled=state.busy;
   $("debug-logging").checked=!!state.debugLogging;
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
+  const update=state.updateInfo;
+  $("installed-version").textContent=state.version?`EVE ${state.version}`:"EVE";
+  $("update-status").textContent=state.updateStatus||"Checks for new releases automatically.";
+  $("check-updates").disabled=!!state.updateChecking;
+  $("check-updates").textContent=state.updateChecking?"Checking…":"Check for updates";
+  $("menu-update").hidden=!update;
+  $("update-banner").hidden=!update || dismissedUpdate===update.version;
+  $("update-title").textContent=update?`EVE ${update.version} is available`:"";
+  const download=state.updateDownload;
+  const downloading=download?.state==="downloading";
+  const downloaded=download?.state==="ready" && download.version===update?.version;
+  const downloadLabel=downloading?`Downloading${download.percent==null?"…":` ${download.percent}%`}`:downloaded?"Open Downloads":"Download update";
+  for(const id of ["download-update","menu-download"]){$(id).textContent=downloadLabel;$(id).disabled=downloading;}
+  $("menu-download").hidden=!update;
+  const downloadNote=download?.state==="error"?download.message:downloaded?"Saved and verified in Downloads. Close Fusion, extract the ZIP, and run the installer.":"Saves the ZIP to Downloads. Close Fusion before installing.";
+  $("download-status").hidden=!download;
+  $("download-status").textContent=downloadNote;
+  $("update-hint").textContent=downloadNote;
   $("account-email").textContent=state.account?.email || (signed?"ChatGPT account":"Not signed in");
   $("account-plan").textContent=signed?`${state.account.planType||"ChatGPT"} · Connected through Codex`:"Use your ChatGPT account";
-  $("status").textContent=state.waitingForFusion?state.waitingReason:state.status;
+  $("status").textContent=clipboardRequest?"Reading clipboard image…":state.waitingForFusion?state.waitingReason:state.status;
+  const tools=state.busy && signed && state.connection==="ready" ? state.activeTools||[] : [];
+  const tool=tools[0];
+  const toolPhase=state.status==="Stopping"?"Stopping":state.waitingForFusion?"Waiting":"Using";
+  $("tool-activity").hidden=!tool;
+  const toolTitle=tool?tool.title:"";
+  const toolName=tool?`${toolPhase} ${tool.name}${tools.length>1?` · +${tools.length-1} more`:""}`:"";
+  // Keep the live region stable while response tokens arrive.
+  if($("tool-title").textContent!==toolTitle) $("tool-title").textContent=toolTitle;
+  if($("tool-name").textContent!==toolName) $("tool-name").textContent=toolName;
+  $("tool-activity").title=tools.map(t=>`${t.name}: ${t.title}`).join("\n");
   $("task-target").hidden=!signed || !state.busy || !state.taskDocument;
   $("task-target").textContent=state.taskDocument?`Task: ${state.taskDocument.name||"No document"} · ${state.waitingForFusion?"Waiting":"Pinned"}`:"";
   $("task-target").title="This task keeps its original document and selection. It waits when another document or command is active.";
@@ -306,6 +358,9 @@ function renderHistory() {
 }
 
 window.fusionJavaScriptHandler={handle(action,data){
+  if(action==="clipboardImage"){
+    try{finishClipboardImage(JSON.parse(data));}catch(error){return "FAILED";}
+  }
   if(action==="state"){
     try{state=JSON.parse(data);scheduleRender();}catch(error){return "FAILED";}
   }
@@ -322,6 +377,12 @@ $("repair-eve").onclick=()=>act("setupHelp",{page:"eve"});
 $("install-codex").onclick=()=>act("setupHelp",{page:"codex"});
 $("debug-logging").onchange=(event)=>act("debugLogging",{enabled:event.target.checked});
 $("open-logs").onclick=()=>act("openLogs");
+$("check-updates").onclick=()=>{dismissedUpdate="";act("checkUpdates");};
+$("menu-update").onclick=()=>act("openUpdate",{page:"notes"});
+$("download-update").onclick=()=>act(state.updateDownload?.state==="ready" && state.updateDownload.version===state.updateInfo?.version?"openDownloads":"downloadUpdate");
+$("menu-download").onclick=$("download-update").onclick;
+$("update-notes").onclick=()=>act("openUpdate",{page:"notes"});
+$("dismiss-update").onclick=()=>{dismissedUpdate=state.updateInfo?.version||"";renderedControls="";render();};
 $("new-chat").onclick=()=>{showHistory(false);act("new");};
 $("history-button").onclick=()=>{const open=$("history-panel").hidden;showHistory(open);if(open){renderHistory();act("history");}};
 $("history-close").onclick=()=>{showHistory(false);$("history-button").focus();};
@@ -351,9 +412,13 @@ function resize(){const input=$("message");input.style.height="auto";input.style
 $("message").oninput=()=>{resize();render();};
 $("message").onkeydown=(event)=>{if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){event.preventDefault();$("composer").requestSubmit();}};
 $("message").onpaste=(event)=>{
-  const files=EveImages.pasteFiles(event.clipboardData);
-  if(!files.length)return; // Keep ordinary text paste native.
-  event.preventDefault();attachImages(files);
+  if(event.isTrusted===false)return;
+  const clipboard=event.clipboardData;
+  const items=Array.from(clipboard?.items||[]);
+  const hasImage=items.some(item=>item.kind==="file" && item.type.startsWith("image/"));
+  const hasText=items.some(item=>item.kind==="string" && item.type==="text/plain") || Array.from(clipboard?.types||[]).includes("text/plain");
+  if(hasText && !hasImage)return; // Text remains the browser's native paste operation.
+  event.preventDefault();pasteClipboardImage();
 };
 $("attach-images").onclick=()=>$("image-files").click();
 if(typeof navigator!=="undefined" && /Mac/.test(navigator.platform||""))$("attach-images").title="Attach images · ⌘V to paste";
@@ -363,7 +428,7 @@ $("image-viewer").onclick=(event)=>{if(event.target===$("image-viewer"))$("image
 $("image-viewer").onclose=()=>$("expanded-image").removeAttribute("src");
 $("composer").onsubmit=async(event)=>{
   event.preventDefault();const text=$("message").value.trim();
-  if((!text&&!draftImages.length)||draftImages.some(item=>!item.url)||(state.busy&&!state.canSteer)||submitting||!state.account||state.connection!=="ready")return;
+  if((!text&&!draftImages.length)||draftImages.some(item=>!item.url)||clipboardRequest||(state.busy&&!state.canSteer)||submitting||!state.account||state.connection!=="ready")return;
   const sentImages=draftImages.slice();const draftText=$("message").value;
   dismissedError="";submitting=true;render();
   try{

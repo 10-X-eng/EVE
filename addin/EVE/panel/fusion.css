@@ -68,6 +68,15 @@ html, html body {
   #app .intro { margin-bottom: 12px; }
 }
 .debug-settings { border-top: 1px solid #354340; margin-top: 12px; padding-top: 12px; }
+.account-menu { max-height:calc(100% - 70px); overflow-y:auto; }
+.update-settings { border-top:1px solid #354340; padding-top:12px; font-size:11px; color:#b9d7c8; }
+.update-settings p { font-size:11px; line-height:1.5; color:#a6b6b0; margin:8px 0; }
+.update-banner { flex-shrink:0; padding:10px 18px; background:#26372e; border-bottom:1px solid #3a5746; color:#d5e5dc; font-size:11px; line-height:1.5; }
+.update-banner strong, .update-banner span { display:block; }
+.update-banner span { color:#b0c5b8; font-size:10px; }
+.update-actions { display:flex; align-items:center; gap:12px; margin-top:6px; }
+.update-actions button { padding:2px 0; background:none; border:0; color:#b8e6cd; font-size:11px; text-decoration:underline; }
+.update-actions #dismiss-update { margin-left:auto; width:24px; font-size:19px; text-decoration:none; }
 .debug-toggle { display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 13px; cursor: pointer; }
 .debug-toggle input { width: 18px; height: 18px; accent-color: #a6dbc7; cursor: pointer; }
 .debug-settings p { color: #a6b6b0; font-size: 11px; line-height: 1.5; margin: 9px 0; }
@@ -90,6 +99,11 @@ html, html body {
 .attach-button svg { width:18px; height:18px; }
 .send-button { flex-shrink:0; }
 .task-target { margin:0 1px 8px; color:#b9d7c8; font-size:10px; overflow-wrap:anywhere; }
+.tool-activity { display:flex; align-items:center; gap:9px; margin:0 0 9px; padding:9px 11px; border:1px solid #354940; border-radius:10px; background:#1b2623; }
+.tool-activity-mark { flex-shrink:0; color:#a6dbc7; font-size:17px; }
+.tool-activity-copy { min-width:0; }
+#tool-title { display:block; color:#d5e5dc; font-size:11px; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#tool-name { display:block; margin-top:2px; color:#99b3a5; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
 .preference-notice { margin-bottom:8px; color:#dfbf92; font-size:10px; line-height:1.4; }
 .image-drafts { display:flex; gap:10px; padding:12px 14px 4px; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#354642 transparent; }
 .message-images { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }

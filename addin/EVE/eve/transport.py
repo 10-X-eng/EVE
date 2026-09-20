@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+from .version import VERSION as EVE_VERSION
 
 VERSION = "0.153.4"
 
@@ -137,7 +138,7 @@ class Transport:
         self._reader.start()
         self._log("runtime.started")
         try:
-            self.request("initialize", {"clientInfo": {"name": "eve", "title": "EVE", "version": "0.1.0"},
+            self.request("initialize", {"clientInfo": {"name": "eve", "title": "EVE", "version": EVE_VERSION},
                                         "capabilities": {"experimentalApi": True}})
             self.notify("initialized", {})
         except Exception:

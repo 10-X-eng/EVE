@@ -4,13 +4,15 @@ Status: implemented prototype. Automated bridge tests and real app-server regist
 
 EVE supplies a small in-process bridge. Codex provides Code Mode, tool calling, authentication, persistent conversations, and the loop that uses tool results to decide what to do next. There is no separate planner or catalog of individual modeling commands.
 
-## Five tools
+## Fusion and chat-image tools
 
 - `fusion_inspect_document`: return an opaque document identity, available products, active workspace, selection, and bounded design summaries when available.
 - `fusion_query_python`: the default for questions and data gathering. Read or search model details, CAM setups, assigned machines, document tools, and accessible local/cloud libraries with generated Python. It uses the same runner and context as execution, without starting a Fusion command.
 - `fusion_api_help`: discover installed Autodesk namespaces and read public API signatures, documentation, and members without invoking methods.
 - `fusion_execute_python`: run an operation through any installed Fusion Python API, including modeling, assemblies, parameters, CAM, and other exposed products.
 - `fusion_capture_viewport`: render the current model view to a bounded PNG, preserving the camera, and deliver it through native Codex image input for visual verification.
+- `list_chat_images`: page through the current conversation's indexed attachments and viewport captures, without loading pixels.
+- `view_chat_image`: reopen an indexed image as native visual input in the active turn. Historical captures are labeled; other conversations and arbitrary files are inaccessible through this tool. These two tools run on the controller worker without invoking Fusion.
 
 Tool descriptions and the current instructions direct EVE to query available machines and tools before choosing them for CAM work, and to query real state rather than ask the user to manually supply it. Queries are read-only by contract, not by a separate sandbox: they share the same in-process Python capabilities. Mutation belongs in the execution tool. Both paths retain document targeting, queued cancellation, captured output/errors, and optional debug logging. Live model tool selection still needs verification.
 

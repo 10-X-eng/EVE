@@ -221,6 +221,90 @@ class ControllerTests(unittest.TestCase):
         self.assertIn(("account/read", {"refreshToken": True}), self.client.calls)
         self.assertFalse(self.urls)
 
+    def test_update_checks_and_download_do_not_interrupt_an_active_turn(self):
+        release = {"version": "0.3.0", "downloadUrl": "https://github.com/10-X-eng/EVE/releases/download/v0.3.0/EVE-0.3.0-windows-x64.zip",
+                   "releaseUrl": "https://github.com/10-X-eng/EVE/releases/tag/v0.3.0"}
+        self.controller.updates.fetch = lambda: release
+        self.controller.dispatch("send", {"text": "Create a bracket"})
+        eventually(lambda: self.controller.turn_id is not None)
+        self.controller.dispatch("checkUpdates")
+        eventually(lambda: self.controller.snapshot()["updateInfo"] is not None)
+        self.assertTrue(self.controller.snapshot()["busy"])
+        self.controller.dispatch("openUpdate", {"page": "download", "url": "https://example.com/ignored"})
+        eventually(lambda: bool(self.urls))
+        self.assertEqual(self.urls, [release["downloadUrl"]])
+        self.assertEqual(self.controller.turn_id, "turn-1")
+        self.controller.updates.fetch = lambda: (_ for _ in ()).throw(OSError("offline"))
+        self.controller.dispatch("checkUpdates")
+        eventually(lambda: "Couldn’t check" in self.controller.snapshot()["updateStatus"])
+        self.assertTrue(self.controller.snapshot()["busy"])
+        self.assertEqual(self.controller.snapshot()["error"], "")
+        self.assertEqual(self.controller.snapshot()["updateInfo"], release)
+        with patch.object(self.controller.downloader, "request") as download:
+            self.controller.dispatch("downloadUpdate", {"url": "https://example.com/ignored"})
+            eventually(lambda: download.called)
+            download.assert_called_once_with(release)
+        self.controller._update_state({"updateDownload": {"state": "ready", "path": str(ROOT / ".cache" / "fixture.zip")}})
+        with patch("eve.controller.open_folder") as open_downloads:
+            self.controller.dispatch("openDownloads", {"path": "ignored"})
+            eventually(lambda: open_downloads.called)
+            open_downloads.assert_called_once_with(ROOT / ".cache")
+        self.assertTrue(self.controller.snapshot()["busy"])
+
+    def test_tool_activity_tracks_overlapping_calls_without_code_or_stale_completions(self):
+        pending = []
+        class Runner:
+            def submit(self, tool, arguments, complete, cancelled):
+                pending.append(complete)
+        self.controller.fusion_tools = Runner()
+        self.controller.dispatch("send", {"text": "Make a bracket"})
+        eventually(lambda: self.controller.turn_id is not None)
+        def call(request_id, title):
+            self.client.on_request(request_id, "item/tool/call", {
+                "threadId": "thread-1", "turnId": self.controller.turn_id,
+                "tool": "fusion_query_python", "arguments": {
+                    "document_id": "fixture", "title": title,
+                    "code": "def run(context):\n    return {'private': 'not UI data'}"}})
+        call("first", "Inspect faces")
+        call("second", "Inspect edges")
+        self.assertEqual(self.controller.snapshot()["activeTools"], [
+            {"name": "fusion_query_python", "title": "Inspect faces"},
+            {"name": "fusion_query_python", "title": "Inspect edges"}])
+        self.client.notify("item/agentMessage/delta", {
+            "threadId": "thread-1", "itemId": "answer", "delta": "Checking"})
+        self.assertEqual(len(self.controller.snapshot()["activeTools"]), 2)
+        pending[1]({"ok": True})
+        self.assertEqual(self.controller.snapshot()["activeTools"][0]["title"], "Inspect faces")
+        self.client.complete()
+        self.assertEqual(self.controller.snapshot()["activeTools"], [])
+        # A delayed callback from the previous turn must not erase the new call.
+        self.controller.state["busy"] = True
+        self.controller.turn_id = "turn-2"
+        call("third", "Measure thickness")
+        pending[0]({"ok": False})
+        self.assertEqual(self.controller.snapshot()["activeTools"][0]["title"], "Measure thickness")
+        self.client.notify("turn/completed", {"threadId": "thread-1", "turn": {"id": "turn-1"}})
+        self.assertTrue(self.controller.snapshot()["busy"])
+        pending[2]({"ok": False})
+        self.assertEqual(self.controller.snapshot()["activeTools"], [])
+        call("fourth", "Check again")
+        self.client.notify("eve/disconnected", {"message": "Runtime closed"})
+        self.assertEqual(self.controller.snapshot()["activeTools"], [])
+
+    def test_tool_activity_clears_when_submission_fails(self):
+        class Runner:
+            def submit(self, *args):
+                raise RuntimeError("Fusion is unavailable")
+        self.controller.fusion_tools = Runner()
+        self.controller.dispatch("send", {"text": "Inspect this"})
+        eventually(lambda: self.controller.turn_id is not None)
+        self.client.on_request("failed", "item/tool/call", {
+            "threadId": "thread-1", "turnId": "turn-1", "tool": "fusion_api_help",
+            "arguments": {"path": "adsk.fusion.Sketch"}})
+        self.assertTrue(any(s["activeTools"] for s in self.snapshots))
+        self.assertEqual(self.controller.snapshot()["activeTools"], [])
+        self.assertFalse(self.client.replies[-1][1]["success"])
+
     def test_debug_menu_toggle_records_failed_code_and_opens_local_folder(self):
         self.controller.dispatch("debugLogging", {"enabled": True})
         eventually(lambda: self.controller.snapshot()["debugLogging"])
@@ -550,8 +634,8 @@ class ControllerTests(unittest.TestCase):
     def test_new_and_resumed_chats_receive_current_tools_and_prompt(self):
         params = thread_start_params(ROOT)
         self.assertEqual({tool["name"] for tool in params["dynamicTools"]},
-                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport"})
-        self.assertNotIn("No tools are available", params["developerInstructions"])
+                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image"})
+        self.assertNotIn("No tools are available", params["baseInstructions"])
         self.client.history = [{"id": "saved-thread", "preview": "Old chat"}]
         self.controller.dispatch("history")
         eventually(lambda: bool(self.controller.snapshot()["history"]))

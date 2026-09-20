@@ -13,16 +13,15 @@ function element() {
     setAttribute(key,value){this.attrs[key]=value;}, focus(){}, click(){},
     showModal(){this.open=true;}, close(){this.open=false;}, removeAttribute(key){delete this[key];}};
 }
-const context = {URLSearchParams, location:{search:''}, window:{},
+const context = {URLSearchParams, File:require('node:buffer').File, atob, Uint8Array, setTimeout, clearTimeout, location:{search:''}, window:{},
   document:{getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);},createElement:element},
   requestAnimationFrame:()=>1};
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(root,'images.js'),'utf8'),context);
 const images = vm.runInContext('EveImages',context);
-assert.equal(images.pasteFiles({items:[{kind:'string',type:'text/plain'}]}).length,0);
 const file={name:'Screenshot.png',type:'image/png',size:100};
-assert.equal(images.pasteFiles({items:[{kind:'file',type:file.type,getAsFile:()=>file}],files:[file]}).length,1);
-assert.equal(images.pasteFiles({items:[],files:[file]})[0],file);
+assert.equal(images.clipboardFile({url:png}).type,'image/png');
+assert.throws(()=>images.clipboardFile({url:'https://example.com/image.png'}),/supported image/);
 for(const url of ['https://example.com/private.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,bad"'])assert.equal(images.imageURL(url),false);
 assert.equal(images.imageURL(png),true);
 const source=fs.readFileSync(path.join(root,'panel.js'),'utf8');
@@ -60,6 +59,35 @@ const submit=()=>elements.get('composer').onsubmit({preventDefault(){}});
   let prevented=false;
   elements.get('message').onpaste({clipboardData:{items:[{kind:'string',type:'text/plain'}]},preventDefault(){prevented=true;}});
   assert.equal(prevented,false,'Ordinary text paste remains native');
+  const beforePaste=run('requests.length');
+  elements.get('message').onpaste({clipboardData:{items:[],types:[]},preventDefault(){prevented=true;}});
+  assert.equal(prevented,true,'An image paste is handled even when Qt exposes no browser File');
+  assert.equal(run('requests.length'),beforePaste+1);
+  assert.equal(run('requests.at(-1).action'),'clipboardImage');
+  const pasteId=run('requests.at(-1).payload.requestId');
+  elements.get('message').value='Do not send before paste completes';
+  await submit();assert.equal(run('requests.length'),beforePaste+1,'Pending native image blocks submit');
+  await context.finishClipboardImage({requestId:'stale',image:{url:png}});
+  assert.equal(run('draftImages.length'),0);
+  await context.finishClipboardImage({requestId:pasteId,image:{url:png}});
+  assert.equal(run('draftImages.length'),1,'Native screenshot uses normal attachment preparation');
+  await context.finishClipboardImage({requestId:pasteId,image:{url:png}});
+  assert.equal(run('draftImages.length'),1,'Duplicate response cannot attach twice');
+  elements.get('image-drafts').children[0].children[1].onclick();
+  context.pasteClipboardImage();
+  const staleId=run('requests.at(-1).payload.requestId');
+  run("state.threadId='other-thread';");
+  await context.finishClipboardImage({requestId:staleId,image:{url:png}});
+  assert.equal(run('draftImages.length'),0,'Paste cannot arrive in another conversation');
+  run("state.threadId='thread';");
+  context.pasteClipboardImage();
+  await context.finishClipboardImage({requestId:run('requests.at(-1).payload.requestId'),error:'Clipboard unavailable'});
+  assert.equal(run('clipboardRequest'),null);
+  assert.equal(run('state.error'),'Clipboard unavailable');
+  assert.equal(elements.get('message').value,'Do not send before paste completes','Paste errors preserve text');
+  const beforeSynthetic=run('requests.length');
+  elements.get('message').onpaste({isTrusted:false,preventDefault(){}});
+  assert.equal(run('requests.length'),beforeSynthetic,'Synthetic events cannot read the clipboard');
   // Removing a thumbnail while decode is pending must not resurrect it.
   images.prepare=()=>new Promise(resolve=>{preparation=resolve;});
   const pending=context.attachImages([file]);

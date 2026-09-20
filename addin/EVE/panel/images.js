@@ -4,12 +4,13 @@ const EveImages = (() => {
   const maxBytes = 1024 * 1024;
   const imageURL = value => typeof value === "string" &&
     /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 1400000;
-  function pasteFiles(clipboard) {
-    if (!clipboard) return [];
-    const items = Array.from(clipboard.items || []);
-    const files = items.filter(item => item.kind === "file" && item.type.startsWith("image/"))
-      .map(item => item.getAsFile()).filter(Boolean);
-    return files.length ? files : Array.from(clipboard.files || []).filter(file => file.type.startsWith("image/"));
+  function clipboardFile(image) {
+    const prefix = "data:image/png;base64,";
+    if (!image || typeof image.url !== "string" || !image.url.startsWith(prefix) || image.url.length > 28000000)
+      throw new Error("The clipboard did not return a supported image.");
+    const bytes = Uint8Array.from(atob(image.url.slice(prefix.length)), c => c.charCodeAt(0));
+    if (bytes.length > 20 * 1024 * 1024) throw new Error("Clipboard image exceeds 20 MiB.");
+    return new File([bytes], "Pasted screenshot.png", {type:"image/png"});
   }
   function read(file) {
     return new Promise((resolve, reject) => {
@@ -55,5 +56,5 @@ const EveImages = (() => {
     if (!fits(url) || !imageURL(url)) throw new Error("This image is still too large. Crop it and paste it again.");
     return {name: String(file.name || "Pasted image").slice(0, 120), url, compressed};
   }
-  return {pasteFiles, prepare, imageURL};
+  return {clipboardFile, prepare, imageURL};
 })();

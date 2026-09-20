@@ -460,6 +460,25 @@ class FusionBridgeTests(unittest.TestCase):
             self.bridge.submit("fusion_api_help", {"path": "adsk.cam.CAM"}, self.results.append, lambda: False)
             self.host.pump()
         self.assertIn("createSetup", self.results[0]["members"])
+        self.assertNotIn("guidance", self.results[0])
+
+    def test_api_help_delivers_scoped_workflow_guidance_without_calling_api(self):
+        def must_not_call(*args):
+            raise AssertionError("API help must not call API methods")
+
+        for path, expected in [("adsk.cam.CAMManager", "libraryManager"),
+                               ("adsk.core.Data", "resumable"),
+                               ("adsk.fusion.Occurrences", "addByInsert")]:
+            with self.subTest(path=path):
+                cls = type(path.split(".")[-1], (), {"get": must_not_call})
+                api = Obj(**{path.split(".")[-1]: cls})
+                with patch.object(bridge.importlib, "import_module", return_value=api):
+                    self.bridge.submit("fusion_api_help", {"path": path}, self.results.append, lambda: False)
+                    self.host.pump()
+                self.assertTrue(self.results[-1]["ok"])
+                self.assertEqual(self.results[-1]["path"], path)
+                self.assertIn(expected, self.results[-1]["guidance"])
+                self.assertIn("get", self.results[-1]["members"])
 
     def test_shutdown_cancels_pending_operations(self):
         self.operation()

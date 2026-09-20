@@ -6,9 +6,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>EVE · Your engineering partner</title>
   <link rel="stylesheet" href="style.css?v=2">
-  <link rel="stylesheet" href="fusion.css?v=11">
-  <script src="images.js?v=1" defer></script>
-  <script src="panel.js?v=12" defer></script>
+  <link rel="stylesheet" href="fusion.css?v=13">
+  <script src="images.js?v=2" defer></script>
+  <script src="panel.js?v=15" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -23,6 +23,14 @@
     <section id="account-menu" class="account-menu" aria-label="Account settings" hidden>
       <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
       <button id="logout" class="secondary-button" hidden>Sign out</button>
+      <div class="update-settings">
+        <span id="installed-version"></span>
+        <p id="update-status" role="status"></p>
+        <button id="check-updates" class="secondary-button">Check for updates</button>
+        <button id="menu-update" class="secondary-button" hidden>What’s new</button>
+        <p id="download-status" role="status" hidden></p>
+        <button id="menu-download" class="secondary-button" hidden>Download update</button>
+      </div>
       <div class="debug-settings">
         <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
         <p id="debug-note">Off by default. When on, saves code, tool results, and errors locally. Logs may contain design details.</p>
@@ -38,6 +46,10 @@
       <button id="history-more" class="secondary-button" hidden>Load older conversations</button>
     </section>
     <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
+    <aside id="update-banner" class="update-banner" aria-label="EVE update" hidden>
+      <div><strong id="update-title"></strong><span id="update-hint">Download to Downloads, then close Fusion and run the installer.</span></div>
+      <div class="update-actions"><button id="download-update">Download update</button><button id="update-notes">What’s new</button><button id="dismiss-update" aria-label="Dismiss update notice" title="Remind me next time EVE starts">×</button></div>
+    </aside>
     <main id="scroll-area">
       <section id="runtime-setup" class="sign-in-card runtime-setup" hidden>
         <span class="eyebrow">LET'S GET CONNECTED</span><h2>Codex needs attention</h2>
@@ -74,6 +86,10 @@
     </main>
     <footer class="composer-area">
       <div id="task-target" class="task-target" role="status" hidden></div>
+      <div id="tool-activity" class="tool-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <span class="tool-activity-mark" aria-hidden="true">⌘</span>
+        <div class="tool-activity-copy"><span id="tool-title"></span><span id="tool-name"></span></div>
+      </div>
       <div id="preference-notice" class="preference-notice" hidden></div>
       <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Dismiss error">×</button></div>
       <div id="reconnect-row" hidden><button id="reconnect" class="secondary-button">Reconnect EVE</button></div>

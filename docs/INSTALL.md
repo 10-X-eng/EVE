@@ -1,8 +1,8 @@
 # Install EVE for Autodesk Fusion
 
-EVE 0.1.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion, an internet connection, and a ChatGPT account with Codex access. Each complete package includes Codex; no separate Python, Node.js, API key, or EVE account is required.
+EVE 0.2.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion, an internet connection, and a ChatGPT account with Codex access. Each complete package includes Codex; no separate Python, Node.js, API key, or EVE account is required.
 
-Download the package for your computer from the [EVE releases page](https://github.com/10-X-eng/EVE/releases): `EVE-0.1.0-windows-x64.zip` or `EVE-0.1.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+Download the package for your computer from the [EVE releases page](https://github.com/10-X-eng/EVE/releases): `EVE-0.2.0-windows-x64.zip` or `EVE-0.2.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
 ## Install on Windows
 
@@ -13,7 +13,7 @@ Download the package for your computer from the [EVE releases page](https://gith
 5. Click **EVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Click **Sign in with ChatGPT**, finish in your browser, and return to Fusion. Existing EVE sign-in is checked automatically.
 
-To verify the download, run `Get-FileHash .\EVE-0.1.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+To verify the download, run `Get-FileHash .\EVE-0.2.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
 ## Install on macOS
 
@@ -25,7 +25,7 @@ To verify the download, run `Get-FileHash .\EVE-0.1.0-windows-x64.zip -Algorithm
 5. Click **EVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Click **Sign in with ChatGPT**, finish in your browser, and return to Fusion. Existing EVE sign-in is checked automatically.
 
-To verify the download, run `shasum -a 256 EVE-0.1.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+To verify the download, run `shasum -a 256 EVE-0.2.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
 ## First conversation
 
@@ -40,6 +40,12 @@ Open a design and start with: **“Inspect this document and summarize its compo
 A running task keeps its starting document and selection. If you switch documents, pending Fusion calls wait until you return. There is one active conversation per Fusion instance.
 
 ## Update or reload
+
+Starting with EVE 0.2.0, EVE checks the public GitHub releases on startup and every 12 hours while running. A notice appears when a newer complete package is available for your platform, including preview releases. Use **Check for updates** in the account menu to check immediately, including when you are signed out.
+
+Choose **Download update** to save the ZIP directly into your Downloads folder. EVE shows progress and verifies its SHA-256 before showing **Open Downloads**. Extract that ZIP, close Fusion, and run the included installer. Downloads use unique filenames so existing files are preserved. EVE does not install updates into a running Fusion session. Network failures do not interrupt your task; retry from the menu.
+
+Users of 0.1.0 must install 0.2.0 manually once to get these notices. You can also use **Watch → Custom → Releases** on the GitHub repository for release announcements.
 
 For a packaged update, close Fusion and install the new complete package. The installer preserves the previous managed add-in under `EVE-install-backups` beside the `AddIns` folder: `%APPDATA%\Autodesk\Autodesk Fusion 360\API` on Windows, `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API` on macOS. Sign-in, history, and preferences are kept separately.
 

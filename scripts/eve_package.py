@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "addin" / "EVE"))
 from eve.transport import host_target  # noqa: E402
 
-VERSION = "0.1.0"
+from eve.version import VERSION  # noqa: E402
 PLATFORM_LABELS = {"x86_64-pc-windows-msvc": "windows-x64", "aarch64-apple-darwin": "macos-arm64"}
 
 

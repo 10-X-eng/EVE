@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ADDINS="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
-MARKER="EVE 0.1.0"
+MARKER="EVE managed installation"
 
 fail() {
   printf 'Installation did not finish. %s\n' "$1" >&2

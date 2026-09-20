@@ -10,7 +10,7 @@ EVE writes and runs Python through Fusion's installed API. It can inspect your a
 
 Sign in with your **ChatGPT account** to use its Codex access. The Windows and macOS packages include the runtime, so you can get started without a separate Python, Node.js, or Codex installation. No API key or separate EVE account is required.
 
-> **Preview 0.1.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.2.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What EVE can do
 
@@ -28,10 +28,13 @@ Sign in with your **ChatGPT account** to use its Codex access. The Windows and m
 - **Paste reference images.** Use **Ctrl+V** (Windows) or **⌘V** (macOS) in the message box, or **Attach images**, to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
 - **Images during a task.** Send an image with text, on its own, or as a correction while EVE is already working. Up to four PNG, JPEG, or WebP images can accompany each message.
 - **Visual verification.** EVE can capture the model viewport and inspect the image alongside API results to check what it has made.
+- **Revisit earlier pictures.** EVE can list and reopen saved attachments and viewport captures from the same chat. Images indexed by this version remain available when that chat is reopened; older captures are identified as historical rather than current model state.
 
 ### Stay in control of the conversation
 
 - **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
+- **See tool activity.** A compact indicator shows EVE's current Fusion or saved-image tool and its operation title, including waiting status and overlapping calls.
+- **Get notified about updates.** EVE checks for new releases on startup and every 12 hours while running. Download the right package directly to Downloads, with progress and checksum verification, then install when you are ready. The account menu also has **Check for updates**.
 - **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
 - **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
 - **Return to old chats.** Browse and search local conversation history, reopen a previous session, and continue where you left off.
@@ -62,7 +65,7 @@ The account menu includes a remembered **Debug logging** switch and **Open logs 
 
 Get the complete Windows package from [EVE Releases](https://github.com/10-X-eng/EVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `EVE-0.1.0-windows-x64.zip` package:
+With an `EVE-0.2.0-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -73,7 +76,7 @@ With an `EVE-0.1.0-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `EVE-0.1.0-macos-arm64.zip` from [EVE Releases](https://github.com/10-X-eng/EVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `EVE-0.2.0-macos-arm64.zip` from [EVE Releases](https://github.com/10-X-eng/EVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install EVE.command`, `SHA256SUMS`, and the `EVE` folder.
 2. Save your work and quit Fusion.
@@ -106,7 +109,7 @@ Fusion inspection, API help, Python operations, and viewport capture
 Results returned to the conversation
 ```
 
-Codex handles ChatGPT authentication, model access, inference, and persistent conversations. EVE connects that conversation to five Fusion tools: document inspection, Python queries, Python execution, installed API help, and viewport capture. Runtime communication stays off Fusion's main thread; document operations run on the main thread through Autodesk's supported event mechanism.
+Codex handles ChatGPT authentication, model access, inference, and persistent conversations. EVE connects that conversation to five Fusion tools—document inspection, Python queries, Python execution, installed API help, and viewport capture—and two tools for listing and reopening saved chat images. Runtime communication stays off Fusion's main thread; document operations run on the main thread through Autodesk's supported event mechanism.
 
 Modeling commands request grouped Undo through Fusion's command transactions. Errors return concrete recovery guidance, and oversized results return bounded previews so the model can narrow a query without repeating a modifying operation just to recover its output. The bridge also includes cancellation and document-target checks.
 

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 START_HERE = {
     ".exe": (
-        "EVE 0.1.0 - Windows preview\n\n"
+        f"EVE {VERSION} - Windows preview\n\n"
         "1. Extract the entire zip into a folder.\n"
         "2. Save your work and close Fusion.\n"
         "3. Double-click Install EVE.exe and choose Install EVE.\n"
@@ -32,7 +32,7 @@ START_HERE = {
         "Updates preserve old add-in files under API\\EVE-install-backups.\n"
     ),
     "": (
-        "EVE 0.1.0 - macOS preview (Apple silicon)\n\n"
+        f"EVE {VERSION} - macOS preview (Apple silicon)\n\n"
         "1. Extract the entire zip into a folder.\n"
         "2. Save your work and quit Fusion.\n"
         "3. Open Terminal, type: bash  (with a space), drag \"Install EVE.command\" into the window, and press Return.\n"

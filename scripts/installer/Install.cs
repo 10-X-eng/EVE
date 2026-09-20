@@ -114,7 +114,7 @@ class Installer : Form
             Directory.CreateDirectory(Path.GetDirectoryName(target));
             File.Copy(Within(source, relative), target, true);
         }
-        File.WriteAllText(Path.Combine(staging, "eve-install-marker.txt"), "EVE 0.1.0");
+        File.WriteAllText(Path.Combine(staging, "eve-install-marker.txt"), "EVE managed installation");
         if (Directory.Exists(destination))
         {
             Directory.CreateDirectory(backupRoot);

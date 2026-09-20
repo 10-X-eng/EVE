@@ -1,20 +1,23 @@
-EVE's first preview brings a ChatGPT-powered engineering assistant into Autodesk Fusion on Windows and macOS.
+# EVE 0.2.0 — Images, tool activity, and updates
 
-## Download and install
+This update fixes screenshot paste in Fusion and adds saved chat image lookup, visible tool activity, and update notifications with verified downloads.
 
-- **Windows x64:** download **EVE-0.1.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install EVE.exe**.
-- **macOS (Apple silicon):** download **EVE-0.1.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install EVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
+## What changed
 
-Reopen Fusion, enable EVE in Scripts and Add-ins if needed, and sign in with ChatGPT.
+- **Screenshot paste works through the native clipboard.** Windows users have confirmed the fix for issue #1. Plain text paste and file attachments continue to work. The macOS clipboard implementation still needs live confirmation.
+- **Revisit pictures from a chat.** EVE can list and reopen indexed attachments and historical viewport captures, including after restarting and reopening a conversation. Older, unindexed pictures need reattaching.
+- **See which tool is active.** The composer shows the current Fusion or saved-image tool and operation title, including waiting and overlapping calls.
+- **A shorter core prompt.** Detailed API recipes are returned when relevant, keeping the main instructions focused on the task.
+- **Update notifications and downloads.** EVE checks on startup and every 12 hours while running. Download the appropriate package to Downloads with progress and SHA-256 verification, then install when ready. The account menu provides a manual check.
+- **Windows and Apple silicon Mac packages.** Both packages must build and pass verification before the release is published.
 
-Each ZIP includes the Codex runtime, installer, and installation guide. You do not need a separate Python, Node.js, Codex installation, or API key. GitHub's **Source code** downloads do not contain the installer or runtime.
+## Update or install
 
-## Included
+- **Windows x64:** download **EVE-0.2.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install EVE.exe**.
+- **macOS (Apple silicon):** download **EVE-0.2.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install EVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
 
-- Python-driven modeling, document queries, CAM inspection, and assembly workflows through Fusion's API.
-- Automatic selection context and a pinned task document.
-- Reference images through paste or the attachment button, plus viewport capture for verification.
-- Streaming chat, mid-task steering, session history, and saved model/effort preferences.
-- Fusion API help, web search, and optional local debug logs.
+Users of 0.1.0 must install this update manually once to receive future in-app update notices. Existing sign-in, chat history, preferences, and cached images are stored separately and preserved by the installer. Start a new conversation once after upgrading to register the new image tools.
 
-These are unsigned previews. Live Fusion verification is ongoing on both platforms; save your design before trying generated changes. Each download's SHA-256 checksum is included as a separate asset.
+Each ZIP includes the Codex runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer. EVE downloads updates on request and does not replace files while Fusion is running.
+
+These are unsigned previews. Live Fusion verification is ongoing; see the repository's verification notes. Each package's SHA-256 checksum is included as a separate release asset.
