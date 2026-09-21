@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>STEVE · Your engineering partner</title>
+  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="fusion.css?v=16">
+  <script src="images.js?v=2" defer></script>
+  <script src="panel.js?v=20" defer></script>
+</head>
+<body>
+  <div id="app" class="app signed-out">
+    <header class="topbar">
+      <div class="brand"><img src="mark.svg" alt="" width="32" height="32"><div><span class="wordmark">STEVE<span class="beta">EARLY ACCESS</span></span><span class="brand-subtitle">Your engineering partner</span></div></div>
+      <div class="header-actions">
+        <button id="history-button" class="icon-button" title="Chat history" aria-label="Chat history" aria-expanded="false" aria-controls="history-panel"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6M12 7v5l3 2"/></svg></button>
+        <button id="new-chat" class="icon-button" title="New conversation" aria-label="New conversation"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button id="account-button" class="icon-button" title="Account" aria-label="Account settings" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg></button>
+      </div>
+    </header>
+    <section id="account-menu" class="account-menu" aria-label="Account settings" hidden>
+      <label class="provider-label" for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="ollama">Ollama (local)</option></select>
+      <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
+      <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="local-refresh" class="secondary-button">Refresh models</button> <button id="local-help" class="secondary-button">Local setup</button></div>
+      <button id="logout" class="secondary-button" hidden>Sign out</button>
+      <div class="update-settings">
+        <span id="installed-version"></span>
+        <p id="update-status" role="status"></p>
+        <button id="check-updates" class="secondary-button">Check for updates</button>
+        <button id="menu-update" class="secondary-button" hidden>What’s new</button>
+        <p id="download-status" role="status" hidden></p>
+        <button id="menu-download" class="secondary-button" hidden>Download update</button>
+      </div>
+      <div class="debug-settings">
+        <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
+        <p id="debug-note">Off by default. When on, saves code, tool results, and errors locally. Logs may contain design details.</p>
+        <button id="open-logs" class="secondary-button">Open logs folder</button>
+      </div>
+    </section>
+    <section id="history-panel" class="history-panel" aria-label="Chat history" hidden>
+      <div class="history-heading"><div><span class="eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>Your conversations</h2></div><button id="history-close" class="icon-button" aria-label="Close chat history">×</button></div>
+      <p class="history-note">Saved on this computer</p>
+      <label class="sr-only" for="history-search">Search conversations</label><input id="history-search" class="history-search" type="search" placeholder="Find a conversation…" autocomplete="off">
+      <p id="history-empty" class="history-empty">Your conversations will appear here after your first message.</p>
+      <div id="history-list" class="history-list"></div>
+      <button id="history-more" class="secondary-button" hidden>Load older conversations</button>
+    </section>
+    <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
+    <aside id="update-banner" class="update-banner" aria-label="STEVE update" hidden>
+      <div><strong id="update-title"></strong><span id="update-hint">Download to Downloads, then close Fusion and run the installer.</span></div>
+      <div class="update-actions"><button id="download-update">Download update</button><button id="update-notes">What’s new</button><button id="dismiss-update" aria-label="Dismiss update notice" title="Remind me next time STEVE starts">×</button></div>
+    </aside>
+    <main id="scroll-area">
+      <section id="runtime-setup" class="sign-in-card runtime-setup" hidden>
+        <span class="eyebrow">LET'S GET CONNECTED</span><h2>Codex needs attention</h2>
+        <p>STEVE couldn't start its included Codex runtime. Install or repair STEVE with the complete STEVE package for your computer, then reconnect.</p>
+        <button id="repair-steve" class="primary-button">STEVE installation guide ↗</button>
+        <button id="install-codex" class="text-button">Official Codex download &amp; setup ↗</button>
+        <span class="sign-in-note">The full STEVE package includes its required runtime. Installing the desktop app alone doesn't repair STEVE.</span>
+      </section>
+      <section id="welcome" class="welcome">
+        <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="crosshair crosshair-one">+</div><div class="crosshair crosshair-two">+</div><img src="mark.svg" width="74" height="74" alt=""><span class="art-label">IDEA → POSSIBILITY</span></div>
+        <span class="eyebrow hero-eyebrow">ENGINEERING & VISUALIZATION EXPERT</span>
+        <h1>Good ideas.<br>A little <em>guidance.</em></h1>
+        <p class="intro">A second set of eyes for your next idea.<br>Let's work through it, together.</p>
+        <section id="sign-in-card" class="sign-in-card">
+          <div class="card-heading"><span class="connection-dot"></span><span id="sign-in-heading">Your tools. Your AI.</span></div>
+          <p id="sign-in-description">Connect your account and bring your thinking partner into Fusion.</p>
+          <label class="sr-only" for="welcome-provider">AI provider</label><select id="welcome-provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="ollama">Ollama (local)</option></select>
+          <button id="login" class="primary-button">Sign in with ChatGPT <span aria-hidden="true">↗</span></button>
+          <div id="login-wait" hidden><span class="small-spinner"></span><span>Finish signing in in your browser</span></div>
+          <span id="grok-login-note" class="sign-in-note" hidden>If the browser shows a code for Grok Build, you don't need to copy it. STEVE completes sign-in automatically. Return to Fusion after approving access.</span>
+          <div id="device-info" hidden><span>Enter this code in your browser</span><strong id="device-code"></strong></div>
+          <button id="device-login" class="text-button">Use a device code instead</button>
+          <button id="cancel-login" class="text-button" hidden>Cancel sign-in</button>
+          <button id="refresh-account" class="text-button" hidden>I've signed in — check again</button>
+          <div id="local-links" hidden><button id="install-ollama" class="text-button">Install Ollama ↗</button><button id="local-setup" class="text-button">Local setup ↗</button></div>
+          <span id="sign-in-note" class="sign-in-note">Uses your subscription's Codex access</span>
+        </section>
+        <div class="suggestions">
+          <span class="eyebrow">A PLACE TO START</span>
+          <button class="suggestion" data-prompt="Create a new component with a parametric 60 mm by 40 mm plate, 5 mm thick. Add four 5 mm mounting holes with centers 8 mm from each adjacent edge. Inspect the current document first and preserve existing geometry."><span class="suggestion-icon">⌑</span><span>Make a parametric part<small>Turn an idea into geometry</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion document and summarize its products, components, parameters, and current selection."><span class="suggestion-icon">⌘</span><span>Understand this document<small>Inspect what you're working on</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion workspace and available APIs. Explain what you can do here, including modeling, assemblies, or manufacturing where supported."><span class="suggestion-icon">◇</span><span>Explore what's possible<small>Work across Fusion's tools</small></span><span class="suggestion-arrow">↗</span></button>
+        </div>
+      </section>
+      <section id="conversation" class="conversation" aria-label="Conversation" hidden></section>
+      <div id="thinking" class="thinking" role="status" hidden><span></span><span></span><span></span><label>STEVE is working</label></div>
+    </main>
+    <footer class="composer-area">
+      <button id="goal-strip" class="goal-strip" type="button" aria-label="Manage current goal" hidden><span aria-hidden="true">◎</span><span id="goal-strip-title"></span><span id="goal-strip-status"></span></button>
+      <div id="task-target" class="task-target" role="status" hidden></div>
+      <div id="tool-activity" class="tool-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <span class="tool-activity-mark" aria-hidden="true">⌘</span>
+        <div class="tool-activity-copy"><span id="tool-title"></span><span id="tool-name"></span></div>
+      </div>
+      <div id="preference-notice" class="preference-notice" hidden></div>
+      <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Dismiss error">×</button></div>
+      <div id="reconnect-row" hidden><button id="reconnect" class="secondary-button">Reconnect STEVE</button></div>
+      <form id="composer" class="composer">
+        <div id="image-drafts" class="image-drafts" aria-label="Attached images" hidden></div>
+        <div id="image-hint" class="sr-only" role="status" hidden></div>
+        <input id="image-files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <label class="sr-only" for="message">Message STEVE</label>
+        <textarea id="message" rows="1" maxlength="32000" placeholder="What are you working on?" aria-describedby="composer-note image-hint"></textarea>
+        <div class="composer-bottom">
+          <div class="generation-options">
+            <div class="model-wrap"><span class="model-spark" aria-hidden="true">✧</span><label class="sr-only" for="model">Model</label><select id="model"><option value="">Account default</option></select></div>
+            <div class="effort-wrap"><label class="sr-only" for="effort">Reasoning effort</label><select id="effort" title="Reasoning effort"><option value="">Default</option></select></div>
+          </div>
+          <div class="composer-actions">
+            <button id="goal-button" type="button" class="attach-button" title="Set or manage a goal · /goal" aria-label="Set or manage a goal">◎</button>
+            <button id="attach-images" type="button" class="attach-button" title="Attach images · Ctrl+V to paste" aria-label="Attach images"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9m-6 12 8-8"/></svg></button>
+            <button id="send" class="send-button" type="submit" title="Send message" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
+            <button id="stop" class="send-button stop-button" type="button" title="Stop response" aria-label="Stop response" hidden><span></span></button>
+          </div>
+        </div>
+      </form>
+      <div class="footer-meta"><span class="status"><span id="status-dot" class="status-dot"></span><span id="status" role="status">Starting STEVE</span></span><span id="composer-note">Fusion tools <span class="info-mark" title="STEVE can inspect documents and run Python through Fusion's installed APIs.">ⓘ</span></span></div>
+    </footer>
+  </div>
+  <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
+  <dialog id="goal-dialog" class="goal-dialog" aria-labelledby="goal-heading">
+    <div class="goal-heading"><div><span class="eyebrow">KEEP WORKING TOWARD AN OUTCOME</span><h2 id="goal-heading">Your goal</h2></div><button id="goal-close" type="button" class="icon-button" aria-label="Close goal controls">×</button></div>
+    <p id="goal-summary"></p><p id="goal-usage" class="goal-note"></p><p id="goal-target-note" class="goal-note"></p>
+    <div class="goal-actions"><button id="goal-pause" type="button" class="secondary-button">Pause</button><button id="goal-resume" type="button" class="secondary-button">Resume</button><button id="goal-clear" type="button" class="text-button">Clear goal</button></div>
+    <form id="goal-form">
+      <label for="goal-objective">Objective</label><textarea id="goal-objective" rows="4" maxlength="4000" required placeholder="Create a mounting bracket and verify its dimensions…"></textarea>
+      <label for="goal-budget">Token budget <span class="goal-note">(optional)</span></label><input id="goal-budget" type="number" min="1" max="9007199254740991" step="1" placeholder="No token limit">
+      <p class="goal-note">STEVE continues until the goal is complete, paused, blocked, or limited. Editing the objective starts fresh usage tracking. Stop also pauses the goal.</p>
+      <button id="goal-save" type="submit" class="primary-button">Start goal</button>
+    </form>
+    <details class="goal-help"><summary>Slash commands</summary><p><code>/goal &lt;objective&gt;</code> — create or replace<br><code>/goal</code> — status and controls<br><code>/goal edit</code> — edit objective and budget<br><code>/goal pause</code> — pause work<br><code>/goal resume</code> — continue<br><code>/goal clear</code> — remove goal, keep chat</p></details>
+  </dialog>
+</body>
+</html>

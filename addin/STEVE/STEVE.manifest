@@ -1,0 +1,10 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "author": "10-X-eng",
+  "description": {"": "STEVE — Your engineering partner inside Autodesk Fusion. Work alongside your design with ChatGPT, Grok, or local Ollama."},
+  "version": "0.3.0",
+  "runOnStartup": true,
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

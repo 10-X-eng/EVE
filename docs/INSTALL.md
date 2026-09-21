@@ -1,0 +1,87 @@
+# Install STEVE for Autodesk Fusion
+
+STEVE 0.3.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
+
+Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.3.0-windows-x64.zip` or `STEVE-0.3.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+
+## Install on Windows
+
+1. Right-click the zip and choose **Extract All**. Keep the entire extracted folder together, including `Install STEVE.exe`, `SHA256SUMS`, and the `STEVE` folder.
+2. Save your work and close Fusion.
+3. Open **Install STEVE.exe** and click **Install STEVE**. Installation is for your current Windows account and does not need administrator access. This preview's installer is unsigned.
+4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
+5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
+6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+
+To verify the download, run `Get-FileHash .\STEVE-0.3.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+
+## Install on macOS
+
+1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
+2. Save your work and quit Fusion.
+3. Open Terminal, type `bash ` (with a trailing space), drag **Install STEVE.command** from Finder into the Terminal window, and press Return. Installation is for your current macOS account and does not need administrator access.
+   Double-clicking **Install STEVE.command** also works, but because this preview is not signed, macOS blocks it the first time. Open **System Settings > Privacy & Security**, choose **Open Anyway** next to the message about the installer, and confirm.
+4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
+5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
+6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+
+To verify the download, run `shasum -a 256 STEVE-0.3.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+
+## First conversation
+
+STEVE 0.3.0 adds **Grok / X** in the **AI provider** selector. Select it, choose **Sign in with X / Grok**, and complete xAI authentication. If the browser shows a code for Grok Build after approval, return to Fusion; STEVE completes sign-in automatically without copying it. You can use **Use a device code instead** if the browser callback cannot reach Fusion. Link your X account in Grok account settings if needed; xAI determines your account's access. Switching providers opens that provider's history and saved model choice and is disabled during a task.
+
+Open a design and start with: **“Inspect this document and summarize its components and parameters.”** Then ask for the change you want, including dimensions and units. Save the design before trying generated operations.
+
+- Select geometry before sending to give STEVE context about “this.”
+- Use the paperclip beside Send, or paste into the message box (Ctrl+V on Windows, ⌘V on macOS), to attach reference images.
+- Choose a model and effort beside Send. STEVE remembers those preferences.
+- Send another message to steer a running task. **Stop** cancels pending work; a long native Fusion operation may need to finish first.
+- Use the history icon to reopen saved conversations.
+
+A running task keeps its starting document and selection. If you switch documents, pending Fusion calls wait until you return. There is one active conversation per Fusion instance.
+
+## Local Ollama
+
+1. Install [Ollama](https://ollama.com/download) and start its app. STEVE connects to `http://127.0.0.1:11434` on your computer; no account or API key is needed.
+2. Download a model with tool support. For a modest GPU, a starting point is `ollama pull gemma4:e2b-it-qat`. Model quality and speed depend on the model and your hardware.
+3. Give the model at least 8K context. To keep the original model unchanged, save a plain-text file named `Modelfile` containing:
+
+   ```text
+   FROM gemma4:e2b-it-qat
+   PARAMETER num_ctx 8192
+   ```
+
+   In the folder containing that file, run `ollama create steve-gemma4:8k -f Modelfile`. This reuses the downloaded weights. The saved setting matters: a temporary context override during model preload does not carry over to Ollama's Responses API.
+4. In STEVE, choose **Ollama (local)** under **AI provider**, then select your configured model. Use **Refresh models** in the account menu after downloading or configuring models. **Local setup** opens these instructions.
+
+Only downloaded models that advertise tool calling appear. Models with vision support can receive attachments and viewport images; text-only models cannot. The Ollama provider excludes cloud models and has no web search; STEVE can still query documentation from Fusion's installed API. Fusion's own cloud/data operations and STEVE's update checks can still use the internet.
+
+STEVE checks the allocated context before each turn and reserves space for the reply. Small context allocations produce setup instructions instead of silently truncating the task. Ollama conversations and model preferences are separate from ChatGPT and Grok. Start with small, inspectable tasks; a small local model will not have the same capability as a frontier model.
+
+## Update or reload
+
+STEVE checks the public GitHub releases on startup and every 12 hours while running. A notice appears when a newer complete package is available for your platform, including preview releases. Use **Check for updates** in the account menu to check immediately, including when you are signed out.
+
+Choose **Download update** to save the ZIP directly into your Downloads folder. STEVE shows progress and verifies its SHA-256 before showing **Open Downloads**. Extract that ZIP, close Fusion, and run the included installer. Downloads use unique filenames so existing files are preserved. STEVE does not install updates into a running Fusion session. Network failures do not interrupt your task; retry from the menu.
+
+For the first release under the STEVE name, download the package manually from the releases page. Earlier installations cannot discover this update after the repository rename. Subsequent STEVE releases use the built-in update notice. You can also use **Watch → Custom → Releases** on the GitHub repository for release announcements.
+
+For a packaged update, close Fusion and install the new complete package. The installer preserves the previous managed add-in under `STEVE-install-backups` beside the `AddIns` folder: `%APPDATA%\Autodesk\Autodesk Fusion 360\API` on Windows, `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API` on macOS. When upgrading a previous managed installation, its add-in folder is replaced by `STEVE`. On the first run, STEVE transfers the previous data folder to its new name before opening any accounts or starting Codex. Sign-ins, chat history, goals, preferences, and cached images are preserved; stored chat paths and provider IDs are updated. An untouched data backup remains beside the new data folder as `STEVE-data-backup-<id>`. Keep enough free disk space for that backup. If both data folders already exist, STEVE stops and keeps both rather than merging or overwriting them. Manual/source installations must be removed from Fusion's add-in list separately; automatic discovery only recognizes previous managed installations.
+
+For a development checkout, use **Stop**, then **Run** in Scripts and Add-ins after source changes. Start a new conversation after tool definitions change.
+
+## Troubleshooting
+
+- **STEVE is not listed:** use the add-in folder selection in Scripts and Add-ins to select the `STEVE` folder under `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns` (Windows) or `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns` (macOS), then Run.
+- **macOS says the installer cannot be opened:** run it through Terminal as described above, or allow it under System Settings > Privacy & Security.
+- **Installer reports an unmanaged STEVE folder:** preserve or rename your existing manually installed folder before installing. The installer will not overwrite it.
+- **Sign-in does not finish:** return to STEVE and choose **Check again**, or use the device-code sign-in option. Use an account with access to the selected provider: Codex access for ChatGPT, or Grok access for xAI.
+- **Codex setup needed:** extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
+- **An operation fails:** enable **Debug logging** in the account menu, reproduce the problem, then choose **Open logs folder**. Review logs for private design information before sharing them.
+
+STEVE's local sign-in, history, preferences, image cache, and optional logs are under `%LOCALAPPDATA%\STEVE` on Windows and `~/Library/Application Support/STEVE` on macOS. These chats do not sync to the ChatGPT website.
+
+## Uninstall
+
+Close Fusion and remove only the `STEVE` folder under the `AddIns` folder named above. Local account data and history remain under STEVE's data folder; remove that separate folder only if you also want to erase STEVE's saved local data.

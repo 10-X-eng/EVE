@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.cache/
+dist/
+artifacts/
+addin/STEVE/runtime/
+addin/STEVE/.vscode/
+.pytest_cache/
