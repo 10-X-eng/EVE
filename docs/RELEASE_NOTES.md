@@ -1,28 +1,24 @@
-# STEVE 0.3.0 — Grok / X and local Ollama
+# STEVE 0.4.0 — Claude subscription support
 
-Choose ChatGPT, Grok / X, or local Ollama to work with STEVE inside Autodesk Fusion. This release adds provider selection while preserving existing ChatGPT conversations and settings.
+Use your Claude subscription in Autodesk Fusion through the official Claude Code client. Select **Claude (experimental)** alongside ChatGPT, Grok / X, and local Ollama.
 
 ## What changed
 
-- **Meet STEVE.** Updated name, S logo, toolbar, installers, and release packages. Existing managed installations and saved data transfer to the new folders with backups.
+- **Use your existing Claude sign-in.** Install Claude Code and run `claude auth login` in a terminal outside Fusion. STEVE detects the account automatically and provides installation and sign-in guidance when needed. Credentials stay with Claude Code.
+- **See model versions and effort choices.** The picker shows resolved names such as Opus 5.5 and Haiku 4.5, preserves context and usage-credit labels, and exposes supported reasoning levels.
+- **Refresh after Claude updates.** The account menu shows the installed Claude Code version. **Check connection** refreshes that version and the model catalog without resetting your chat.
+- **Keep STEVE's tools and conversations.** Claude supports Fusion tool calls, streaming, images, steering, saved history, and native goal controls through the existing conversation engine. Signed replay data is isolated by chat.
+- **Handle failures clearly.** Interrupted or incomplete responses do not dispatch unfinished tool batches. Claude errors reach the chat, and cancellation stops the owned process. The adapter prevents additional upstream generations within a single model request.
 
-- **Manage long-running goals.** `/goal <objective>`, `/goal`, `/goal edit`, `/goal pause`, `/goal resume`, and `/goal clear` use Codex's native goal lifecycle. The ◎ control shows status, token usage, optional budgets, and editing controls. Stop pauses the goal, automatic turns retain the Fusion target, and saved goals stay paused until explicitly resumed.
-- **See STEVE's Python.** Compact, expandable cards show submitted Fusion scripts and their running, waiting, or completion state without replacing the code pane as replies stream. Scripts appear when submitted, rather than token by token.
-- **Sign in with X / Grok.** Select Grok / X on the sign-in card or in the account menu and approve access in your browser. STEVE completes sign-in automatically; there is no need to copy the code the browser may show for Grok Build. A separate device-code flow is also available.
-- **Choose Grok models and effort.** Available models, supported reasoning levels, and defaults come from xAI's live catalog. STEVE remembers your selected model and effort per model.
-- **Use STEVE's Fusion tools with Grok.** The integration supports Python operations, design queries, image inputs, streaming, steering, and saved chat image lookup through the bundled runtime.
-- **Keep provider settings separate.** Each provider has its own sign-in, conversation history, and preferences. Switching is disabled during a task or sign-in.
-- **Run a local model with Ollama.** No sign-in is required. STEVE discovers downloaded models with tool support, checks their actual context allocation, and supports images when the model has vision. Local setup guidance includes a small Gemma configuration for modest GPUs. Web search is unavailable with this provider.
+Claude support is experimental. Web search is not connected for this provider; Fusion's installed API documentation remains available. Claude Code is installed separately. Anthropic controls model access, subscription limits, and any usage-credit or extra-usage charges. No API key or separate STEVE account is required.
 
-xAI determines account eligibility and access. No API key or separate STEVE account is required. Browser sign-in is user-confirmed on Windows, and automated checks cover the runtime/tool loop, resumed conversations, and effort forwarding. Live Grok modeling and macOS sign-in still need verification; see [verification status](https://github.com/10-X-eng/STEVE/blob/main/docs/VERIFICATION.md).
+Live Haiku and Sonnet checks completed tool rounds against a simulated document. Automated checks cover the protocol, images, steering, history, goals, and cancellation. Native Fusion workflows and macOS Claude usage still need live confirmation; see [verification status](https://github.com/10-X-eng/STEVE/blob/main/docs/VERIFICATION.md).
 
 ## Update or install
 
-- **Windows x64:** download **STEVE-0.3.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install STEVE.exe**.
-- **macOS (Apple silicon):** download **STEVE-0.3.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install STEVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
+- **Windows x64:** download **STEVE-0.4.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install STEVE.exe**.
+- **macOS (Apple silicon):** download **STEVE-0.4.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install STEVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
 
-Download this transition release manually: older installations cannot discover it after the repository rename. The installer replaces the previous managed add-in folder with STEVE. On first run, STEVE transfers sign-ins, chat history, goals, preferences, and cached images into its new data folder, retaining a backup. Future updates appear in STEVE's account menu.
-
-Each ZIP includes the Codex runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer. STEVE downloads updates on request and does not replace files while Fusion is running.
+Existing STEVE users can use **Check for updates** once this release is published. The installer preserves saved chats and preferences. Each ZIP includes the conversation runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer.
 
 These are unsigned previews. Both platform packages must pass automated build and installation verification before publication. Each package's SHA-256 checksum is included as a separate release asset.

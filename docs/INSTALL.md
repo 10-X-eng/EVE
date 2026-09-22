@@ -1,8 +1,8 @@
 # Install STEVE for Autodesk Fusion
 
-STEVE 0.3.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
+STEVE 0.4.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
 
-Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.3.0-windows-x64.zip` or `STEVE-0.3.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.4.0-windows-x64.zip` or `STEVE-0.4.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
 ## Install on Windows
 
@@ -11,9 +11,9 @@ Download the package for your computer from the [STEVE releases page](https://gi
 3. Open **Install STEVE.exe** and click **Install STEVE**. Installation is for your current Windows account and does not need administrator access. This preview's installer is unsigned.
 4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `Get-FileHash .\STEVE-0.3.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+To verify the download, run `Get-FileHash .\STEVE-0.4.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
 ## Install on macOS
 
@@ -23,13 +23,13 @@ To verify the download, run `Get-FileHash .\STEVE-0.3.0-windows-x64.zip -Algorit
    Double-clicking **Install STEVE.command** also works, but because this preview is not signed, macOS blocks it the first time. Open **System Settings > Privacy & Security**, choose **Open Anyway** next to the message about the installer, and confirm.
 4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `shasum -a 256 STEVE-0.3.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+To verify the download, run `shasum -a 256 STEVE-0.4.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
 ## First conversation
 
-STEVE 0.3.0 adds **Grok / X** in the **AI provider** selector. Select it, choose **Sign in with X / Grok**, and complete xAI authentication. If the browser shows a code for Grok Build after approval, return to Fusion; STEVE completes sign-in automatically without copying it. You can use **Use a device code instead** if the browser callback cannot reach Fusion. Link your X account in Grok account settings if needed; xAI determines your account's access. Switching providers opens that provider's history and saved model choice and is disabled during a task.
+STEVE 0.4.0 adds **Claude (experimental)** through your external Claude Code sign-in; see [Claude setup](#claude-subscription-experimental). **Grok / X** remains available in the **AI provider** selector. Select it, choose **Sign in with X / Grok**, and complete xAI authentication. If the browser shows a code for Grok Build after approval, return to Fusion; STEVE completes sign-in automatically without copying it. You can use **Use a device code instead** if the browser callback cannot reach Fusion. Link your X account in Grok account settings if needed; xAI determines your account's access. Switching providers opens that provider's history and saved model choice and is disabled during a task.
 
 Open a design and start with: **“Inspect this document and summarize its components and parameters.”** Then ask for the change you want, including dimensions and units. Save the design before trying generated operations.
 
@@ -40,6 +40,19 @@ Open a design and start with: **“Inspect this document and summarize its compo
 - Use the history icon to reopen saved conversations.
 
 A running task keeps its starting document and selection. If you switch documents, pending Fusion calls wait until you return. There is one active conversation per Fusion instance.
+
+## Claude subscription (experimental)
+
+1. Install the official [Claude Code client](https://code.claude.com/docs/en/setup) for your computer.
+2. Open a terminal outside Fusion and run `claude auth login`. Choose your Claude subscription account and finish sign-in there. Use `claude auth status` to verify it.
+3. In STEVE, select **Claude (experimental)** under **AI provider**. Existing sign-in is detected automatically. After signing in or changing accounts, click **Check connection**.
+4. Choose a model and, where supported, an effort level. Model labels include their resolved version (for example, **Opus 5** or **Haiku 4.5**). The account menu shows your installed **Claude Code version**. After updating Claude Code, **Check connection** refreshes both that version and the model catalog without restarting STEVE. Start with a document inspection before asking for changes.
+
+STEVE uses the unmodified Claude Code client and its own account store. It does not copy credentials or run an embedded sign-in flow. Sign out with `claude auth logout` in a terminal; this affects other apps using that same Claude Code account. STEVE reads the CLI's model picker without starting a generation. Model availability, usage credits, and extra usage remain controlled by Anthropic and your account. [Anthropic's current SDK guidance](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan) says `claude -p` and third-party app usage draw from subscription usage limits; this is not unlimited access.
+
+This experimental integration supports STEVE's Fusion tools, streamed replies, images, steering, history, and goals. Claude web search is not connected yet; installed Fusion API documentation remains available. STEVE uses a conservative 200K conversation window. It keeps Claude conversations and signed replay data under its local `claude-runtime` directory, separate from the other providers; these may contain design information and do not appear in the Claude website's chat history. The transport adapts [Hermes's MIT-licensed Claude subscription client](https://github.com/NousResearch/hermes-plugin-claude-subscription-directsdk); attribution ships with the add-in.
+
+If setup fails, update with `claude update`, verify `claude auth status`, then check the connection again. STEVE searches PATH and the standard native install directory (`~/.local/bin`). For a custom installation, set `STEVE_CLAUDE_COMMAND` to the executable before launching Fusion; `STEVE_CLAUDE_CONFIG_DIR` selects a separately CLI-managed account directory. API keys and alternate Anthropic backend overrides are rejected on this subscription path, with the conflicting variable names shown in the UI. The adapter relies on version-sensitive Claude Code replay behavior; Windows Claude Code 2.1.260 has been exercised locally. Native Fusion and macOS confirmation remain preview checks.
 
 ## Local Ollama
 

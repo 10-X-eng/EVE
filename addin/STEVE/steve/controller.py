@@ -17,6 +17,7 @@ from .debug_log import DebugLog
 from .preferences import ProviderChoice
 from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
+from .claude_transport import ClaudeTransport
 from .grok_auth import login_url_allowed
 from .updates import UpdateChecker
 from .downloads import UpdateDownloader
@@ -129,11 +130,12 @@ def python_activity(tool, arguments, identifier):
 
 
 class Controller:
-    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport):
+    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport, claude_factory=ClaudeTransport):
         self.publish = publish
         self.factory = transport_factory
         self.grok_factory = grok_factory
         self.ollama_factory = ollama_factory
+        self.claude_factory = claude_factory
         self.open_browser = open_browser
         self.fusion_tools = fusion_tools
         self.debug = debug_log or DebugLog(data_home())
@@ -164,7 +166,7 @@ class Controller:
                       "taskDocument": None, "waitingForFusion": False, "waitingReason": "",
                       "goal": None, "goalBusy": False, "goalNotice": "", "goalHasTarget": False,
                       "messages": [], "busy": False, "loginPending": False, "device": None,
-                      "accountChecked": False, "localStatus": "", "error": "", "status": "Checking your account", "version": VERSION,
+                      "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
                       "runtimeIssue": False, "debugLogging": self.debug.enabled,
@@ -402,6 +404,7 @@ class Controller:
                 "steve": install_guide_url(),
                 "codex": "https://learn.chatgpt.com/docs/quickstart?setup=app",
                 "ollama": "https://ollama.com/download",
+                "claude": "https://code.claude.com/docs/en/setup",
                 "local": "https://github.com/10-X-eng/STEVE/blob/main/docs/INSTALL.md#local-ollama",
             }
             destination = destinations.get(payload.get("page"))
@@ -491,9 +494,9 @@ class Controller:
                               goal=None, goalBusy=False, goalNotice="", goalHasTarget=False, taskDocument=None,
                               history=[], historyCursor=None, historyLoading=False, runtimeIssue=False,
                               account=None, models=[], accountChecked=False, loginPending=False, device=None,
-                              localStatus="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
+                              localStatus="", providerVersion="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
         self.emit()
-        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory}.get(self.state["provider"], self.factory)
+        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory, "claude": self.claude_factory}.get(self.state["provider"], self.factory)
         client = factory(lambda method, params: self._notification(method, params) if self.client is client else None)
         self.client = client
         client.debug = self.debug
@@ -731,7 +734,8 @@ class Controller:
                 self.thread_id = self.turn_id = None
                 self._task_context = None
                 self.state.update(threadId=None, messages=[], history=[], historyCursor=None, goal=None, goalHasTarget=False)
-            self.state.update(account=public, accountChecked=True, localStatus=result.get("localStatus", ""))
+            self.state.update(account=public, accountChecked=True, localStatus=result.get("localStatus", ""),
+                              providerVersion=result.get("providerVersion", ""))
             if account:
                 self.login_id = None
                 if self.state["loginPending"] or changed:
@@ -828,7 +832,7 @@ class Controller:
         self.emit()
 
     def _login(self, device=False):
-        if self.state["provider"] == "ollama":
+        if self.state["provider"] in ("ollama", "claude"):
             self._refresh_account(refresh_models=True)
             return
         if self.state["loginPending"]:
