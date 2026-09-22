@@ -101,10 +101,20 @@ install_payload() {
     cp "$destination/steve-upgrade.json" "$staging/steve-upgrade.json" || fail "The upgrade record could not be preserved."
   fi
   local replaced="${previous:-$destination}"
+  # Fusion can reopen after the outer wait; do not swap a live add-in.
+  if pgrep -x "Autodesk Fusion" > /dev/null; then
+    fail "Fusion reopened during installation. Quit Fusion and retry."
+  fi
   if [[ -d "$replaced" ]]; then
     mkdir -p "$backup_root" || fail "The backup directory could not be created."
     [[ ! -L "$backup_root" ]] || fail "Installation folders must not be filesystem links."
     mv "$replaced" "$backup" || fail "The previous add-in could not be backed up."
+  fi
+  if pgrep -x "Autodesk Fusion" > /dev/null; then
+    if [[ -d "$backup" && ! -d "$replaced" ]]; then
+      mv "$backup" "$replaced" || fail "Fusion reopened and the old add-in could not be restored; check the backup folder."
+    fi
+    fail "Fusion reopened during installation. Quit Fusion and retry."
   fi
   if ! mv "$staging" "$destination"; then
     if [[ -d "$backup" && ! -d "$replaced" ]]; then
@@ -121,6 +131,21 @@ if [[ $# -eq 3 && "$1" == "--test-install" ]]; then
     exit 0
   fi
   exit 1
+fi
+
+# Detached by STEVE after the user chooses Install update; no Terminal window.
+if [[ $# -eq 2 && "$1" == "--auto-install" ]]; then
+  result="$2"
+  package="$(cd "$(dirname "$0")" && pwd)"
+  printf 'Waiting for Fusion to close. Save your work and quit Fusion.\n' > "$result"
+  while pgrep -x "Autodesk Fusion" > /dev/null; do sleep 2; done
+  if (install_payload "$package" "$ADDINS" >> "$result" 2>&1); then
+    printf 'Installed. Reopen Fusion to use the update.\n' > "$result"
+  else
+    printf 'Installation failed; the previous installation was retained if the replacement failed.\n' >> "$result"
+    exit 1
+  fi
+  exit 0
 fi
 
 package="$(cd "$(dirname "$0")" && pwd)"

@@ -129,7 +129,9 @@ class UpdateDownloader:
         progress(None)
         try:
             path = download_package(release, progress, self._closed.is_set)
-            result = {"state": "ready", "version": release["version"], "path": str(path)}
+            with path.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            result = {"state": "ready", "version": release["version"], "path": str(path), "sha256": digest}
         except Exception as exc:
             result = {"state": "error", "version": release["version"],
                       "message": str(exc) if isinstance(exc, ValueError) else "Download failed. Check your connection and available disk space, then try again."}

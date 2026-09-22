@@ -41,6 +41,7 @@
         <p id="update-status" role="status"></p>
         <button id="check-updates" class="secondary-button">Check for updates</button>
         <button id="menu-update" class="secondary-button" hidden>What’s new</button>
+        <button id="menu-update-now" class="secondary-button" hidden>Update STEVE</button>
         <p id="download-status" role="status" hidden></p>
         <button id="menu-download" class="secondary-button" hidden>Download update</button>
       </div>
@@ -60,8 +61,8 @@
     </section>
     <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
     <aside id="update-banner" class="update-banner" aria-label="STEVE update" hidden>
-      <div><strong id="update-title"></strong><span id="update-hint">Download to Downloads, then close Fusion and run the installer.</span></div>
-      <div class="update-actions"><button id="download-update">Download update</button><button id="update-notes">What’s new</button><button id="dismiss-update" aria-label="Dismiss update notice" title="Remind me next time STEVE starts">×</button></div>
+      <div><strong id="update-title"></strong><span id="update-hint">Download and install without a terminal.</span></div>
+      <div class="update-actions"><button id="update-steve-now">Update STEVE</button><button id="download-update">Download only</button><button id="update-notes">What’s new</button><button id="dismiss-update" aria-label="Dismiss update notice" title="Remind me next time STEVE starts">×</button></div>
     </aside>
     <main id="scroll-area">
       <section id="runtime-setup" class="sign-in-card runtime-setup" hidden>
@@ -134,6 +135,11 @@
     </footer>
   </div>
   <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
+  <dialog id="update-confirm" class="goal-dialog" aria-labelledby="update-confirm-heading">
+    <h2 id="update-confirm-heading">Install STEVE update?</h2>
+    <p>STEVE will download the newest release for your platform, verify it, and stage it. Wait for “Update queued,” then save your work and quit Fusion; the installer will replace only your managed STEVE add-in, keep a backup, and leave your account data intact. Reopen Fusion afterward. Fusion will not be closed automatically.</p>
+    <div class="goal-actions"><button id="confirm-update" type="button" class="primary-button">Download and install after Fusion closes</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
+  </dialog>
   <dialog id="goal-dialog" class="goal-dialog" aria-labelledby="goal-heading">
     <div class="goal-heading"><div><span class="eyebrow">KEEP WORKING TOWARD AN OUTCOME</span><h2 id="goal-heading">Your goal</h2></div><button id="goal-close" type="button" class="icon-button" aria-label="Close goal controls">×</button></div>
     <p id="goal-summary"></p><p id="goal-usage" class="goal-note"></p><p id="goal-target-note" class="goal-note"></p>

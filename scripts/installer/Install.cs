@@ -165,11 +165,18 @@ class Installer : Form
         else if (File.Exists(Path.Combine(destination, "steve-upgrade.json")))
             File.Copy(Path.Combine(destination, "steve-upgrade.json"), Path.Combine(staging, "steve-upgrade.json"), true);
         string replaced = previous ?? destination;
+        if (Process.GetProcessesByName("Fusion360").Length != 0)
+            throw new IOException("Fusion reopened during installation. Close it and retry.");
         if (Directory.Exists(replaced))
         {
             Directory.CreateDirectory(backupRoot);
             PlainDirectory(backupRoot);
             Directory.Move(replaced, backup);
+        }
+        if (Process.GetProcessesByName("Fusion360").Length != 0)
+        {
+            if (Directory.Exists(backup) && !Directory.Exists(replaced)) Directory.Move(backup, replaced);
+            throw new IOException("Fusion reopened during installation. Close it and retry.");
         }
         try { Directory.Move(staging, destination); }
         catch
@@ -187,6 +194,26 @@ class Installer : Form
         {
             try { InstallPayload(args[1], args[2]); return 0; }
             catch (Exception error) { File.WriteAllText(Path.Combine(args[1], "installer-test-error.txt"), error.ToString()); return 1; }
+        }
+        if (args.Length == 2 && args[0] == "--auto-install")
+        {
+            string result = args[1];
+            try
+            {
+                File.WriteAllText(result, "Waiting for Fusion to close. Save your work and quit Fusion.");
+                while (Process.GetProcessesByName("Fusion360").Length != 0)
+                    System.Threading.Thread.Sleep(2000);
+                string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                           "Autodesk", "Autodesk Fusion 360", "API", "AddIns");
+                InstallPayload(AppDomain.CurrentDomain.BaseDirectory, root);
+                File.WriteAllText(result, "Installed. Reopen Fusion to use the update.");
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(result, "Installation failed: " + error.Message);
+                return 1;
+            }
         }
         Application.EnableVisualStyles();
         Application.Run(new Installer());

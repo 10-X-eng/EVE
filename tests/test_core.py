@@ -389,6 +389,67 @@ class ControllerTests(unittest.TestCase):
             open_downloads.assert_called_once_with(ROOT / ".cache")
         self.assertTrue(self.controller.snapshot()["busy"])
 
+    def test_install_update_requires_matching_verified_download_and_stages_on_worker(self):
+        self.controller.state["updateInfo"] = {"version": "0.5.0"}
+        with patch("steve.controller.stage_update") as stage, patch("steve.controller.launch_update") as launch:
+            self.controller.dispatch("installUpdate")
+            eventually(lambda: "Download" in self.controller.snapshot()["updateStatus"])
+            stage.assert_not_called()
+            self.controller.state["updateDownload"] = {"state": "ready", "version": "0.5.0", "path": "/verified.zip", "sha256": "a" * 64}
+            stage.return_value = Path("/staged")
+            self.controller.dispatch("installUpdate")
+            eventually(lambda: launch.called)
+            self.assertEqual(stage.call_args.args[:2], (Path("/verified.zip"), "0.5.0"))
+            self.assertEqual(stage.call_args.args[3], ROOT / "addin")
+            self.assertEqual(stage.call_args.kwargs["expected_digest"], "a" * 64)
+            launch.assert_called_once_with(Path("/staged"))
+            self.assertIn("quit Fusion", self.controller.snapshot()["updateStatus"])
+            self.assertIn("Restart Fusion", self.controller.snapshot()["updateStatus"])
+
+    def test_one_click_update_downloads_then_installs_only_matching_verified_release(self):
+        release = {"version": "0.5.0"}
+        self.controller.state["updateInfo"] = release
+        with patch.object(self.controller.downloader, "request") as download, \
+             patch("steve.controller.stage_update", return_value=Path("/staged")) as stage, \
+             patch("steve.controller.launch_update") as launch:
+            self.controller.dispatch("updateSteve")
+            eventually(lambda: download.called)
+            download.assert_called_once_with(release)
+            self.assertEqual(self.controller.snapshot()["autoInstallVersion"], "0.5.0")
+            self.controller._update_state({"updateDownload": {"state": "ready", "version": "0.4.0", "path": "/wrong.zip", "sha256": "b" * 64}})
+            self.assertFalse(launch.called)
+            self.controller._update_state({"updateDownload": {"state": "ready", "version": "0.5.0", "path": "/verified.zip", "sha256": "a" * 64}})
+            eventually(lambda: launch.called)
+            self.assertEqual(stage.call_args.args[0], Path("/verified.zip"))
+            self.assertIsNone(self.controller.snapshot()["autoInstallVersion"])
+
+    def test_one_click_update_does_not_queue_install_after_download_failure(self):
+        self.controller.state["updateInfo"] = {"version": "0.5.0"}
+        with patch.object(self.controller.downloader, "request"), patch("steve.controller.launch_update") as launch:
+            self.controller.dispatch("updateSteve")
+            eventually(lambda: self.controller.snapshot()["autoInstallVersion"] == "0.5.0")
+            self.controller._update_state({"updateDownload": {"state": "error", "version": "0.5.0", "message": "checksum failed"}})
+            self.assertIsNone(self.controller.snapshot()["autoInstallVersion"])
+            launch.assert_not_called()
+
+    def test_staging_does_not_block_stop_on_controller_worker(self):
+        started, finish = threading.Event(), threading.Event()
+        self.controller.state["updateInfo"] = {"version": "0.5.0"}
+        self.controller.state["updateDownload"] = {"state": "ready", "version": "0.5.0", "path": "/verified.zip", "sha256": "a" * 64}
+        def stage(*args, **kwargs):
+            started.set()
+            finish.wait(2)
+            return Path("/staged")
+        try:
+            with patch("steve.controller.stage_update", side_effect=stage), patch("steve.controller.launch_update"):
+                self.controller.dispatch("installUpdate")
+                self.assertTrue(started.wait(2))
+                self.controller.dispatch("stop")
+                eventually(lambda: self.controller._commands.empty())
+                self.assertTrue(self.controller.state["updateInstalling"])
+        finally:
+            finish.set()
+
     def test_tool_activity_tracks_code_and_overlapping_calls_without_stale_completions(self):
         pending = []
         class Runner:

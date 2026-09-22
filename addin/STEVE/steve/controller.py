@@ -22,6 +22,7 @@ from .grok_auth import login_url_allowed
 from .updates import UpdateChecker
 from .runtime_updates import RuntimeUpdater
 from .downloads import UpdateDownloader
+from .app_update import stage_update, launch_update, previous_install_result
 from .version import VERSION
 from .goals import goal_command, validate_goal
 from .images import ImageStore, validate_images, MAX_STORED_IMAGE_BYTES
@@ -169,6 +170,8 @@ class Controller:
                       "messages": [], "busy": False, "loginPending": False, "device": None,
                       "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
+                      "updateInstalling": False, "updateInstallReady": False, "autoInstallVersion": None,
+                      "updateInstallFailure": previous_install_result(self.debug.folder.parent, VERSION),
                       "codexVersion": "", "codexManaged": False, "codexUpdateInfo": None,
                       "codexUpdateChecking": False, "codexUpdateStatus": "", "codexUpdating": False, "codexPendingVersion": "", "codexRestarting": False,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
@@ -181,11 +184,37 @@ class Controller:
         self.runtime_updater = RuntimeUpdater(self._update_state, home=self.debug.folder.parent)
 
     def _update_state(self, changes):
+        queue_install = False
         with self._lock:
             if self._closed:
                 return
             self.state.update(changes)
+            download = changes.get("updateDownload")
+            version = self.state["autoInstallVersion"]
+            if (version and download and download.get("version") == version):
+                if download.get("state") == "ready" and download.get("sha256"):
+                    queue_install = True
+                    self.state["autoInstallVersion"] = None
+                elif download.get("state") == "error":
+                    self.state["autoInstallVersion"] = None
         self.emit()
+        if queue_install:
+            self.dispatch("installUpdate")
+
+    def _prepare_update(self, download, version):
+        try:
+            package = stage_update(Path(download["path"]), version, self.debug.folder.parent,
+                                   Path(__file__).resolve().parents[2], expected_digest=download["sha256"])
+            with self._lock:
+                if self._closed:
+                    return
+            launch_update(package)
+        except Exception as exc:
+            self._update_state({"updateInstalling": False,
+                                "updateStatus": f"Couldn’t prepare installation: {exc}"})
+        else:
+            self._update_state({"updateInstalling": False, "updateInstallReady": True,
+                                "updateStatus": "Update queued. Save your work and quit Fusion to apply it. Wait for installation to finish, then Restart Fusion to use the new STEVE version."})
 
     def start_update_checks(self):
         self.updates.request()
@@ -395,6 +424,41 @@ class Controller:
                 release = self.state.get("updateInfo")
             if release:
                 self.downloader.request(release)
+        elif action == "updateSteve":
+            with self._lock:
+                release = self.state.get("updateInfo")
+                download = self.state.get("updateDownload")
+                if not release or self.state["updateInstallReady"] or self.state["updateInstalling"] or self.state["autoInstallVersion"]:
+                    return
+                version = release["version"]
+                if download and download.get("state") == "downloading" and download.get("version") != version:
+                    self.state["updateStatus"] = "Wait for the current download, then try again."
+                    self.emit()
+                    return
+                ready = download and download.get("state") == "ready" and download.get("version") == version and download.get("sha256")
+                if not ready:
+                    self.state["autoInstallVersion"] = version
+            if ready:
+                self.dispatch("installUpdate")
+            else:
+                self.downloader.request(release)
+        elif action == "installUpdate":
+            with self._lock:
+                release = self.state.get("updateInfo")
+                download = self.state.get("updateDownload")
+                if self.state["updateInstalling"] or self.state["updateInstallReady"]:
+                    return
+                if (not release or not download or download.get("state") != "ready" or
+                        download.get("version") != release.get("version") or not download.get("sha256")):
+                    self.state["updateStatus"] = "Download and verify the latest update first."
+                    self.emit()
+                    return
+                self.state["updateInstalling"] = True
+                self.state["updateInstallFailure"] = None
+                self.state["updateStatus"] = "Preparing the update…"
+            self.emit()
+            threading.Thread(target=self._prepare_update, args=(dict(download), release["version"]),
+                             name="STEVE-Install-Preparation", daemon=True).start()
         elif action == "openDownloads":
             with self._lock:
                 download = self.state.get("updateDownload")
