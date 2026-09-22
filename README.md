@@ -125,7 +125,7 @@ STEVE checks for a saved sign-in before opening a new login. Model availability 
 
 The preview supports **Windows x64** and **macOS on Apple silicon**, and requires Fusion and an internet connection. The installers are currently unsigned. They install per user, preserve the previous managed installation during updates, and refuse to replace a STEVE folder they did not install.
 
-Startup checks the bundled Codex runtime and supporting files. Missing or incompatible components produce setup help with STEVE repair instructions and the official Codex setup link. Repair the complete STEVE package to restore its bundled runtime.
+Codex updates independently of STEVE. The account menu shows the running Codex version and checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
 
 To reload an updated development add-in, **Stop STEVE, then Run it again** in Scripts and Add-ins. Start a **New conversation** after changes to tool definitions.
 
@@ -181,7 +181,7 @@ python3 scripts/build_package.py
 python3 scripts/verify_package.py
 ```
 
-Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. The bundled runtime is version-pinned per platform and verified against its SHA-256 digest. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from the account menu without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
 
 Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
 

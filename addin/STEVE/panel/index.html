@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css?v=2">
   <link rel="stylesheet" href="fusion.css?v=16">
   <script src="images.js?v=2" defer></script>
-  <script src="panel.js?v=22" defer></script>
+  <script src="panel.js?v=24" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -26,6 +26,16 @@
       <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="local-refresh" class="secondary-button">Refresh models</button> <button id="local-help" class="secondary-button">Local setup</button></div>
       <div id="claude-controls" hidden><p id="claude-version" class="sign-in-note"></p><p class="sign-in-note">Claude Code manages your account. Use <code>claude auth login</code> or <code>claude auth logout</code> in a terminal outside Fusion.</p><button id="claude-refresh" class="secondary-button">Check connection</button></div>
       <button id="logout" class="secondary-button" hidden>Sign out</button>
+      <button id="chatgpt-refresh" class="secondary-button" hidden>Refresh models</button>
+      <div class="update-settings">
+        <span id="codex-version">Codex runtime</span>
+        <p id="codex-update-status" role="status"></p>
+        <button id="check-codex-updates" class="secondary-button">Check Codex updates</button>
+        <button id="update-codex" class="secondary-button" hidden>Update Codex</button>
+        <button id="restart-steve" class="secondary-button">Restart STEVE</button>
+        <p class="sign-in-note">Codex updates independently of STEVE. After downloading, use Restart STEVE here to apply the update and reopen your chat. Fusion stays open.</p>
+        <button id="bundled-codex" class="text-button" hidden>Use bundled Codex</button>
+      </div>
       <div class="update-settings">
         <span id="installed-version"></span>
         <p id="update-status" role="status"></p>

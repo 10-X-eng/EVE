@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import platform
 import queue
+import re
 import signal
 import subprocess
 import sys
@@ -11,7 +12,8 @@ import threading
 import time
 from .version import VERSION as STEVE_VERSION
 
-VERSION = "0.153.4"
+# Reproducible build baseline, not a restriction on independently updated runtimes.
+VERSION = "0.155.1"
 
 
 class RuntimeUnavailable(RuntimeError):
@@ -40,8 +42,37 @@ def host_target(system=None, machine=None):
     return f"{arch}-unknown-linux-musl"
 
 
+def bundled_runtime():
+    return Path(__file__).resolve().parents[1] / "runtime"
+
+
+def selected_runtime(home=None, target=None):
+    """An atomic pointer selects an independently installed, verified runtime."""
+    folder = Path(home or data_home()) / "runtimes"
+    target = target or host_target()
+    try:
+        selection = json.loads((folder / "active.json").read_text(encoding="utf-8"))
+        name = selection.get("directory", "")
+        if not re.fullmatch(r"codex-[0-9]+\.[0-9]+\.[0-9]+-[a-f0-9]{32}", name):
+            return bundled_runtime()
+        root = folder / name
+        if not root.resolve().is_relative_to(folder.resolve()):
+            return bundled_runtime()
+        runtime_command(root, target)
+        return root
+    except (OSError, ValueError, AttributeError, RuntimeUnavailable):
+        return bundled_runtime()
+
+
+def runtime_version(root=None):
+    try:
+        return json.loads(((root or selected_runtime()) / "steve-runtime.json").read_text(encoding="utf-8"))["version"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+
+
 def runtime_command(root=None, target=None):
-    root = Path(root) if root else Path(__file__).resolve().parents[1] / "runtime"
+    root = Path(root) if root else selected_runtime(target=target)
     target = target or host_target()
     suffix = ".exe" if target.endswith("-windows-msvc") else ""
     manifest = root / "steve-runtime.json"
@@ -55,13 +86,14 @@ def runtime_command(root=None, target=None):
     try:
         metadata = json.loads(manifest.read_text(encoding="utf-8"))
         version = metadata.get("version")
-        package_version = json.loads((root / "codex-package.json").read_text(encoding="utf-8")).get("version")
+        package = json.loads((root / "codex-package.json").read_text(encoding="utf-8"))
+        package_version = package.get("version")
     except (OSError, ValueError, AttributeError) as exc:
         raise RuntimeUnavailable("Codex's package metadata is damaged. Repair STEVE with the complete package.") from exc
-    if version != VERSION or package_version != VERSION:
+    if not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) or package_version != version:
         raise RuntimeUnavailable("This Codex runtime is incompatible with STEVE. Repair STEVE with the complete package.")
-    built_for = metadata.get("target")
-    if built_for and built_for != target:
+    built_for = metadata.get("target") or package.get("target")
+    if (built_for and built_for != target) or package.get("target", target) != target:
         raise RuntimeUnavailable(f"This Codex runtime was built for {built_for}, not this computer ({target}). "
                                  "Install the STEVE package made for your platform.")
     if not suffix and not os.access(executable, os.X_OK):
@@ -123,9 +155,12 @@ class Transport:
         self.home.mkdir(parents=True, exist_ok=True)
         (self.home / "codex").mkdir(exist_ok=True)
         (self.home / "workspace").mkdir(exist_ok=True)
+        root = selected_runtime() if self.command is None else None
+        self.runtime_version = runtime_version(root) if root else ""
+        self.runtime_managed = root is not None and root != bundled_runtime()
         try:
             self.process = subprocess.Popen(
-                self.command or runtime_command(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                self.command or runtime_command(root), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
                 cwd=self.home / "workspace", env=runtime_environment(self.home),
                 **process_options(),

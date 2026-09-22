@@ -64,9 +64,9 @@ def main():
     assert payload_names == expected_names, "Package has missing or obsolete payload files"
     print(f"Complete zip installed; {files} payload files verified against checksums and source", flush=True)
     sys.path.insert(0, str(installed))
-    from steve.transport import Transport
+    from steve.transport import Transport, runtime_command
     from steve.controller import thread_start_params
-    client = Transport(lambda method, params: None, home=scratch / "runtime-home")
+    client = Transport(lambda method, params: None, command=runtime_command(installed / "runtime"), home=scratch / "runtime-home")
     try:
         client.start()
         assert client.request("account/read", {"refreshToken": False}).get("account") is None

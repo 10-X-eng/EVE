@@ -72,6 +72,16 @@ Only downloaded models that advertise tool calling appear. Models with vision su
 
 STEVE checks the allocated context before each turn and reserves space for the reply. Small context allocations produce setup instructions instead of silently truncating the task. Ollama conversations and model preferences are separate from ChatGPT and Grok. Start with small, inspectable tasks; a small local model will not have the same capability as a frontier model.
 
+## Codex updates
+
+Codex can update without a new STEVE release. In the account menu, **Check Codex updates** checks OpenAI's latest stable release for your platform. STEVE also checks automatically on startup and every 12 hours. The menu shows the version currently running.
+
+Choose **Update Codex** to download the complete app-server package into STEVE's local data folder. STEVE verifies OpenAI's SHA-256 digest and tests startup, model discovery, Fusion tool declarations, and the goal protocol before selecting it. This does not sign in or generate a model response. Downloading does not interrupt your current task or overwrite its runtime.
+
+When the menu says the update is ready, finish or pause your task, then click **Restart STEVE** in that same menu. STEVE restarts its conversation engine, reopens your current chat, and refreshes the model catalog. Fusion and the add-in stay open. Saved sign-in, chats, images, and preferences stay in place. **Refresh models** in the ChatGPT account menu can also reload the catalog without resetting your chat. OpenAI controls which models your account can access.
+
+If an updated runtime causes a problem, choose **Use bundled Codex**, then click **Restart STEVE**. The original runtime is preserved. Download failures leave your current runtime selected. These checks cover startup compatibility; they cannot guarantee every behavior of future Codex releases. Independently installed runtimes live in the `runtimes` subdirectory of STEVE's local data folder. Updating a separate Codex CLI or desktop app does not update this copy.
+
 ## Update or reload
 
 STEVE checks the public GitHub releases on startup and every 12 hours while running. A notice appears when a newer complete package is available for your platform, including preview releases. Use **Check for updates** in the account menu to check immediately, including when you are signed out.
@@ -90,7 +100,7 @@ For a development checkout, use **Stop**, then **Run** in Scripts and Add-ins af
 - **macOS says the installer cannot be opened:** run it through Terminal as described above, or allow it under System Settings > Privacy & Security.
 - **Installer reports an unmanaged STEVE folder:** preserve or rename your existing manually installed folder before installing. The installer will not overwrite it.
 - **Sign-in does not finish:** return to STEVE and choose **Check again**, or use the device-code sign-in option. Use an account with access to the selected provider: Codex access for ChatGPT, or Grok access for xAI.
-- **Codex setup needed:** extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
+- **Codex setup needed:** after a Codex update, try **Use bundled Codex**, then **Restart STEVE** in the account menu first. If the bundled runtime is damaged, extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
 - **An operation fails:** enable **Debug logging** in the account menu, reproduce the problem, then choose **Open logs folder**. Review logs for private design information before sharing them.
 
 STEVE's local sign-in, history, preferences, image cache, and optional logs are under `%LOCALAPPDATA%\STEVE` on Windows and `~/Library/Application Support/STEVE` on macOS. These chats do not sync to the ChatGPT website.

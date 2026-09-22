@@ -1,8 +1,11 @@
-# STEVE 0.4.0 — Claude subscription support
+# STEVE 0.4.0 — Claude subscriptions and independent Codex updates
 
 Use your Claude subscription in Autodesk Fusion through the official Claude Code client. Select **Claude (experimental)** alongside ChatGPT, Grok / X, and local Ollama.
 
 ## What changed
+
+- **Update Codex independently.** The account menu shows the running Codex version, checks OpenAI's latest stable release, and downloads verified updates without waiting for a STEVE release. Downloads run alongside your current task; click **Restart STEVE** in the account menu to activate the update and reopen your chat without restarting Fusion. The bundled runtime remains available for recovery.
+- **Refresh OpenAI models.** Refresh the ChatGPT model catalog without resetting your conversation. The packaged Codex baseline is now 0.155.1; newer compatible stable versions can be installed independently.
 
 - **Use your existing Claude sign-in.** Install Claude Code and run `claude auth login` in a terminal outside Fusion. STEVE detects the account automatically and provides installation and sign-in guidance when needed. Credentials stay with Claude Code.
 - **See model versions and effort choices.** The picker shows resolved names such as Opus 5.5 and Haiku 4.5, preserves context and usage-credit labels, and exposes supported reasoning levels.

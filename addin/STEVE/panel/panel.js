@@ -278,7 +278,7 @@ function render() {
 
 function renderControls() {
   renderGoal();
-  const connected=state.connection==="ready";
+  const connected=state.connection==="ready" && !state.codexRestarting;
   const local=state.provider==="ollama";
   const claude=state.provider==="claude";
   const signed=!!state.account && (!(local || claude) || state.models.length>0);
@@ -328,6 +328,20 @@ function renderControls() {
   $("effort").disabled=!signed || state.busy || !!state.goalBusy || !(state.effortOptions||[]).length;
   $("logout").hidden=local || claude || !signed;
   $("logout").disabled=state.busy || !!state.goalBusy;
+  $("chatgpt-refresh").hidden=local || grok || claude;
+  $("chatgpt-refresh").disabled=state.busy || !!state.goalBusy || !connected;
+  $("codex-version").textContent=state.codexVersion?`Codex ${state.codexVersion}`:"Codex runtime";
+  $("codex-update-status").textContent=state.codexPendingVersion?`Codex ${state.codexPendingVersion} is ready. Restart STEVE to use it and refresh models.`:state.codexUpdateStatus||"Checks OpenAI for updates automatically.";
+  $("check-codex-updates").disabled=!!state.codexUpdateChecking || !!state.codexUpdating;
+  $("check-codex-updates").textContent=state.codexUpdateChecking?"Checking…":"Check Codex updates";
+  $("update-codex").hidden=!state.codexUpdateInfo || !!state.codexPendingVersion;
+  $("update-codex").disabled=!!state.codexUpdating;
+  $("update-codex").textContent=state.codexUpdating?"Updating Codex…":state.codexUpdateInfo?`Update Codex to ${state.codexUpdateInfo.version}`:"Update Codex";
+  $("bundled-codex").hidden=!state.codexManaged && !state.codexPendingVersion && !state.runtimeIssue;
+  $("bundled-codex").disabled=!!state.codexUpdating;
+  $("restart-steve").disabled=!!state.busy || !!state.goalBusy || !!state.loginPending || !!state.codexUpdating || !!state.codexRestarting || state.connection==="starting";
+  $("restart-steve").textContent=state.codexRestarting?"Restarting STEVE…":"Restart STEVE";
+  $("restart-steve").title=state.busy || state.goalBusy?"Finish or pause the current task before restarting":"Restart STEVE's conversation engine and reopen this chat";
   $("debug-logging").checked=!!state.debugLogging;
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
@@ -471,6 +485,11 @@ function goalBudget() {
 
 $("login").onclick=()=>state.provider==="ollama"?act("accountRefresh",{refreshModels:true}):act("login");
 $("claude-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
+$("chatgpt-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
+$("check-codex-updates").onclick=()=>act("checkCodexUpdates");
+$("update-codex").onclick=()=>act("updateCodex");
+$("bundled-codex").onclick=()=>act("useBundledCodex");
+$("restart-steve").onclick=()=>act("restartRuntime");
 $("install-claude").onclick=()=>act("setupHelp",{page:"claude"});
 $("goal-button").onclick=()=>openGoal();
 $("goal-strip").onclick=()=>openGoal();

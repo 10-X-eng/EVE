@@ -1,21 +1,21 @@
 """Download and verify the complete pinned Codex app-server package for a platform."""
 import argparse
 import hashlib
-import json
 from pathlib import Path
-import shutil
 import sys
-import tarfile
+import tempfile
 import urllib.request
+from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "addin" / "STEVE"))
 from steve.transport import VERSION, host_target  # noqa: E402
+from steve.runtime_updates import extract_package  # noqa: E402
 
 # SHA-256 digests of the upstream release archives, one per supported platform.
 PACKAGES = {
-    "x86_64-pc-windows-msvc": "69441ca4c8f6197923dc1b70a8aa870ff912b5367347287d021eaca1f3add971",
-    "aarch64-apple-darwin": "90f0467fd03294896204e8856bf969a0691590e8bef78dc2563a264b186f3265",
+    "x86_64-pc-windows-msvc": "fcb5234b13ca915a68a1de1e4bcdcca1c789da5702f2f281733882608570aee7",
+    "aarch64-apple-darwin": "328e5a416bf64f96e3162439c8c39819c164f1a9cff983ca6f09eb3af90bd760",
 }
 
 
@@ -30,14 +30,14 @@ def archive_digest(target):
 
 
 def cached_archive(target):
-    return ROOT / ".cache" / archive_name(target)
+    return ROOT / ".cache" / ("codex-" + VERSION) / archive_name(target)
 
 
 def fetch(target=None):
     target = target or host_target()
     sha256 = archive_digest(target)
     archive = cached_archive(target)
-    archive.parent.mkdir(exist_ok=True)
+    archive.parent.mkdir(parents=True, exist_ok=True)
     if not archive.exists():
         print(f"Downloading Codex {VERSION} for {target}…", flush=True)
         partial = archive.with_suffix(".partial")
@@ -51,20 +51,24 @@ def fetch(target=None):
     if actual != sha256:
         raise RuntimeError("Codex package checksum mismatch; remove the cached archive and retry.")
     destination = ROOT / "addin" / "STEVE" / "runtime"
-    if (destination / "steve-runtime.json").is_file():
-        # Replace an earlier runtime completely so no other platform's files remain.
-        shutil.rmtree(destination)
-    destination.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(archive) as package:
-        package.extractall(destination, filter="data")
-    suffix = ".exe" if target.endswith("-windows-msvc") else ""
-    executable = destination / "bin" / ("codex-app-server" + suffix)
-    if not executable.is_file() or not executable.with_name("codex-code-mode-host" + suffix).is_file():
-        raise RuntimeError("The downloaded package has an unexpected layout.")
-    (destination / "steve-runtime.json").write_text(
-        json.dumps({"version": VERSION, "target": target, "archive": archive.name, "sha256": sha256}, indent=2),
-        encoding="utf-8",
-    )
+    backup = ROOT / ".cache" / ("runtime-before-" + uuid4().hex)
+    if not destination.resolve().is_relative_to(ROOT.resolve()) or not backup.resolve().is_relative_to(ROOT.resolve()):
+        raise RuntimeError("Runtime build paths must remain inside this checkout.")
+    with tempfile.TemporaryDirectory(prefix="runtime-build-", dir=ROOT / ".cache") as staging:
+        candidate = Path(staging) / "runtime"
+        candidate.mkdir()
+        extract_package(archive, candidate, VERSION, target, sha256)
+        if destination.exists():
+            try:
+                destination.rename(backup)
+            except OSError as exc:
+                raise RuntimeError("Stop the local STEVE add-in before replacing its development runtime. The existing runtime was preserved.") from exc
+        try:
+            candidate.rename(destination)
+        except OSError:
+            if backup.exists():
+                backup.rename(destination)
+            raise
     print(f"Verified Codex {VERSION} ({target}): {destination}")
     return destination
 
