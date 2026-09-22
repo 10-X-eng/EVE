@@ -221,6 +221,74 @@ class ControllerTests(unittest.TestCase):
         self.assertIn(("account/read", {"refreshToken": True}), self.client.calls)
         self.assertFalse(self.urls)
 
+    def test_codex_update_does_not_interrupt_current_turn(self):
+        self.controller.dispatch("send", {"text": "Inspect this document"})
+        eventually(lambda: self.controller.turn_id is not None)
+        thread, turn = self.controller.thread_id, self.controller.turn_id
+        release = {"version": "99.0.0"}
+        self.controller.state["codexUpdateInfo"] = release
+        with patch.object(self.controller.runtime_updater, "install") as install:
+            self.controller.dispatch("updateCodex")
+            eventually(lambda: bool(install.call_count))
+            install.assert_called_once_with(release)
+        self.assertEqual((self.controller.thread_id, self.controller.turn_id), (thread, turn))
+        self.assertTrue(self.controller.state["busy"])
+        self.assertFalse(self.client.closed)
+        self.assertFalse(any(method == "turn/interrupt" for method, _ in self.client.calls))
+
+    def test_restart_runtime_restores_idle_chat_and_refreshes_version(self):
+        self.controller.thread_id = "saved-thread"
+        self.controller.state["threadId"] = "saved-thread"
+        self.controller.state["codexPendingVersion"] = "99.0.0"
+        def factory(notify):
+            client = FakeClient(notify)
+            client.runtime_version = "99.0.0"
+            client.runtime_managed = True
+            return client
+        self.controller.factory = factory
+        self.assertTrue(self.controller.dispatch("restartRuntime"))
+        eventually(lambda: not self.controller.state["codexRestarting"])
+        self.assertTrue(self.client.closed)
+        self.assertEqual(self.controller.thread_id, "saved-thread")
+        self.assertEqual(self.controller.state["codexVersion"], "99.0.0")
+        self.assertFalse(self.controller.state["codexPendingVersion"])
+        self.assertEqual(self.controller.state["messages"][0]["text"], "Design a bracket")
+        self.assertTrue(any(method == "model/list" for method, _ in self.controller.client.calls))
+
+    def test_restart_is_rejected_while_work_login_or_download_is_active(self):
+        for flag in ("busy", "goalBusy", "loginPending", "codexUpdating", "codexRestarting"):
+            with self.subTest(flag=flag):
+                self.controller.state[flag] = True
+                self.assertFalse(self.controller.dispatch("restartRuntime"))
+                self.controller.state[flag] = False
+        self.controller._send_queued = True
+        self.assertFalse(self.controller.dispatch("restartRuntime"))
+        self.controller._send_queued = False
+        self.assertFalse(self.client.closed)
+
+    def test_restart_reports_activation_failure_instead_of_claiming_success(self):
+        self.controller.state["codexPendingVersion"] = "99.0.0"
+        self.assertTrue(self.controller.dispatch("restartRuntime"))
+        eventually(lambda: not self.controller.state["codexRestarting"])
+        self.assertIn("did not activate", self.controller.state["error"])
+
+    def test_model_refresh_preserves_chat_and_uses_catalog_capabilities(self):
+        self.controller.thread_id = "saved-chat"
+        self.controller.state["messages"] = [{"role": "user", "text": "Keep my chat"}]
+        original = self.client.request
+        def request(method, params=None, **kwargs):
+            if method == "model/list":
+                return {"data": [{"id": "new-model", "displayName": "New OpenAI model", "inputModalities": ["text"],
+                                  "supportedReasoningEfforts": [{"reasoningEffort": "high"}]}]}
+            return original(method, params, **kwargs)
+        self.client.request = request
+        self.controller.dispatch("accountRefresh", {"refreshModels": True})
+        eventually(lambda: self.controller.state["models"][0]["id"] == "new-model")
+        self.assertFalse(self.controller.state["models"][0]["supportsImages"])
+        self.assertEqual(self.controller.state["models"][0]["efforts"][0]["id"], "high")
+        self.assertEqual(self.controller.thread_id, "saved-chat")
+        self.assertEqual(self.controller.state["messages"][0]["text"], "Keep my chat")
+
     def test_provider_switch_preserves_preferences_and_rejects_stale_events(self):
         def grok_factory(notify):
             client = FakeClient(notify)

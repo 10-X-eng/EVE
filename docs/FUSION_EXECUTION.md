@@ -57,7 +57,7 @@ Live web search is enabled for public Autodesk documentation. Shell, browser aut
 
 The model catalog supplies `supportedReasoningEfforts` and `defaultReasoningEffort`. `turn/start` receives the selected model and effective `effort`; model defaults are sent explicitly to clear previous turn overrides. Local preferences retain the model and a separate effort choice per model, including the account-default option. Model/effort controls are disabled during a running turn; steering does not change them.
 
-Automated tests cover deferred execution, general product access, document switching, cancellation, failure reporting, command transaction flags, API help, output bounds, and keeping the transport responsive during pending work. The actual pinned Codex runtime accepts the controller's tool declarations. These checks do not prove live model creation or broad Autodesk API coverage.
+Automated tests cover deferred execution, general product access, document switching, cancellation, failure reporting, command transaction flags, API help, output bounds, and keeping the transport responsive during pending work. The actual Codex runtime accepts the controller's tool declarations. These checks do not prove live model creation or broad Autodesk API coverage.
 
 The first live checks should create a parametric component, verify dimensions and bodies through the API, undo it once, and exercise a deliberate error followed by a correction. Also inspect an assembly and a manufacturing workspace. Report specific API gaps rather than claiming every Fusion UI feature is supported.
 

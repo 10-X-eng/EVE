@@ -10,6 +10,14 @@ STEVE is a Fusion add-in for Windows x64 and macOS on Apple silicon, with ChatGP
 
 `steve.downloads` streams a requested package to a unique partial file in Downloads, then verifies the published SHA-256 before renaming it to ZIP. Windows uses [SHGetKnownFolderPath](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath) for redirected Downloads folders; macOS uses the current user's Downloads folder. Closing STEVE cancels pending work and removes partial files when the download worker exits. Completed downloads and existing files are preserved. Downloading never extracts a package or starts an installer; the existing installer handles upgrades with Fusion closed.
 
+## Independent Codex updates
+
+`steve.runtime_updates` checks OpenAI's latest stable release and the host's complete app-server asset. It requires the official asset URL, uploaded status, bounded size, and SHA-256 digest from GitHub. Downloads and extraction are bounded, archive links and escaping paths are rejected, and package version/target/layout are verified. A temporary isolated runtime checks initialization, model discovery, thread creation with STEVE's tools/Code Mode, and goal reads without credentials or inference.
+
+A successful update moves into a unique directory under the user's `runtimes` folder and atomically replaces `active.json`. Running processes keep their original files. Selection applies on the next transport startup, including provider changes or reconnects. The account-menu **Restart STEVE** action closes and reconnects the owned conversation transport, refreshes models, and resumes the current saved thread while leaving Fusion and the add-in running. Active/queued tasks, goals, sign-ins, and downloads block this action. A restart verifies that the pending version actually activated, and the updater reads back its saved selection before reporting readiness. It shows the running version separately from the pending version. Recovery clears the selection for the next start; existing runtime directories are retained. Invalid or missing selections use the bundled runtime. Chats and credentials stay in their existing provider homes.
+
+`transport.VERSION` specifies only the reproducible package-build baseline. Runtime validation requires internally consistent metadata and supporting files, not equality with that constant. Build downloads have version-specific cache paths and stage a complete package before replacing the development runtime; the previous directory is preserved under `.cache`. Stop the local add-in before replacing a development runtime. Installed users use the background updater instead.
+
 ## Grok provider
 
 Model discovery reads `capabilities.reasoning_effort` and `capabilities.default_reasoning_effort` from xAI's [model catalog](https://docs.x.ai/developers/rest-api-reference/inference/models). Only levels understood by the bundled runtime are offered; models without capability metadata keep the provider default. Selected effort travels through Codex's turn settings into Responses `reasoning.effort`, including tool continuations and resumed conversations.
@@ -39,7 +47,7 @@ python3 scripts/audit_portability.py
 
 Use `py -3.13` in place of `python3` on Windows. Every script defaults to the platform it runs on: the runtime download, package name, installer, and verification follow `host_target()` in `steve/transport.py`. `fetch_runtime.py --target` downloads another platform's runtime for inspection; packages are built and verified on their own platform.
 
-The runtime download is pinned to Codex 0.153.4 per platform (`x86_64-pc-windows-msvc` and `aarch64-apple-darwin`) and verified with SHA-256. Keep the entire package, including the Code Mode host, resources, and package metadata. `steve-runtime.json` records the version and target, and startup refuses a runtime built for another platform. Code Mode is explicitly enabled, with `core`, `conversation`, and `view` kept as direct-call namespaces.
+The reproducible build baseline is Codex 0.155.1 per platform (`x86_64-pc-windows-msvc` and `aarch64-apple-darwin`) and verified with SHA-256. Keep the entire package, including the Code Mode host, resources, and package metadata. `steve-runtime.json` records the version and target, and startup refuses a runtime built for another platform. Code Mode is explicitly enabled, with `core`, `conversation`, and `view` kept as direct-call namespaces.
 
 The smoke test uses `.cache/smoke-home`; it checks startup, account reads, model discovery, thread creation, and shutdown without signing in or making an inference request. It does not prove that a ChatGPT conversation works.
 
@@ -51,7 +59,7 @@ Toolbar PNGs are committed assets. To change the mark, update the SVG and `scrip
 
 ## GitHub builds and releases
 
-The **Build and release** workflow runs on pushes to `main`, pull requests, and manual dispatch. A Windows job compiles `Install STEVE.exe` and a macOS (Apple silicon) job packages `Install STEVE.command`. Each downloads its checksum-pinned runtime, builds and audits the ZIP, runs Python/JavaScript and installer checks, and verifies an installation of the complete package. Successful builds upload both ZIPs and SHA-256 files as Actions artifacts.
+The **Build and release** workflow runs on pushes to `main`, pull requests, and manual dispatch. A Windows job compiles `Install STEVE.exe` and a macOS (Apple silicon) job packages `Install STEVE.command`. Each downloads its checksum-verified runtime baseline, builds and audits the ZIP, runs Python/JavaScript and installer checks, and verifies an installation of the complete package. Successful builds upload both ZIPs and SHA-256 files as Actions artifacts.
 
 Releases are automatic: push a new version to `main`, and after the build passes the publishing job creates its version tag and a GitHub preview release with the Windows and macOS assets. Pushes with an already-published version still run checks but skip publishing. Pull requests never publish. The job checks that `main` still matches the tested commit and never moves an existing tag. Publishing uses GitHub's built-in token; no personal token secret is needed. **Run workflow** on `main` is also available to retry a build.
 
@@ -72,7 +80,7 @@ The production runtime home is `%LOCALAPPDATA%\STEVE` on Windows and `~/Library/
 
 STEVE validates the saved ChatGPT account on startup and before opening a new login. It checks again when the palette reopens or regains focus, handles account-change notifications, and polls while sign-in is pending. Browser login uses the runtime's local completion page instead of the hosted ChatGPT desktop handoff. Refresh the account after successful login.
 
-`thread_start_params` is shared by the controller and runtime/package checks. Initialization enables `experimentalApi` for `thread/start.dynamicTools`. The pinned runtime validates and persists the five Fusion tools and two chat-image tools at thread creation. `thread/resume` restores those declarations; it does not accept replacement tools. Start a new chat when changing tool definitions in this prototype. See [execution details](FUSION_EXECUTION.md).
+`thread_start_params` is shared by the controller and runtime/package checks. Initialization enables `experimentalApi` for `thread/start.dynamicTools`. The runtime validates and persists the five Fusion tools and two chat-image tools at thread creation. `thread/resume` restores those declarations; it does not accept replacement tools. Start a new chat when changing tool definitions in this prototype. See [execution details](FUSION_EXECUTION.md).
 
 Before launching Codex, startup checks the bundled executable, Code Mode host, resources, and version metadata. Missing or incompatible files produce a setup card with STEVE repair instructions and the official Codex download/setup page.
 
@@ -128,4 +136,4 @@ Fusion on macOS runs add-ins with its bundled Python (3.14 in Fusion 2705) and r
 - [Fusion Python debugging](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/PythonSpecific_UM.htm)
 - [Codex app-server protocol](https://learn.chatgpt.com/docs/app-server)
 
-Current Autodesk docs and the installed Fusion API were inspected on September 19, 2026. Consult the pinned runtime's protocol when changing the Codex adapter.
+Current Autodesk docs and the installed Fusion API were inspected on September 19, 2026. Consult the current runtime's protocol when changing the Codex adapter.

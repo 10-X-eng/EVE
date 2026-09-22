@@ -123,6 +123,27 @@ const runChecks = async () => {
       check(!document.getElementById('send').disabled, 'Goal command unavailable between automatic turns');
       document.getElementById('composer').requestSubmit(); await frame();
       check(goalCalls.at(-1).payload.text==='/goal clear', 'Slash clear did not reach controller command parser');
+      snapshot.codexVersion='0.155.1'; snapshot.codexUpdateInfo={version:'99.0.0'};
+      snapshot.codexUpdateStatus='Codex 99.0.0 is available'; send(); await frame();
+      check(document.getElementById('codex-version').textContent==='Codex 0.155.1', 'Runtime version missing');
+      check(!document.getElementById('update-codex').disabled, 'Background download blocked by active turn');
+      document.getElementById('update-codex').click(); await frame();
+      check(goalCalls.at(-1).action==='updateCodex', 'Codex update did not reach controller');
+      snapshot.codexUpdating=true; send(); await frame();
+      check(document.getElementById('update-codex').disabled, 'Duplicate update not disabled');
+      snapshot.codexUpdating=false; snapshot.codexPendingVersion='99.0.0'; send(); await frame();
+      check(document.getElementById('codex-update-status').textContent.includes('Restart STEVE'), 'Missing restart instruction');
+      check(document.getElementById('update-codex').hidden, 'Pending update offered twice');
+      check(!document.getElementById('bundled-codex').hidden, 'Recovery control missing');
+      check(document.getElementById('restart-steve').disabled, 'Restart should not interrupt an active task');
+      snapshot.busy=false; snapshot.goal=null; send(); await frame();
+      document.getElementById('restart-steve').click(); await frame();
+      check(goalCalls.at(-1).action==='restartRuntime', 'Restart did not reach controller');
+      snapshot.codexRestarting=true; send(); await frame();
+      check(document.getElementById('restart-steve').disabled && document.getElementById('send').disabled, 'Restart should block duplicate restarts and new turns');
+      snapshot.codexRestarting=false; send(); await frame();
+      document.getElementById('chatgpt-refresh').click(); await frame();
+      check(goalCalls.at(-1).action==='accountRefresh' && goalCalls.at(-1).payload.refreshModels, 'Model refresh missing');
       return {tokenUpdates: 240, domMutations: mutations.length, messagesRetained: articles.length};
 };
 

@@ -8,9 +8,11 @@ STEVE is an AI engineering assistant that lives in Fusion. Ask it to create a pa
 
 STEVE writes and runs Python through Fusion's installed API. It can inspect your actual document, make changes, and check the result through queries and viewport images. Its reach includes sketches, solid modeling, assemblies, parameters, manufacturing, and other capabilities exposed by Autodesk's API.
 
-Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your xAI account’s Grok access, or **Ollama (local)** for a downloaded model on your computer. The Windows and macOS packages include the runtime, so you can get started without a separate Python, Node.js, or Codex installation. No API key or separate STEVE account is required.
+Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your xAI account’s Grok access, **Claude (experimental)** through your Claude Code subscription login, or **Ollama (local)** for a downloaded model on your computer. The Windows and macOS packages include the conversation runtime, so you can get started without a separate Python, Node.js, or Codex installation. Claude additionally requires the official Claude Code client; Ollama requires its local app. No API key or separate STEVE account is required.
 
-> **Preview 0.3.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
+
+> **Preview 0.4.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What STEVE can do
 
@@ -95,7 +97,7 @@ Choose **Ollama (local)** to use a model running on your computer, with no sign-
 
 Get the complete Windows package from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `STEVE-0.3.0-windows-x64.zip` package:
+With an `STEVE-0.4.0-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -106,7 +108,7 @@ With an `STEVE-0.3.0-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `STEVE-0.3.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `STEVE-0.4.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
 2. Save your work and quit Fusion.
@@ -123,7 +125,7 @@ STEVE checks for a saved sign-in before opening a new login. Model availability 
 
 The preview supports **Windows x64** and **macOS on Apple silicon**, and requires Fusion and an internet connection. The installers are currently unsigned. They install per user, preserve the previous managed installation during updates, and refuse to replace a STEVE folder they did not install.
 
-Startup checks the bundled Codex runtime and supporting files. Missing or incompatible components produce setup help with STEVE repair instructions and the official Codex setup link. Repair the complete STEVE package to restore its bundled runtime.
+Codex updates independently of STEVE. The account menu shows the running Codex version and checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
 
 To reload an updated development add-in, **Stop STEVE, then Run it again** in Scripts and Add-ins. Start a **New conversation** after changes to tool definitions.
 
@@ -179,7 +181,7 @@ python3 scripts/build_package.py
 python3 scripts/verify_package.py
 ```
 
-Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. The bundled runtime is version-pinned per platform and verified against its SHA-256 digest. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from the account menu without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
 
 Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
 

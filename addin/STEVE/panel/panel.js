@@ -278,9 +278,10 @@ function render() {
 
 function renderControls() {
   renderGoal();
-  const connected=state.connection==="ready";
+  const connected=state.connection==="ready" && !state.codexRestarting;
   const local=state.provider==="ollama";
-  const signed=!!state.account && (!local || state.models.length>0);
+  const claude=state.provider==="claude";
+  const signed=!!state.account && (!(local || claude) || state.models.length>0);
   const hasMessages=state.messages.length>0 && signed;
   $("app").classList.toggle("signed-out",!signed);
   $("welcome").hidden=hasMessages || !!state.runtimeIssue;
@@ -289,19 +290,23 @@ function renderControls() {
   $("sign-in-card").hidden=signed;
   $("login").disabled=!connected || !state.accountChecked || state.loginPending;
   const grok=state.provider==="grok";
-  const providerName=local?"Ollama":grok?"Grok / X":"ChatGPT";
+  const providerName=local?"Ollama":grok?"Grok / X":claude?"Claude":"ChatGPT";
   for(const id of ["provider","welcome-provider"]){$(id).value=state.provider||"chatgpt";$(id).disabled=!!state.busy || !!state.goalBusy || !!state.loginPending || state.connection==="starting";}
-  $("login").textContent=local?(!state.accountChecked?"Checking Ollama…":"Refresh models"):state.loginPending?"Signing in…":!state.accountChecked?"Checking your account…":grok?"Sign in with X / Grok ↗":"Sign in with ChatGPT ↗";
+  $("login").textContent=claude?(!state.accountChecked?"Checking Claude Code…":"Check connection"):local?(!state.accountChecked?"Checking Ollama…":"Refresh models"):state.loginPending?"Signing in…":!state.accountChecked?"Checking your account…":grok?"Sign in with X / Grok ↗":"Sign in with ChatGPT ↗";
   $("sign-in-heading").textContent=local?"Your tools. Your local model.":"Your tools. Your AI.";
-  $("sign-in-description").textContent=local?(state.localStatus||"Start Ollama and choose a downloaded model. No sign-in needed."):"Connect your account and bring your thinking partner into Fusion.";
-  $("sign-in-note").textContent=local?"Runs on this computer. Choose a model with tool support and at least 8K context. Web search is unavailable.":grok?"Uses your xAI account’s Grok access. Link your X account at grok.com if needed.":"Uses your subscription's Codex access";
+  $("sign-in-description").textContent=claude?(state.localStatus||"Sign in to Claude Code outside Fusion, then check the connection here."):local?(state.localStatus||"Start Ollama and choose a downloaded model. No sign-in needed."):"Connect your account and bring your thinking partner into Fusion.";
+  $("sign-in-note").textContent=claude?"Experimental · Uses the account signed into Claude Code and its subscription limits. Web search is unavailable.":local?"Runs on this computer. Choose a model with tool support and at least 8K context. Web search is unavailable.":grok?"Uses your xAI account’s Grok access. Link your X account at grok.com if needed.":"Uses your subscription's Codex access";
+  $("claude-controls").hidden=!claude;
+  $("claude-version").textContent=state.providerVersion?`Claude Code ${state.providerVersion}`:"Claude Code · Version unavailable";
+  $("claude-links").hidden=!claude;
+  $("claude-refresh").disabled=state.busy || !connected;
   $("local-controls").hidden=!local;
   $("local-links").hidden=!local;
   $("local-status").textContent=state.localStatus||"Checking local Ollama…";
   $("local-refresh").disabled=state.busy || !connected;
   $("login-wait").hidden=!state.loginPending;
   $("grok-login-note").hidden=!grok || signed || !state.loginPending || !!state.device;
-  $("device-login").hidden=local || state.loginPending;
+  $("device-login").hidden=local || claude || state.loginPending;
   $("device-login").disabled=!connected || !state.accountChecked;
   $("cancel-login").hidden=!state.loginPending;
   $("refresh-account").hidden=!state.loginPending;
@@ -321,8 +326,22 @@ function renderControls() {
   $("new-chat").disabled=state.busy || !!state.goalBusy || !hasMessages;
   $("model").disabled=!signed || state.busy || !!state.goalBusy;
   $("effort").disabled=!signed || state.busy || !!state.goalBusy || !(state.effortOptions||[]).length;
-  $("logout").hidden=local || !signed;
+  $("logout").hidden=local || claude || !signed;
   $("logout").disabled=state.busy || !!state.goalBusy;
+  $("chatgpt-refresh").hidden=local || grok || claude;
+  $("chatgpt-refresh").disabled=state.busy || !!state.goalBusy || !connected;
+  $("codex-version").textContent=state.codexVersion?`Codex ${state.codexVersion}`:"Codex runtime";
+  $("codex-update-status").textContent=state.codexPendingVersion?`Codex ${state.codexPendingVersion} is ready. Restart STEVE to use it and refresh models.`:state.codexUpdateStatus||"Checks OpenAI for updates automatically.";
+  $("check-codex-updates").disabled=!!state.codexUpdateChecking || !!state.codexUpdating;
+  $("check-codex-updates").textContent=state.codexUpdateChecking?"Checking…":"Check Codex updates";
+  $("update-codex").hidden=!state.codexUpdateInfo || !!state.codexPendingVersion;
+  $("update-codex").disabled=!!state.codexUpdating;
+  $("update-codex").textContent=state.codexUpdating?"Updating Codex…":state.codexUpdateInfo?`Update Codex to ${state.codexUpdateInfo.version}`:"Update Codex";
+  $("bundled-codex").hidden=!state.codexManaged && !state.codexPendingVersion && !state.runtimeIssue;
+  $("bundled-codex").disabled=!!state.codexUpdating;
+  $("restart-steve").disabled=!!state.busy || !!state.goalBusy || !!state.loginPending || !!state.codexUpdating || !!state.codexRestarting || state.connection==="starting";
+  $("restart-steve").textContent=state.codexRestarting?"Restarting STEVE…":"Restart STEVE";
+  $("restart-steve").title=state.busy || state.goalBusy?"Finish or pause the current task before restarting":"Restart STEVE's conversation engine and reopen this chat";
   $("debug-logging").checked=!!state.debugLogging;
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
@@ -465,6 +484,13 @@ function goalBudget() {
 }
 
 $("login").onclick=()=>state.provider==="ollama"?act("accountRefresh",{refreshModels:true}):act("login");
+$("claude-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
+$("chatgpt-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
+$("check-codex-updates").onclick=()=>act("checkCodexUpdates");
+$("update-codex").onclick=()=>act("updateCodex");
+$("bundled-codex").onclick=()=>act("useBundledCodex");
+$("restart-steve").onclick=()=>act("restartRuntime");
+$("install-claude").onclick=()=>act("setupHelp",{page:"claude"});
 $("goal-button").onclick=()=>openGoal();
 $("goal-strip").onclick=()=>openGoal();
 $("goal-close").onclick=()=>$("goal-dialog").close();

@@ -17,8 +17,10 @@ from .debug_log import DebugLog
 from .preferences import ProviderChoice
 from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
+from .claude_transport import ClaudeTransport
 from .grok_auth import login_url_allowed
 from .updates import UpdateChecker
+from .runtime_updates import RuntimeUpdater
 from .downloads import UpdateDownloader
 from .version import VERSION
 from .goals import goal_command, validate_goal
@@ -129,11 +131,12 @@ def python_activity(tool, arguments, identifier):
 
 
 class Controller:
-    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport):
+    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport, claude_factory=ClaudeTransport):
         self.publish = publish
         self.factory = transport_factory
         self.grok_factory = grok_factory
         self.ollama_factory = ollama_factory
+        self.claude_factory = claude_factory
         self.open_browser = open_browser
         self.fusion_tools = fusion_tools
         self.debug = debug_log or DebugLog(data_home())
@@ -164,8 +167,10 @@ class Controller:
                       "taskDocument": None, "waitingForFusion": False, "waitingReason": "",
                       "goal": None, "goalBusy": False, "goalNotice": "", "goalHasTarget": False,
                       "messages": [], "busy": False, "loginPending": False, "device": None,
-                      "accountChecked": False, "localStatus": "", "error": "", "status": "Checking your account", "version": VERSION,
+                      "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
+                      "codexVersion": "", "codexManaged": False, "codexUpdateInfo": None,
+                      "codexUpdateChecking": False, "codexUpdateStatus": "", "codexUpdating": False, "codexPendingVersion": "", "codexRestarting": False,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
                       "runtimeIssue": False, "debugLogging": self.debug.enabled,
                       "debugLogPath": str(self.debug.path)}
@@ -173,6 +178,7 @@ class Controller:
         self._worker.start()
         self.updates = UpdateChecker(self._update_state)
         self.downloader = UpdateDownloader(self._update_state)
+        self.runtime_updater = RuntimeUpdater(self._update_state, home=self.debug.folder.parent)
 
     def _update_state(self, changes):
         with self._lock:
@@ -183,6 +189,7 @@ class Controller:
 
     def start_update_checks(self):
         self.updates.request()
+        self.runtime_updater.request()
 
     def snapshot(self):
         with self._lock:
@@ -212,6 +219,13 @@ class Controller:
         with self._lock:
             if self._closed:
                 return
+            if self.state["codexRestarting"] and action not in ("sync", "debugLogging", "openLogs", "setupHelp"):
+                return False
+            if action == "restartRuntime":
+                if (self.state["busy"] or self._send_queued or self.state["goalBusy"] or self.state["loginPending"]
+                        or self.state["codexUpdating"] or self.state["connection"] == "starting"):
+                    return False
+                self.state["codexRestarting"] = True
             if action == "provider" and (self.state["busy"] or self._send_queued or self.state["loginPending"]):
                 return False
             if action == "goal":
@@ -333,7 +347,7 @@ class Controller:
                         self.state["device"] = None
                     if action == "connect":
                         self.state["connection"] = "disconnected"
-                        self.state["runtimeIssue"] = isinstance(exc, RuntimeUnavailable)
+                        self.state["runtimeIssue"] = isinstance(exc, RuntimeUnavailable) or bool(getattr(self.client, "runtime_managed", False))
                         if self.state["runtimeIssue"]:
                             self.state["status"] = "Codex setup needed"
                 self.emit()
@@ -348,6 +362,12 @@ class Controller:
                 if action == "accountRefresh":
                     with self._lock:
                         self._account_check_queued = False
+                if action == "restartRuntime":
+                    with self._lock:
+                        self.state["codexRestarting"] = False
+                    self.emit()
+                    if self.state["connection"] == "ready" and self.state["account"]:
+                        self.dispatch("history")
 
     def _handle(self, action, payload):
         if action == "provider":
@@ -360,6 +380,16 @@ class Controller:
             self._connect()
         elif action == "checkUpdates":
             self.updates.request()
+        elif action == "checkCodexUpdates":
+            self.runtime_updater.request()
+        elif action == "updateCodex":
+            release = self.state.get("codexUpdateInfo")
+            if release:
+                self.runtime_updater.install(release)
+        elif action == "useBundledCodex":
+            self.runtime_updater.use_bundled()
+        elif action == "restartRuntime":
+            self._restart_runtime()
         elif action == "downloadUpdate":
             with self._lock:
                 release = self.state.get("updateInfo")
@@ -394,7 +424,7 @@ class Controller:
         elif action == "sync":
             self.emit()
             if self.state["connection"] == "ready" and not self.state["busy"]:
-                self.dispatch("accountRefresh")
+                self.dispatch("accountRefresh", {"refreshModels": True})
         elif action == "connect":
             self._connect()
         elif action == "setupHelp":
@@ -402,6 +432,7 @@ class Controller:
                 "steve": install_guide_url(),
                 "codex": "https://learn.chatgpt.com/docs/quickstart?setup=app",
                 "ollama": "https://ollama.com/download",
+                "claude": "https://code.claude.com/docs/en/setup",
                 "local": "https://github.com/10-X-eng/STEVE/blob/main/docs/INSTALL.md#local-ollama",
             }
             destination = destinations.get(payload.get("page"))
@@ -479,6 +510,30 @@ class Controller:
                                   history=[], historyCursor=None, error="", status="Sign in to begin")
             self.emit()
 
+    def _restart_runtime(self):
+        """Restart only our conversation engine; restore the current idle chat."""
+        if self.state["busy"] or self.state["goalBusy"] or self.state["loginPending"] or self.state["codexUpdating"]:
+            return
+        thread_id = self.thread_id
+        account = copy.deepcopy(self.state["account"])
+        pending_version = self.state["codexPendingVersion"]
+        self._update_state({"status": "Restarting STEVE", "error": ""})
+        try:
+            self._connect()
+        except Exception:
+            self._update_state({"connection": "disconnected", "runtimeIssue": True})
+            raise
+        if thread_id and self.state["account"] and self.state["account"] == account:
+            # This ID belongs to the current conversation, not a panel-supplied path/ID.
+            self.state["history"] = [{"id": thread_id, "title": "Current conversation", "updatedAt": 0}]
+            try:
+                self._open_history(thread_id)
+            except Exception as exc:
+                raise RuntimeError("STEVE restarted, but could not reopen this chat. Open it from chat history before continuing.") from exc
+        if pending_version and self.state["codexVersion"] != pending_version:
+            raise RuntimeError(f"STEVE restarted, but Codex {pending_version} did not activate. Check Codex updates and retry.")
+        self._update_state({"codexUpdateStatus": f"Codex {self.state['codexVersion']} is running"})
+
     def _connect(self):
         if self.client:
             self.client.close()
@@ -491,19 +546,26 @@ class Controller:
                               goal=None, goalBusy=False, goalNotice="", goalHasTarget=False, taskDocument=None,
                               history=[], historyCursor=None, historyLoading=False, runtimeIssue=False,
                               account=None, models=[], accountChecked=False, loginPending=False, device=None,
-                              localStatus="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
+                              localStatus="", providerVersion="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
         self.emit()
-        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory}.get(self.state["provider"], self.factory)
+        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory, "claude": self.claude_factory}.get(self.state["provider"], self.factory)
         client = factory(lambda method, params: self._notification(method, params) if self.client is client else None)
         self.client = client
         client.debug = self.debug
         client.on_request = lambda request_id, method, params: self._tool_request(client, request_id, method, params)
-        self.client.start()
+        try:
+            self.client.start()
+        finally:
+            with self._lock:
+                self.state.update(codexVersion=getattr(client, "runtime_version", ""),
+                                  codexManaged=getattr(client, "runtime_managed", False))
         if self._closed:
             self.client.close()
             return
         with self._lock:
             self.state["connection"] = "ready"
+            if self.state["codexPendingVersion"] == self.state["codexVersion"] and self.state["codexVersion"]:
+                self.state.update(codexPendingVersion="", codexUpdateStatus=f"Codex {self.state['codexVersion']} is running")
         self._refresh_account(refresh_token=True)
 
     def _interrupt_turn(self):
@@ -731,7 +793,8 @@ class Controller:
                 self.thread_id = self.turn_id = None
                 self._task_context = None
                 self.state.update(threadId=None, messages=[], history=[], historyCursor=None, goal=None, goalHasTarget=False)
-            self.state.update(account=public, accountChecked=True, localStatus=result.get("localStatus", ""))
+            self.state.update(account=public, accountChecked=True, localStatus=result.get("localStatus", ""),
+                              providerVersion=result.get("providerVersion", ""))
             if account:
                 self.login_id = None
                 if self.state["loginPending"] or changed:
@@ -755,7 +818,7 @@ class Controller:
                         models.append({"id": model.get("model") or model["id"],
                                        "name": model.get("displayName") or model["id"],
                                        "isDefault": bool(model.get("isDefault")),
-                                       "supportsImages": model.get("supportsImages", True),
+                                       "supportsImages": model.get("supportsImages", "image" in model.get("inputModalities", ["text", "image"])),
                                        "defaultEffort": model.get("defaultReasoningEffort") or "",
                                        "efforts": [{"id": e["reasoningEffort"], "description": e.get("description", "")}
                                                    for e in model.get("supportedReasoningEfforts", [])]})
@@ -828,7 +891,7 @@ class Controller:
         self.emit()
 
     def _login(self, device=False):
-        if self.state["provider"] == "ollama":
+        if self.state["provider"] in ("ollama", "claude"):
             self._refresh_account(refresh_models=True)
             return
         if self.state["loginPending"]:
@@ -1099,6 +1162,7 @@ class Controller:
         self._closed = True
         self.updates.close()
         self.downloader.close()
+        self.runtime_updater.close()
         self._commands.put(None)
         if self.client:
             self.client.close()

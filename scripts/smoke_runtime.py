@@ -6,7 +6,7 @@ from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "addin" / "STEVE"))
-from steve.transport import Transport
+from steve.transport import Transport, bundled_runtime, runtime_command
 from steve.controller import thread_start_params
 
 
@@ -14,7 +14,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--home", type=Path, default=ROOT / ".cache" / "smoke-home")
     args = parser.parse_args()
-    client = Transport(lambda method, params: None, home=args.home.resolve())
+    client = Transport(lambda method, params: None, command=runtime_command(bundled_runtime()), home=args.home.resolve())
     try:
         client.start()
         account = client.request("account/read", {"refreshToken": False})
