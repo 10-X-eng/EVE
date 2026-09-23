@@ -256,7 +256,7 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(any(method == "model/list" for method, _ in self.controller.client.calls))
 
     def test_restart_is_rejected_while_work_login_or_download_is_active(self):
-        for flag in ("busy", "goalBusy", "loginPending", "codexUpdating", "codexRestarting"):
+        for flag in ("busy", "jobBusy", "loginPending", "codexUpdating", "codexRestarting"):
             with self.subTest(flag=flag):
                 self.controller.state[flag] = True
                 self.assertFalse(self.controller.dispatch("restartRuntime"))

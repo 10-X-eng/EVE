@@ -103,7 +103,7 @@
       <div id="thinking" class="thinking" role="status" hidden><span></span><span></span><span></span><label>STEVE is working</label></div>
     </main>
     <footer class="composer-area">
-      <button id="goal-strip" class="goal-strip" type="button" aria-label="Manage current goal" hidden><span aria-hidden="true">◎</span><span id="goal-strip-title"></span><span id="goal-strip-status"></span></button>
+      <button id="job-strip" class="job-strip" type="button" aria-label="Manage current job" hidden><span aria-hidden="true">◎</span><span id="job-strip-title"></span><span id="job-strip-status"></span></button>
       <div id="task-target" class="task-target" role="status" hidden></div>
       <div id="tool-activity" class="tool-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
         <span class="tool-activity-mark" aria-hidden="true">⌘</span>
@@ -124,7 +124,7 @@
             <div class="effort-wrap"><label class="sr-only" for="effort">Reasoning effort</label><select id="effort" title="Reasoning effort"><option value="">Default</option></select></div>
           </div>
           <div class="composer-actions">
-            <button id="goal-button" type="button" class="attach-button" title="Set or manage a goal · /goal" aria-label="Set or manage a goal">◎</button>
+            <button id="job-button" type="button" class="attach-button" title="Set or manage a job · /jobs" aria-label="Set or manage a job">◎</button>
             <button id="attach-images" type="button" class="attach-button" title="Attach images · Ctrl+V to paste" aria-label="Attach images"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9m-6 12 8-8"/></svg></button>
             <button id="send" class="send-button" type="submit" title="Send message" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
             <button id="stop" class="send-button stop-button" type="button" title="Stop response" aria-label="Stop response" hidden><span></span></button>
@@ -135,22 +135,22 @@
     </footer>
   </div>
   <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
-  <dialog id="update-confirm" class="goal-dialog" aria-labelledby="update-confirm-heading">
+  <dialog id="update-confirm" class="job-dialog" aria-labelledby="update-confirm-heading">
     <h2 id="update-confirm-heading">Install STEVE update?</h2>
     <p>STEVE will download the newest release for your platform, verify it, and stage it. Wait for “Update queued,” then save your work and quit Fusion; the installer will replace only your managed STEVE add-in, keep a backup, and leave your account data intact. Reopen Fusion afterward. Fusion will not be closed automatically.</p>
-    <div class="goal-actions"><button id="confirm-update" type="button" class="primary-button">Download and install after Fusion closes</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
+    <div class="job-actions"><button id="confirm-update" type="button" class="primary-button">Download and install after Fusion closes</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
   </dialog>
-  <dialog id="goal-dialog" class="goal-dialog" aria-labelledby="goal-heading">
-    <div class="goal-heading"><div><span class="eyebrow">KEEP WORKING TOWARD AN OUTCOME</span><h2 id="goal-heading">Your goal</h2></div><button id="goal-close" type="button" class="icon-button" aria-label="Close goal controls">×</button></div>
-    <p id="goal-summary"></p><p id="goal-usage" class="goal-note"></p><p id="goal-target-note" class="goal-note"></p>
-    <div class="goal-actions"><button id="goal-pause" type="button" class="secondary-button">Pause</button><button id="goal-resume" type="button" class="secondary-button">Resume</button><button id="goal-clear" type="button" class="text-button">Clear goal</button></div>
-    <form id="goal-form">
-      <label for="goal-objective">Objective</label><textarea id="goal-objective" rows="4" maxlength="4000" required placeholder="Create a mounting bracket and verify its dimensions…"></textarea>
-      <label for="goal-budget">Token budget <span class="goal-note">(optional)</span></label><input id="goal-budget" type="number" min="1" max="9007199254740991" step="1" placeholder="No token limit">
-      <p class="goal-note">STEVE continues until the goal is complete, paused, blocked, or limited. Editing the objective starts fresh usage tracking. Stop also pauses the goal.</p>
-      <button id="goal-save" type="submit" class="primary-button">Start goal</button>
+  <dialog id="job-dialog" class="job-dialog" aria-labelledby="job-heading">
+    <div class="job-heading"><div><span class="eyebrow">KEEP WORKING TOWARD AN OUTCOME</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
+    <p id="job-summary"></p><p id="job-usage" class="job-note"></p><p id="job-target-note" class="job-note"></p>
+    <div class="job-actions"><button id="job-pause" type="button" class="secondary-button">Pause</button><button id="job-resume" type="button" class="secondary-button">Resume</button><button id="job-clear" type="button" class="text-button">Clear job</button></div>
+    <form id="job-form">
+      <label for="job-objective">Objective</label><textarea id="job-objective" rows="4" maxlength="4000" required placeholder="Create a mounting bracket and verify its dimensions…"></textarea>
+      <label for="job-budget">Token budget <span class="job-note">(optional)</span></label><input id="job-budget" type="number" min="1" max="9007199254740991" step="1" placeholder="No token limit">
+      <p class="job-note">STEVE continues until the job is complete, paused, blocked, or limited. Editing the objective starts fresh usage tracking. Stop also pauses the job.</p>
+      <button id="job-save" type="submit" class="primary-button">Start job</button>
     </form>
-    <details class="goal-help"><summary>Slash commands</summary><p><code>/goal &lt;objective&gt;</code> — create or replace<br><code>/goal</code> — status and controls<br><code>/goal edit</code> — edit objective and budget<br><code>/goal pause</code> — pause work<br><code>/goal resume</code> — continue<br><code>/goal clear</code> — remove goal, keep chat</p></details>
+    <details class="job-help"><summary>Slash commands</summary><p><code>/jobs &lt;objective&gt;</code> — create or replace<br><code>/jobs</code> — status and controls<br><code>/jobs edit</code> — edit objective and budget<br><code>/jobs pause</code> — pause work<br><code>/jobs resume</code> — continue<br><code>/jobs clear</code> — remove job, keep chat</p></details>
   </dialog>
 </body>
 </html>

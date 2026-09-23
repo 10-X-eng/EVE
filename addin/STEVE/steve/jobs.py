@@ -1,9 +1,9 @@
-"""User goal commands; Codex owns persistence, accounting, and continuation."""
+"""User job commands; Codex owns persistence, accounting, and continuation."""
 import re
 
 
-def goal_command(text):
-    match = re.fullmatch(r"/goal(?:\s+([\s\S]*))?", text.strip())
+def job_command(text):
+    match = re.fullmatch(r"/jobs(?:\s+([\s\S]*))?", text.strip())
     if not match:
         return None
     value = (match[1] or "").strip()
@@ -11,19 +11,19 @@ def goal_command(text):
         return {"command": value or "status"}
     word, _, rest = value.partition(" ")
     if word in ("pause", "resume", "clear", "status", "help"):
-        raise ValueError(f"Use /goal {word} without extra text.")
+        raise ValueError(f"Use /jobs {word} without extra text.")
     return {"command": "set", "objective": rest.strip() if word == "edit" else value}
 
 
-def validate_goal(payload):
+def validate_job(payload):
     command = payload.get("command", "status")
     if command not in ("status", "set", "pause", "resume", "clear", "edit", "help"):
-        raise ValueError("Use /goal, /goal <objective>, /goal edit, /goal pause, /goal resume, or /goal clear.")
+        raise ValueError("Use /jobs, /jobs <objective>, /jobs edit, /jobs pause, /jobs resume, or /jobs clear.")
     result = {"command": command}
     if command == "set":
         objective = payload.get("objective")
         if not isinstance(objective, str) or not 1 <= len(objective.strip()) <= 4000:
-            raise ValueError("A goal needs an objective of 1–4,000 characters.")
+            raise ValueError("A job needs an objective of 1–4,000 characters.")
         result["objective"] = objective.strip()
     if "tokenBudget" in payload:
         budget = payload["tokenBudget"]

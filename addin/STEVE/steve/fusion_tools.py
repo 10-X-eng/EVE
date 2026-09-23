@@ -171,7 +171,7 @@ class FusionTools:
             key = action.partition(":")[2]
             saved = self.saved_tasks.get(key)
             if not saved or (saved[1] is not None and optional_property(saved[1], "isValid") is False):
-                raise ToolError("target_document_closed", "The goal's original document is no longer available. Create a new goal on the intended document.")
+                raise ToolError("target_document_closed", "The job's original document is no longer available. Create a new job on the intended document.")
             self.task, self.document, self.document_id = saved
         if action == "send":
             self.task = None

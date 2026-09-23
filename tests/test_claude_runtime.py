@@ -22,7 +22,7 @@ except RuntimeUnavailable:
 
 @unittest.skipUnless(HAS_RUNTIME, "Fetch the bundled runtime first")
 class ClaudeRuntimeTests(unittest.TestCase):
-    def test_goal_continues_and_completes_with_native_goal_tool(self):
+    def test_job_continues_and_completes_with_native_job_tool(self):
         from steve.controller import Controller
         from steve.debug_log import DebugLog
         from steve.preferences import ProviderChoice
@@ -34,7 +34,7 @@ class ClaudeRuntimeTests(unittest.TestCase):
             class Model:
                 def create(self, **params):
                     calls.append(params)
-                    tool = [{"id": "goal_done", "type": "function", "function": {"name": "update_goal", "arguments": '{"status":"complete"}'}}] if len(calls) == 2 else None
+                    tool = [{"id": "job_done", "type": "function", "function": {"name": "update_goal", "arguments": '{"status":"complete"}'}}] if len(calls) == 2 else None
                     return FixtureStream([completion("Verified fixture step.", tool)])
                 def cancel(self):
                     pass
@@ -49,9 +49,9 @@ class ClaudeRuntimeTests(unittest.TestCase):
                     controller.dispatch("connect")
                     eventually(lambda: bool(controller.state["models"] or controller.state["error"]), 35)
                     self.assertTrue(controller.state["models"], controller.state["error"])
-                    controller.dispatch("goal", {"command": "set", "objective": "Verify fixture", "tokenBudget": 100},
+                    controller.dispatch("job", {"command": "set", "objective": "Verify fixture", "tokenBudget": 100},
                         capture_context=lambda _: {"document_id": "fixture", "name": "Fixture", "task_key": "fixture"})
-                    eventually(lambda: controller.state["goal"] and controller.state["goal"]["status"] == "complete" and not controller.state["busy"], 20)
+                    eventually(lambda: controller.state["job"] and controller.state["job"]["status"] == "complete" and not controller.state["busy"], 20)
                     self.assertFalse(controller.state["error"], controller.state["error"])
                     self.assertEqual(len(calls), 3)
                     self.assertTrue({"create_goal", "get_goal", "update_goal"} <= {t["function"]["name"] for t in calls[0]["tools"]})
