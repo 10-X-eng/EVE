@@ -123,6 +123,17 @@ elements.get('open-logs').onclick();
 assert.equal(vm.runInContext('selectedAction.action', context), 'openLogs');
 console.log('Debug menu checks passed: enable, disable, and open logs.');
 
+// Updating requires an explicit in-app confirmation.
+context.document.getElementById('update-confirm').showModal = () => {elements.get('update-confirm').open = true;};
+elements.get('update-confirm').close = () => {elements.get('update-confirm').open = false;};
+vm.runInContext(source.slice(source.indexOf('$("update-steve-now").onclick'), source.indexOf('$("new-chat").onclick')), context);
+elements.get('update-steve-now').onclick();
+assert.equal(elements.get('update-confirm').open, true);
+elements.get('confirm-update').onclick();
+assert.equal(vm.runInContext('selectedAction.action', context), 'updateSteve');
+assert.equal(elements.get('update-confirm').open, false);
+console.log('Update confirmation controls passed.');
+
 // The composer steers an active turn, keeps Stop available, and retains failed drafts.
 (async () => {
   context.Option = function(text, value) { return {text, value}; };
@@ -206,6 +217,10 @@ console.log('Debug menu checks passed: enable, disable, and open logs.');
   assert.equal(elements.get('installed-version').textContent, 'STEVE 0.2.0');
   assert.equal(elements.get('update-title').textContent, 'STEVE 0.3.0 is available');
   assert.equal(elements.get('update-banner').hidden, false);
+  assert.equal(elements.get('update-steve-now').hidden, false);
+  elements.get('update-steve-now').onclick();
+  assert.equal(elements.get('update-confirm').open, true);
+  elements.get('cancel-update').onclick();
   assert.equal(elements.get('check-updates').disabled, true);
   elements.get('download-update').onclick();
   assert.equal(vm.runInContext('selectedAction.action', context), 'downloadUpdate');
@@ -213,8 +228,14 @@ console.log('Debug menu checks passed: enable, disable, and open logs.');
   context.renderControls();
   assert.equal(elements.get('download-update').textContent, 'Downloading 47%');
   assert.equal(elements.get('menu-download').disabled, true);
+  assert.equal(elements.get('update-steve-now').disabled, true);
   vm.runInContext(`state.updateDownload={state:'ready',version:'0.3.0'};`, context);
   context.renderControls();
+  assert.equal(elements.get('update-steve-now').hidden, false);
+  vm.runInContext(`state.updateInstallReady=true;`, context);
+  context.renderControls();
+  assert.equal(elements.get('update-steve-now').hidden, true);
+  vm.runInContext(`state.updateInstallReady=false;`, context);
   elements.get('download-update').onclick();
   assert.equal(vm.runInContext('selectedAction.action', context), 'openDownloads');
   elements.get('dismiss-update').onclick();

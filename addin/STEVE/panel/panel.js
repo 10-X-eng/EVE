@@ -346,7 +346,7 @@ function renderControls() {
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
   $("installed-version").textContent=state.version?`STEVE ${state.version}`:"STEVE";
-  $("update-status").textContent=state.updateStatus||"Checks for new releases automatically.";
+  $("update-status").textContent=state.updateInstallFailure||state.updateStatus||"Checks for new releases automatically.";
   $("check-updates").disabled=!!state.updateChecking;
   $("check-updates").textContent=state.updateChecking?"Checking…":"Check for updates";
   $("menu-update").hidden=!update;
@@ -355,10 +355,11 @@ function renderControls() {
   const download=state.updateDownload;
   const downloading=download?.state==="downloading";
   const downloaded=download?.state==="ready" && download.version===update?.version;
-  const downloadLabel=downloading?`Downloading${download.percent==null?"…":` ${download.percent}%`}`:downloaded?"Open Downloads":"Download update";
+  for(const id of ["update-steve-now","menu-update-now"]){$(id).hidden=!update || !!state.updateInstallReady;$(id).disabled=downloading || !!state.autoInstallVersion || !!state.updateInstalling;$(id).textContent=state.autoInstallVersion?"Downloading update…":state.updateInstalling?"Preparing update…":"Update STEVE";}
+  const downloadLabel=downloading?`Downloading${download.percent==null?"…":` ${download.percent}%`}`:downloaded?"Open Downloads":"Download only";
   for(const id of ["download-update","menu-download"]){$(id).textContent=downloadLabel;$(id).disabled=downloading;}
   $("menu-download").hidden=!update;
-  const downloadNote=download?.state==="error"?download.message:downloaded?"Saved and verified in Downloads. Close Fusion, extract the ZIP, and run the installer.":"Saves the ZIP to Downloads. Close Fusion before installing.";
+  const downloadNote=state.updateInstallFailure|| (state.updateInstallReady?state.updateStatus:state.updateInstalling?"Preparing the installer…":state.updateStatus?.startsWith("Couldn’t prepare installation")?state.updateStatus:download?.state==="error"?download.message:state.autoInstallVersion?"Downloading and verifying the update. Save your work before quitting Fusion.":downloaded?"Verified in Downloads. Choose Update STEVE to apply it after Fusion closes.":"Update STEVE downloads and installs after Fusion closes; Download only saves the ZIP.");
   $("download-status").hidden=!download;
   $("download-status").textContent=downloadNote;
   $("update-hint").textContent=downloadNote;
@@ -521,6 +522,10 @@ $("check-updates").onclick=()=>{dismissedUpdate="";act("checkUpdates");};
 $("menu-update").onclick=()=>act("openUpdate",{page:"notes"});
 $("download-update").onclick=()=>act(state.updateDownload?.state==="ready" && state.updateDownload.version===state.updateInfo?.version?"openDownloads":"downloadUpdate");
 $("menu-download").onclick=$("download-update").onclick;
+$("update-steve-now").onclick=()=>$("update-confirm").showModal();
+$("menu-update-now").onclick=$("update-steve-now").onclick;
+$("confirm-update").onclick=()=>{$("update-confirm").close();act("updateSteve");};
+$("cancel-update").onclick=()=>$("update-confirm").close();
 $("update-notes").onclick=()=>act("openUpdate",{page:"notes"});
 $("dismiss-update").onclick=()=>{dismissedUpdate=state.updateInfo?.version||"";renderedControls="";render();};
 $("new-chat").onclick=()=>{showHistory(false);act("new");};
