@@ -610,6 +610,20 @@ class FusionBridgeTests(unittest.TestCase):
                 self.assertIn(expected, self.results[-1]["guidance"])
                 self.assertIn("get", self.results[-1]["members"])
 
+    def test_python_context_help_is_available_without_importing_or_executing_api_members(self):
+        from steve.tool_protocol import validate_call
+        validate_call('fusion_api_help', {'path': 'steve.python'})
+        with patch.object(bridge.importlib, 'import_module', side_effect=AssertionError('No API import expected')):
+            self.bridge.submit('fusion_api_help', {'path': 'steve.python'}, self.results.append, lambda: False)
+            self.host.pump()
+        result = self.results[-1]
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['path'], 'steve.python')
+        self.assertIn('def run(context)', result['documentation'])
+        self.assertIn('task target', result['documentation'])
+        self.assertIn('12,000', result['documentation'])
+        self.assertEqual(self.host.executions, 0)
+
     def test_shutdown_cancels_pending_operations(self):
         self.operation()
         self.bridge.close()

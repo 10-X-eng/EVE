@@ -59,11 +59,14 @@ The draft PRs form one ordered stack: foundation (#31), optional supplier path
 (#32), native process geometry (#33), shared state/assemblies (#34), partial radii
 (#35), build orientation (#36), report currency (#37), imported solids (#38),
 paired pocket repair (#39), reference discovery (#40), applicability/readiness
-(#41), existing-pattern bend inspection (#42), and the selected face-distance
-changes. Later branches include
+(#41), existing-pattern bend inspection (#42), selected face distances (#43),
+and the tool-contract/on-demand-context review. Later branches include
 their predecessors. Review each PR against its declared base; do not merge later
 branches out of order or interpret a green package build as process qualification.
 
 The local source add-in contains this stack under `addin/STEVE`. Loading the source
 add-in and starting a new conversation exposes the new tool definitions. This is
 separate from building or publishing an installer.
+
+The tool-description audit and dynamic-tool registration constraints are recorded
+in [TOOL_CONTRACTS.md](TOOL_CONTRACTS.md).

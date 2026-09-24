@@ -460,6 +460,30 @@ missing/malformed/failed native results, bad indices, stale bodies and cancellat
 This adds selected feature measurement evidence, not real print, fitting,
 drainage, arbitrary geometry or manufacturing-process qualification.
 
+## Tool contract and on-demand context review
+
+All 13 STEVE tool descriptions were checked against their validators/handlers.
+Repeated script-context text now lives at `fusion_api_help('steve.python')`;
+purpose, required action relationships, ID provenance, defaults, side effects and
+report interpretation remain visible in the relevant tool/schema. The core prompt
+and tool inventory did not change. See [TOOL_CONTRACTS.md](TOOL_CONTRACTS.md) for
+the per-tool review and runtime-registration evidence.
+
+Compact JSON serialization of the complete tool schemas decreased from 14,144 to
+10,910 characters (3,234 fewer, 22.9%). The 905-character script-context reference
+loads when requested. These are schema character counts, not provider token
+counts or a claim about full conversation size.
+
+With the revised descriptions, a paired GPT-6-Astra/medium read-only test loaded
+`steve.python` and `steve.helpers` in both modes, and `steve.dfm.milling` when
+enabled. Both measured 3 mm remaining material and correctly reported failure of
+the supplied 4 mm requirement without geometry changes. DFM-off used 4 calls in
+20.140 seconds; DFM-on used 11 in 87.859 seconds. The latter guessed a nonexistent
+`BRepFace.index`, received the installed-API recovery guidance, read the class help
+and completed the inspection. No one-off warning was added to every tool for that
+recovered API mistake. These are integration observations, not a latency or model
+quality benchmark; no complete absence of ambiguity is claimed.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
