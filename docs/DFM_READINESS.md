@@ -25,11 +25,11 @@ not a passing manufacturing assessment.
 | --- | --- | --- |
 | #24 Foundation | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases | Broader provider/panel workflows and independently reviewed outcome corpus; live macOS Fusion |
 | #25 Milling/drilling | Full cylindrical bands, partial cylindrical radii, native recognition adapters with missing-extension handling; native and SAT-imported pocket/shaft measurements; library-derived cutter criterion; two paired model repair cases | Entitled recognition, intersecting/counterbore/open-pocket coverage, tooling/reach/workholding qualification, sharp/NURBS cases and measured design-quality improvement |
-| #26 FDM/FFF | Explicit build-frame envelopes, rotated/repeated assemblies, planar underside slopes, sampled walls and open-surface rejection; synthetic boundary profiles | A confirmed printer/material profile; fine-feature/clearance and support/bridge coverage; paired additive design outcomes and independent printing review |
+| #26 FDM/FFF | Explicit build-frame envelopes, rotated/repeated assemblies, planar underside slopes, sampled walls and open-surface rejection; selected trimmed-face distances on known slots before/after rigid placement; synthetic boundary profiles | A confirmed printer/material profile; broader fine-feature, directional/assembly clearance and support/bridge coverage; paired additive design outcomes and independent printing review |
 | #27 Sheet metal/RMFG | Native rule and existing flat-pattern metadata; paged native bend lines on a 2 mm bent-strip fixture (R3 inside, 90 degrees, 20 mm bend lines); single-body STEP export; optional OAuth, protected storage, upload approval, immutable retry jobs and scoped reports | Multi-bend/relief/sequence and tooling qualification; real account authorization and approved supplier upload/report with an actionable finding; live macOS export |
 | #28 Turning | Axis/trimming classification and full bands on native/SAT stepped shafts with a groove and bore; wrong-axis rejection and sourced diameter boundaries | Machine/tool/workholding profile, tool approach/reach/groove fit, interrupted and more complex turning fixtures, paired design outcomes |
-| #29 Resin | Build frame, sampled walls, closed-void screening; sealed/open cavity fixtures and unavailable-volume handling | Confirmed resin/machine/support intent; multiple-opening/flow/suction-cup and fine-feature coverage; paired resin outcomes |
-| #30 Powder | Shared envelope/wall/closed-void measurements with process-specific guidance and synthetic profiles | Select and qualify one actual polymer or metal process/profile; escape passages and removal evidence; post-processing, fine features and paired outcomes. No powder variant is production-qualified |
+| #29 Resin | Build frame, sampled walls, closed-void screening; sealed/open cavity fixtures, unavailable-volume handling and selected face distances with synthetic slot criteria | Confirmed resin/machine/support intent; multiple-opening/flow/suction-cup and broader fine-feature coverage; paired resin outcomes |
+| #30 Powder | Shared envelope/wall/closed-void and selected face-distance measurements with process-specific guidance and synthetic profiles | Select and qualify one actual polymer or metal process/profile; escape passages and removal evidence; post-processing, broader fine features and paired outcomes. No powder variant is production-qualified |
 
 Detailed measurements, fixture commands, failure observations and boundaries are
 in [DFM_EVALUATION.md](DFM_EVALUATION.md). Supplier authorization and data handling
@@ -59,7 +59,8 @@ The draft PRs form one ordered stack: foundation (#31), optional supplier path
 (#32), native process geometry (#33), shared state/assemblies (#34), partial radii
 (#35), build orientation (#36), report currency (#37), imported solids (#38),
 paired pocket repair (#39), reference discovery (#40), applicability/readiness
-(#41), and the existing-pattern bend inspection changes. Later branches include
+(#41), existing-pattern bend inspection (#42), and the selected face-distance
+changes. Later branches include
 their predecessors. Review each PR against its declared base; do not merge later
 branches out of order or interpret a green package build as process qualification.
 

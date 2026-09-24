@@ -75,6 +75,13 @@ replaced body is not silently substituted.
 - A normal-ray helper measures material at one interior face sample, requiring
   a confirmed solid interior and an exit on the same body. It does not find the
   global minimum wall thickness or qualify unsampled regions.
+- A selected face-pair helper measures native minimum distance between trimmed
+  faces, with an unordered pair of endpoints in part coordinates. Component faces
+  are measured through a rigid assembly occurrence and mapped back to the part.
+  Feature membership and material-versus-air require separate evidence. Shared
+  edges can legitimately measure zero; this is not an automatic gap/wall scan.
+  Values within Fusion's modeling tolerance of a process criterion require an
+  unknown boundary finding. Modeling tolerance is not a manufacturing allowance.
 - Native closed-void shells provide resin/powder entrapment evidence. Missing
   shell volume remains unknown, never zero. An open cavity still needs process
   checks for escape-hole size, orientation, flow and washing. This criterion

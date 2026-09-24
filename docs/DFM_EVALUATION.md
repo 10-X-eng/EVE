@@ -415,6 +415,51 @@ This fixture validates measurement plumbing for one bend. It does not qualify
 multi-bend parts, physical bend identification, relief, flange clearances,
 springback, tooling/sequence, pattern currency or supplier acceptance.
 
+## Selected trimmed-face distance validation
+
+`face_distance(first_index, second_index)` measures two selected trimmed faces
+through native MeasureManager. It does not enumerate candidate gaps, classify
+intervening material, find directional clearances or substitute infinite planes.
+It uses a root-context occurrence for component faces, requires a rigid transform,
+maps the endpoints back to native part coordinates and rejects changed placement.
+Unavailable native results remain unknown without a bounding-box approximation.
+
+The first live run exposed `invalid argument geometryOne` for native component
+faces; committing creation before inspection did not fix it. Explicit assembly
+proxies did. The helper was corrected and then tested both at identity placement
+and after rotating the disposable occurrence 90 degrees and translating it
+70/-30/20 mm. Distances and native endpoint coordinates matched in both cases.
+Native endpoint ordering did not consistently match the input faces, so the
+result deliberately exposes an **unordered** endpoint pair.
+
+Three U-section fixtures have independently specified 0.2/0.4/0.8 mm slots,
+2 mm legs and base, and 5 mm extrusion. Native volumes matched 202/204/208 mm³.
+Opposing slot walls and separate coplanar trimmed end faces both measured the
+specified gap; infinite supporting planes of those end faces would incorrectly
+give zero. A shared edge measured zero, while a pair across material measured
+2 mm. Analytic construction and separate point-containment checks establish
+air/material for these fixtures only, not a general classification algorithm.
+
+Synthetic minimum-gap criteria of 0.4 mm were exercised through the actual DFM
+runner for FDM, resin and powder stages. The 0.2 mm case produced a concern and
+the 0.8 mm case passed its dimensional comparison. The nominal 0.4 mm case read
+0.3999999999999959 mm: coordinate subtraction put it outside the existing narrow
+binary64 comparison allowance. The face-distance guidance now requires an
+**unknown boundary finding** when the measurement is within Fusion's modeling
+tolerance of the criterion. It neither rounds away the raw value nor treats
+modeling tolerance as a manufacturing allowance or certified uncertainty bound.
+The boundary case stayed unknown for every process. Each report also retained
+unknown actual manufacturing coverage, including when its dimension passed.
+
+`scripts/fusion_face_distance_smoke.py` creates only the guarded fixture component;
+call `measure(component)` separately for read-only checks. It rejects duplicate
+creation. Existing body geometry was preserved during setup and every body
+revision was preserved during inspection. Unit tests cover units, actual face
+arguments, inverse placement, changed/nonrigid/unavailable placements, zero,
+missing/malformed/failed native results, bad indices, stale bodies and cancellation.
+This adds selected feature measurement evidence, not real print, fitting,
+drainage, arbitrary geometry or manufacturing-process qualification.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
