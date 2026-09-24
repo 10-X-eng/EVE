@@ -217,6 +217,9 @@ TOOLS = [
          "stages": {"type": "array", "description": "Omit to read; supply the COMPLETE ordered plan to replace it, preserving prior constraints; [] clears only when the user requests forgetting this part's plan.", "minItems": 0, "maxItems": 8, "items": {
              "type": "object", "properties": {
                  "process": {"type": "string", "enum": list(GUIDES)},
+                 "machine": {"type": "object", "description": "Optional confirmed machine; copy selection from fusion_api_help steve.machines.<id>. Omit if unknown.",
+                     "properties": {"id": {"type": "string"}, "definition_hash": {"type": "string"}},
+                     "required": ["id", "definition_hash"], "additionalProperties": False},
                  "material": {"type": "string"}, "notes": {"type": "string"},
                  "criteria": {"type": "object", "description": "Named numeric limits with explicit units and provenance. Do not invent universal limits.",
                      "additionalProperties": {"type": "object", "properties": {
@@ -277,7 +280,7 @@ TOOLS = [
          "code": {"type": "string", "maxLength": 60000, "description": "Source without Markdown fences. Return names/counts and measured verification under 24,000 JSON characters. Truncation does not mean edits failed: inspect resulting state before retrying writes."}},
          "required": ["document_id", "title", "code"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_api_help", "deferLoading": False,
-     "description": "Read installed API signatures/members or STEVE guidance without calling API methods. Paths: adsk lists namespaces; adsk.<namespace>[.<Class>[.<member>]] inspects an API; steve.python documents script context; steve.helpers documents helper methods; steve.dfm[.<process>] documents manufacturing checks.",
+     "description": "Read installed API signatures/members or STEVE guidance without calling API methods. Paths: adsk lists namespaces; adsk.<namespace>[.<Class>[.<member>]] inspects an API; steve.python documents script context; steve.helpers documents helper methods; steve.dfm[.<process>] documents manufacturing checks; steve.machines[.<id>] lists machines or reads one definition.",
      "inputSchema": {"type": "object", "properties": {"path": {"type": "string", "maxLength": 250}},
                      "required": ["path"], "additionalProperties": False}},
 ]
@@ -333,6 +336,7 @@ def tool_failure(exc, code=None, execution_started=False):
         "chat_image_delivery_failed": "The saved image was not delivered to the model. Do not claim visual inspection or change the design to recreate the image. Retry view_chat_image only after resolving the reported cause.",
         "execution_error": "Inspect the current document and the reported failing line. Use fusion_api_help for the API involved, correct the cause, and query existing geometry or CAM operations before retrying changes. Do not repeat unchanged code.",
         "dfm_disabled": "DFM is off. Do not retry DFM tools or change the setting yourself; the user can enable DFM in STEVE's menu. Continue the requested work using the ordinary Fusion tools.",
+        "machine_definition_unavailable": "Read fusion_api_help steve.machines or steve.machines.<id>. Confirm the intended machine/process and review changed capabilities before updating the plan's machine reference. Missing capabilities stay unknown. Do not silently substitute a machine or use stale limits.",
         "rmfg_export_scope": "No geometry was uploaded. The installed STEP exporter exports a whole component. Use a single-solid component with no children/meshes, or report that the current part scope is unsupported. Do not export the parent assembly, hide neighbors, restructure the design, or copy it into a new document without an explicit user request.",
         "rmfg_unavailable": "Follow the specific RMFG error. Connect or approve only through STEVE's user interface. Preserve the returned job ID for retries; do not repeat uploads as new jobs. For stale geometry, request a new snapshot and approval. Supplier processing is not a Fusion failure; do not modify geometry just to retry.",
         "dfm_plan_required": "Read the body's plan with fusion_dfm_plan. Resolve manufacturing intent and consequential missing inputs, save its stages, then check an existing stage index. Do not invent limits.",
@@ -443,6 +447,11 @@ def validate_call(tool, arguments):
         return
     if tool == "fusion_api_help":
         path = arguments.get("path")
+        if set(arguments) == {"path"} and isinstance(path, str) and (path == 'steve.machines' or path.startswith('steve.machines.')):
+            if path != 'steve.machines':
+                from .machines import identifier
+                identifier(path[len('steve.machines.'):])
+            return
         if set(arguments) == {"path"} and path in ("steve.python", "steve.helpers", "steve.dfm", *("steve.dfm." + p for p in GUIDES)):
             return
         if set(arguments) != {"path"} or not isinstance(path, str) or len(path) > 250 or not path.split(".")[0] == "adsk" or any(not part.isidentifier() or part.startswith("_") for part in path.split(".")):

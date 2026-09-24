@@ -12,6 +12,9 @@ bounded reports; geometry and plan currency; and explicit pass, concern, unknown
 and evidence-backed not-applicable findings. Inspection uses the existing pinned
 Fusion query runner and does not authorize edits. Process guidance is loaded on
 demand. General DFM requires neither a supplier login nor a product MCP connection.
+Machine definitions live in separate sourced JSON files and bind plan stages by
+content hash. Initial printer envelopes and the extension contract are documented
+in [MACHINES.md](MACHINES.md); absent machine capabilities remain unknown.
 
 The reports describe the code's stated measurements and applicability judgments.
 They cannot establish that arbitrary generated code inspected every relevant
@@ -61,7 +64,7 @@ The draft PRs form one ordered stack: foundation (#31), optional supplier path
 paired pocket repair (#39), reference discovery (#40), applicability/readiness
 (#41), existing-pattern bend inspection (#42), selected face distances (#43),
 the tool-contract/on-demand-context review (#44), milling topology fixtures (#45),
-and provider toggle integration tests.
+provider toggle integration tests (#46), and machine definitions.
 Later branches include
 their predecessors. Review each PR against its declared base; do not merge later
 branches out of order or interpret a green package build as process qualification.

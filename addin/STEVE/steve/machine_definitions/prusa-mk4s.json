@@ -1,0 +1,41 @@
+{
+  "id": "prusa-mk4s",
+  "name": "Original Prusa MK4S",
+  "manufacturer": "Prusa Research",
+  "revision": "1",
+  "processes": [
+    "fdm"
+  ],
+  "verified_on": "2026-09-24",
+  "sources": {
+    "specifications": "https://www.prusa3d.com/product/original-prusa-mk4s-kit/"
+  },
+  "capabilities": {
+    "nominal_build_x": {
+      "value": 250,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal part extent along build X; excludes supports, brim, raft and placement offsets."
+    },
+    "nominal_build_y": {
+      "value": 210,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal part extent along build Y; excludes supports, brim, raft and placement offsets."
+    },
+    "nominal_build_z": {
+      "value": 220,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal part extent along build Z; excludes supports, brim, raft and placement offsets."
+    }
+  },
+  "unverified": [
+    "Installed machine configuration and available usable envelope must be confirmed.",
+    "No material/nozzle/slicer-specific wall, overhang, bridge or clearance limits are defined.",
+    "No adhesion, strength, support success or physical printing qualification."
+  ]
+}

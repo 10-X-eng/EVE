@@ -166,6 +166,35 @@ class DfmBridgeTests(unittest.TestCase):
         self.assertNotEqual(after['reportBinding']['revision'], result['dfm']['revision'])
         self.assertEqual(after['reportBinding']['planHash'], result['dfm']['planHash'])
 
+    def test_machine_change_during_check_invalidates_report_and_historical_binding(self):
+        from steve import machines
+        self.tools.dfm.set_enabled(True)
+        original = machines.load('prusa-mk4s')
+        selection = {key: original[key] for key in ('id', 'definition_hash')}
+        self.call('fusion_dfm_plan', stages=[{'process': 'fdm', 'machine': selection}])
+        changed = {**original, 'definition_hash': '0' * 64}
+        execute = bridge.run_python
+        def change_after_measurement(*args, **kwargs):
+            result = execute(*args, **kwargs)
+            loader.return_value = changed
+            return result
+        with patch.object(machines, 'load', return_value=original) as loader:
+            with patch.object(bridge, 'run_python', side_effect=change_after_measurement) as run:
+                result = self.call('fusion_dfm_check', stage=0, title='Machine envelope', code=
+                    "def run(context):\n context['dfm'].compare('X', 200, 'machine.nominal_build_x', '<=', 'mm')")[0]
+                self.assertEqual(run.call_count, 1)
+            self.assertTrue(result['ok'])
+            self.assertEqual(result['dfm']['status'], 'stale')
+            self.assertEqual(result['dfm']['findings'][0]['status'], 'unknown')
+            self.assertEqual(result['dfm']['findings'][0]['limit'], 250)
+            self.assertEqual(self.call('fusion_dfm_plan')[0]['reportBinding']['machineStatus'], 'stale')
+            with patch.object(bridge, 'run_python', wraps=execute) as run:
+                blocked = self.call('fusion_dfm_check', stage=0, title='Recheck', code='def run(context):\n return None')[0]
+                self.assertEqual(blocked['errorCode'], 'machine_definition_unavailable')
+                run.assert_not_called()
+            loader.side_effect = machines.MachineDefinitionError('Definition missing')
+            self.assertEqual(self.call('fusion_dfm_plan')[0]['reportBinding']['machineStatus'], 'unknown')
+
 
 if __name__ == '__main__':
     unittest.main()
