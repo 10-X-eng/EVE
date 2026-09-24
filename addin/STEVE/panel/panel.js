@@ -343,6 +343,8 @@ function renderControls() {
   $("restart-steve").textContent=state.codexRestarting?"Restarting STEVE…":"Restart STEVE";
   $("restart-steve").title=state.busy || state.jobBusy?"Finish or pause the current task before restarting":"Restart STEVE's conversation engine and reopen this chat";
   $("debug-logging").checked=!!state.debugLogging;
+  $("dfm-enabled").checked=!!state.dfmEnabled;
+  $("dfm-enabled").disabled=!!state.busy || !!state.jobBusy || state.job?.status==="active";
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
   $("installed-version").textContent=state.version?`STEVE ${state.version}`:"STEVE";
@@ -517,6 +519,7 @@ $("reconnect").onclick=()=>act("connect");
 $("repair-steve").onclick=()=>act("setupHelp",{page:"steve"});
 $("install-codex").onclick=()=>act("setupHelp",{page:"codex"});
 $("debug-logging").onchange=(event)=>act("debugLogging",{enabled:event.target.checked});
+$("dfm-enabled").onchange=(event)=>act("dfm",{enabled:event.target.checked});
 $("open-logs").onclick=()=>act("openLogs");
 $("check-updates").onclick=()=>{dismissedUpdate="";act("checkUpdates");};
 $("menu-update").onclick=()=>act("openUpdate",{page:"notes"});
@@ -600,6 +603,7 @@ function previewAction(action,payload){
   else if(action==="model"){state.model=payload.model;}
   else if(action==="effort"){state.effort=payload.effort;}
   else if(action==="debugLogging"){state.debugLogging=payload.enabled;}
+  else if(action==="dfm"){state.dfmEnabled=payload.enabled;}
   else if(action==="send"){
     state.messages.push({role:"user",text:payload.text});state.busy=true;state.status="Thinking";
     previewTimer=setTimeout(()=>{state.messages.push({role:"assistant",text:"Start with the **design intent**: what should stay fixed, and what should be easy to change?\n\nFor a mounting bracket, I'd define three parameters first:\n\n1. **Plate thickness** — driven by material and load.\n2. **Hole spacing** — matched to the parts it connects.\n3. **Bend height** — enough clearance for assembly.\n\nThen build a fully constrained sketch around the origin.\n\nWhat will your bracket attach to?"});state.busy=false;state.status="Ready";render();},900);

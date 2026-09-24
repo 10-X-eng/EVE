@@ -25,6 +25,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 - **Read the right documentation.** Search installed API classes and official samples, inspect exact signatures, and fetch Autodesk API references through tools available to every provider.
 - **Inspect each Fusion product.** Bounded summaries expose Design structure and feature health, CAM setup and operation state, and the Electronics information available through the installed API.
 - **Check measured outcomes.** STEVE can report measured checks and feature-health changes separately from whether its Python completed. Missing coverage and failed checks remain visible.
+- **Consider manufacturing (experimental).** Enable **DFM** in the menu and tell STEVE how a part will be made. It can retain per-body process stages and sourced limits, then run measured Python checks with explicit concerns and unknowns. This is an experimental checking workflow, not a certified process-rule library; see [DFM scope and validation](docs/DFM.md).
 
 ### Show STEVE what you mean
 

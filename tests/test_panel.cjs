@@ -121,6 +121,9 @@ elements.get('debug-logging').onchange({target:{checked:false}});
 assert.equal(vm.runInContext('selectedAction.payload.enabled', context), false);
 elements.get('open-logs').onclick();
 assert.equal(vm.runInContext('selectedAction.action', context), 'openLogs');
+elements.get('dfm-enabled').onchange({target:{checked:true}});
+assert.equal(vm.runInContext('selectedAction.action', context), 'dfm');
+assert.equal(vm.runInContext('selectedAction.payload.enabled', context), true);
 console.log('Debug menu checks passed: enable, disable, and open logs.');
 
 // Updating requires an explicit in-app confirmation.

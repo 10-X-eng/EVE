@@ -46,6 +46,10 @@
         <button id="menu-download" class="secondary-button" hidden>Download update</button>
       </div>
       <div class="debug-settings">
+        <label class="debug-toggle" for="dfm-enabled"><span>DFM <small>Experimental</small></span><input id="dfm-enabled" type="checkbox" role="switch" aria-describedby="dfm-note"></label>
+        <p id="dfm-note">Consider manufacturing while designing and check measured geometry. Tell STEVE how the part will be made. Finish or pause a task before changing this setting.</p>
+      </div>
+      <div class="debug-settings">
         <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
         <p id="debug-note">Off by default. When on, saves code, tool results, and errors locally. Logs may contain design details.</p>
         <button id="open-logs" class="secondary-button">Open logs folder</button>

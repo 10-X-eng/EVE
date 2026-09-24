@@ -20,6 +20,8 @@ from .verification import Checks, snapshot, report
 from .python_helpers import FusionHelpers, helper_help
 from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
+from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body
+from .dfm_geometry import DfmGeometry
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
 
@@ -154,6 +156,7 @@ class FusionTools:
         self.document = None
         self.document_id = None
         self.debug = None
+        self.dfm = DfmStore(home or data_home())
         self.capture_folder = Path(home or data_home()) / "captures"
         self.bind(app.registerCustomEvent(EVENT_ID), EventHandler(self), self.handlers)
         self.definition = app.userInterface.commandDefinitions.addButtonDefinition(
@@ -184,7 +187,7 @@ class FusionTools:
 
     def check_command(self, tool):
         state = self.command_state()
-        if tool in ("fusion_query_python", "fusion_capture_viewport"):
+        if tool in ("fusion_query_python", "fusion_capture_viewport", "fusion_dfm_plan", "fusion_dfm_check"):
             return state["readAllowed"]
         if state["readAllowed"] and not state["executionAllowed"]:
             raise ToolError("electronics_selection_read_only",
@@ -237,6 +240,15 @@ class FusionTools:
 
     def run_script(self, job):
         context = self.context()
+        dfm = None
+        if job['tool'] == 'fusion_dfm_check':
+            body, key, plan = self.dfm_target(job['arguments'], context)
+            index = job['arguments']['stage']
+            if not plan or index >= len(plan['stages']):
+                raise ToolError('dfm_plan_required', 'No saved manufacturing plan at that stage index.')
+            dfm = DfmChecks(body, plan['stages'][index])
+            dfm.measurements = DfmGeometry(body, self.app, adsk.core, adsk.cam, job['cancelled'])
+            context['dfm'] = dfm
         if job["tool"] == "fusion_execute_python":
             job["before"] = snapshot(context["design"])
             job["checks"] = Checks()
@@ -249,6 +261,8 @@ class FusionTools:
         with protect_cam_values(getattr(adsk.cam, "CAMParameter", None), record):
             result = run_python(job["arguments"]["code"], context, job["cancelled"],
                                 diagnostic=record if self.debug and self.debug.enabled else None)
+        if dfm is not None:
+            result['dfm'] = dfm.report(result['ok'])
         if (self.task and job["arguments"].get("execution_mode") == "application"
                 and self.app.activeDocument != self.document):
             # An application-mode script can intentionally create/open a document.
@@ -261,6 +275,33 @@ class FusionTools:
             self.on_wait("", self.task_label())
         record("python.completed", ok=result["ok"])
         return result
+
+    def dfm_target(self, arguments, context=None):
+        if not self.dfm.enabled:
+            raise ToolError('dfm_disabled', 'Enable DFM in STEVE before using DFM tools.')
+        context = context or self.context()
+        design = context['design']
+        if design is None:
+            raise ToolError('dfm_target_unavailable', 'DFM requires a Design product and a BRepBody.')
+        found = design.findEntityByToken(arguments['part_token'])
+        body = adsk.fusion.BRepBody.cast(found[0]) if len(found) == 1 else None
+        if body is None or not body.isValid:
+            raise ToolError('dfm_target_unavailable', 'The body token is invalid, ambiguous or no longer available.')
+        body = native_body(body)
+        data_file = optional_property(context['document'], 'dataFile')
+        file_id = optional_property(data_file, 'id')
+        key = file_id if file_id else 'session:' + str(self.document_id)
+        return body, key, self.dfm.plan(key, body, design)
+
+    def dfm_plan(self, arguments):
+        context = self.context()
+        body, key, plan = self.dfm_target(arguments, context)
+        if 'stages' in arguments:
+            self.dfm.save_plan(key, body, context['design'], arguments['stages'])
+            plan = self.dfm.plan(key, body, context['design'])
+        return {'ok': True, 'body': body.name, 'partToken': body.entityToken,
+                'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',
+                'scope': 'Native body definition. Occurrence placement, assembly context and build orientation require explicit checks.'}
 
     def verify(self, job, result):
         if "before" not in job:
@@ -434,6 +475,8 @@ class FusionTools:
     def api_help(self, path):
         if path == "steve.helpers":
             return helper_help()
+        if path == 'steve.dfm' or path.startswith('steve.dfm.'):
+            return {'ok': True, **dfm_guide(path[len('steve.dfm.'):] if path != 'steve.dfm' else None)}
         parts = path.split(".")
         if path == "adsk":
             return {"ok": True, "namespaces": self.namespaces()}
@@ -516,11 +559,14 @@ class FusionTools:
                 self.finish(job, self.search_docs(job["arguments"]["query"], job["arguments"].get("offset", 0)))
             elif job["tool"] == "fusion_capture_viewport":
                 self.finish(job, self.capture_viewport(job))
+            elif job["tool"] == "fusion_dfm_plan":
+                self.check_target(job)
+                self.finish(job, self.dfm_plan(job['arguments']))
             else:
                 self.check_target(job)
                 if not self.check_command(job["tool"]):
                     raise ToolError("active_command", "Finish or cancel the active Fusion command, then retry this operation.")
-                querying = job["tool"] == "fusion_query_python"
+                querying = job["tool"] in ("fusion_query_python", "fusion_dfm_check")
                 if querying or job["arguments"].get("execution_mode", "command") == "application":
                     result = self.run_script(job)
                     result.update(executionMode="query" if querying else "application", undoGrouped=False)

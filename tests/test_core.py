@@ -219,6 +219,19 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(self.controller.snapshot()["accountChecked"])
         self.assertEqual(self.controller.snapshot()["account"]["email"], "test@example.com")
 
+    def test_dfm_switch_publishes_context_and_does_not_change_mid_turn(self):
+        self.assertFalse(self.controller.snapshot()['dfmEnabled'])
+        self.controller.dispatch('dfm', {'enabled': True})
+        eventually(lambda: self.snapshots[-1]['dfmEnabled'])
+        self.controller.dispatch('send', {'text': 'Design a printable bracket'})
+        eventually(lambda: self.controller.turn_id is not None)
+        sent = next(p for method, p in self.client.calls if method == 'turn/start')
+        context = next(p['text'] for p in sent['input'] if p.get('text', '').startswith(CONTEXT_PREFIX))
+        self.assertTrue(json.loads(context[len(CONTEXT_PREFIX):])['dfmEnabled'])
+        with self.assertRaisesRegex(ValueError, 'Finish or pause'):
+            self.controller.dispatch('dfm', {'enabled': False})
+        self.assertTrue(self.controller.dfm.enabled)
+
     def test_documentation_worker_does_not_block_stop_or_require_fusion_bridge(self):
         from steve.documentation import BASE
         entered, release = threading.Event(), threading.Event()
@@ -876,7 +889,7 @@ class ControllerTests(unittest.TestCase):
     def test_new_and_resumed_chats_receive_current_tools_and_prompt(self):
         params = thread_start_params(ROOT)
         self.assertEqual({tool["name"] for tool in params["dynamicTools"]},
-                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image", "fusion_search_docs", "fusion_fetch_docs"})
+                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image", "fusion_search_docs", "fusion_fetch_docs", "fusion_dfm_plan", "fusion_dfm_check"})
         self.assertNotIn("No tools are available", params["baseInstructions"])
         self.client.history = [{"id": "saved-thread", "preview": "Old chat"}]
         self.controller.dispatch("history")
