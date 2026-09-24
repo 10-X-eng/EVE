@@ -7,8 +7,12 @@ import copy
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
+import tempfile
 import threading
+
+from .secure_store import SecureStore
 
 
 GUIDES = {
@@ -55,6 +59,7 @@ def guide(process=None):
     common = {
         'experimental': True,
         'workflow': 'Inspect the target and resolve a BRepBody token. Read/set its plan with fusion_dfm_plan; use fusion_dfm_check for a selected stage. Derive criteria from user requirements or a documented profile, never invent availability or limits. Preserve functional requirements; recheck after relevant edits.',
+        'assemblyFrames': 'Plans and dfm.body describe the native part definition; repeated occurrences share that plan. They do not share placement or automatically share a print orientation. For an explicitly chosen assembly build frame, retain the intended BRepBody proxy, obtain its assemblyContext occurrence in the root context (including nested childOccurrences), copy occurrence.transform2 and invert it. Transform build-direction Vector3D objects by that inverse before passing their components to native envelope/overhang helpers. Use Point3D for axis origins so translation is included; Fusion point coordinates are cm, while rotational_surfaces takes an origin in mm. Do not use the retired occurrence.transform. Record the occurrence, chosen axes and measured revision; changing placement requires a new orientation-dependent assessment. Do not silently measure every occurrence with native XYZ or infer a build orientation from assembly placement.',
         'signatures': [
             "context['dfm'].body: selected native BRepBody (component coordinates; account for assembly/build transforms)",
             "context['dfm'].stage: copied process/material/notes/criteria",
@@ -131,6 +136,7 @@ class DfmStore:
         self.enabled = False
         self._plans = {}
         self._lock = threading.RLock()
+        self._guard = SecureStore(home, 'dfm-plan-write')
         try:
             if self.path.stat().st_size > 2_000_000:
                 return
@@ -152,20 +158,41 @@ class DfmStore:
         except (OSError, ValueError, AttributeError):
             pass
 
+    def _refresh(self):
+        # Process-local unsaved documents never enter the shared file. Refresh
+        # persistent plans under the writer lock, without toggling an active
+        # instance's DFM behavior in the middle of its task.
+        current = DfmStore(self.path.parent)
+        sessions = {key:value for key,value in self._plans.items() if key.startswith('session:')}
+        self._plans = {**current._plans, **sessions}
+        return current.enabled
+
+    def _file_lock(self):
+        return self._guard.locked('Another STEVE instance is saving DFM plans. Retry when that write finishes; no Fusion operation was cancelled.')
+
     def _write(self, enabled, plans):
         persistent = {key: value for key, value in plans.items() if not key.startswith('session:')}
         encoded = json.dumps({'enabled': enabled, 'plans': persistent}, allow_nan=False)
         if len(encoded.encode('utf-8')) > 2_000_000:
             raise ValueError('DFM local plan storage is full. Remove unused plans before adding more.')
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix('.tmp')
-        temporary.write_text(encoded, encoding='utf-8')
-        temporary.replace(self.path)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=self.path.parent, suffix='.tmp', delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(encoded.encode('utf-8'))
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary.replace(self.path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     def set_enabled(self, enabled):
         if type(enabled) is not bool:
             raise ValueError('DFM enabled must be true or false.')
-        with self._lock:
+        with self._lock, self._file_lock():
+            self._refresh()
             self._write(enabled, self._plans)
             self.enabled = enabled
 
@@ -184,14 +211,16 @@ class DfmStore:
         return None
 
     def plan(self, document_key, body, design):
-        with self._lock:
+        with self._lock, self._file_lock():
+            self._refresh()
             return copy.deepcopy(self._entry(self._key(document_key), body, design))
 
     def save_plan(self, document_key, body, design, stages):
         stages = validate_stages(stages)
         body = native(body)
         short(body.entityToken, 'Part token', 4096)
-        with self._lock:
+        with self._lock, self._file_lock():
+            persistent_enabled = self._refresh()
             key = self._key(document_key)
             old = self._entry(key, body, design)
             plans = copy.deepcopy(self._plans)
@@ -201,7 +230,7 @@ class DfmStore:
             if len(entries) >= 64 or len(plans) > 128:
                 raise ValueError('DFM plans support up to 64 bodies per document and 128 documents.')
             entries.append({'token': body.entityToken, 'stages': stages})
-            self._write(self.enabled, plans)
+            self._write(persistent_enabled, plans)
             self._plans = plans
 
 

@@ -113,6 +113,38 @@ model runs requested a final viewport image and received an unsupported-tool res
 The model was able to finish using measured geometry. This development adapter is
 not a security sandbox or a substitute for testing the add-in's normal UI queue.
 
+## Repeated and nested assembly fixtures
+
+A mixed-body component contained a **2 × 1 × 0.125 inch** plate and a separate
+turning body. Two more instances repeated that definition: one translated and
+rotated 90° about Z, and one nested under a rotated parent with a second 90°
+rotation. A temporary process store resolved all three plate proxies to the same
+ordered plan, while preserving the other body's independent turning plan.
+
+The test explicitly mapped an assembly build frame into native body coordinates
+using each root-context occurrence's inverse `transform2`. Against a supplied
+60 × 30 × 5 mm envelope, the original and 180° nested instance measured
+50.8 × 25.4 × 3.175 mm and fit. The 90° instance measured
+25.4 × 50.8 × 3.175 mm and exceeded Y. Independently expected translated bounds
+matched each proxy; all pre-existing body revisions were unchanged.
+
+The reproducible developer fixture is `scripts/fusion_assembly_dfm_smoke.py`.
+This validates plan ownership, inch conversion and explicit frame handling. It
+does not qualify arbitrary mixed-process sequences, assembly collision clearance,
+or automatic print orientation selection. Guidance now gives the tested frame
+conversion steps instead of relying on the model to infer them.
+
+Reference: [Autodesk occurrence transforms](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_Occurrence_transform2.htm)
+and [assembly proxies](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/ComponentsProxies_UM.htm).
+
+A separate two-instance regression reproduced lost saved plans and a reverted
+remembered switch when a stale store overwrote another instance's file. Plan
+reads/writes now refresh persistent data under a nonblocking process lock; writes
+use unique temporary files and atomic replacement. Unsaved-document plans stay
+local, and another instance's preference change does not toggle an active task.
+Tests cover interleaved saves, preserved preferences, lock contention and retry.
+The exact live repaired-part check also passed through the updated store.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

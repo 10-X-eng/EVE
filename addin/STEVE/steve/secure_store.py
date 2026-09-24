@@ -23,7 +23,7 @@ class SecureStore:
         self._depth = 0
 
     @contextmanager
-    def locked(self):
+    def locked(self, busy_message='Another STEVE instance is using this connection. Retry when it finishes.'):
         with self._lock:
             if self._depth:
                 self._depth += 1
@@ -46,7 +46,7 @@ class SecureStore:
                         import fcntl
                         fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError:
-                    raise RuntimeError('Another STEVE instance is using this connection. Retry when it finishes.') from None
+                    raise RuntimeError(busy_message) from None
                 try:
                     self._depth = 1
                     yield
