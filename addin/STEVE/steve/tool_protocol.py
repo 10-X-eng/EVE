@@ -33,6 +33,10 @@ before modeling. Execution uses Fusion's main thread, so do not promise backgrou
 while another document is active.
 
 Work in coherent operations
+Use context['helpers'] for captured selection/entity resolution, validated Design unit
+expressions, and bounded collection pages. Read fusion_api_help('steve.helpers') for
+signatures and examples. Helpers supplement full Python operations; they do not require
+a separate tool call per API step. Invalid original entities must not be replaced silently.
 Use fusion_query_python to inspect, measure, search, and verify actual state; keep queries
 free of side effects. Do not ask the user to list information you can query.
 Use fusion_execute_python for requested changes. Write a coherent, bounded operation
@@ -134,6 +138,7 @@ PYTHON_CONTEXT = (
     "Define def run(context); STEVE calls it once on Fusion's main thread with fresh globals. "
     "Context: app, data, ui, document, product, products (by productType), design, root, units, "
     "selection, selectionCount, selectionInvalidCount, targetPinned, dataPanel (pinned scope IDs). "
+    "helpers provides selected, entity, evaluate and page; fusion_api_help path steve.helpers documents these. "
     "Modification scripts also receive verification.check(label, actual, expected, tolerance=0.0, units='') "
     "to record up to 20 measured scalar checks without aborting on a mismatch. "
     "Document/product/selection are the task target; design/root/units may be None. "
@@ -209,6 +214,7 @@ def tool_failure(exc, code=None, execution_started=False):
                 "api_member_unavailable" if isinstance(exc, AttributeError) else
                 "api_signature_mismatch" if isinstance(exc, TypeError) else "execution_error")
     recovery = {
+        "entity_unavailable": "The pinned entity is stale, missing, ambiguous, or has the wrong type. Inspect the original document and resolve the intended target before changes. Do not use a later UI selection or arbitrarily choose the first match.",
         "documentation_unavailable": "The documentation read failed, not a Fusion operation. Use installed fusion_api_help or another official sample link. Check connectivity for network errors; do not interpret a missing page as an unavailable API or retry in a loop.",
         "invalid_python": "Correct the Python syntax at the reported line, keep work inside def run(context), and submit the corrected code without Markdown fences.",
         "invalid_arguments": "Correct the named argument using this tool's input schema. Python tools require document_id, title, and code defining run(context); get document_id from fusion_inspect_document.",
@@ -285,6 +291,8 @@ def validate_call(tool, arguments):
         return
     if tool == "fusion_api_help":
         path = arguments.get("path")
+        if set(arguments) == {"path"} and path == "steve.helpers":
+            return
         if set(arguments) != {"path"} or not isinstance(path, str) or len(path) > 250 or not path.split(".")[0] == "adsk" or any(not part.isidentifier() or part.startswith("_") for part in path.split(".")):
             raise ValueError("Choose a public API path rooted at adsk.")
         return
