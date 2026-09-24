@@ -87,6 +87,16 @@ class RMFGJobTests(unittest.TestCase):
             self.jobs.read(job['id'])
         self.assertFalse(self.client.calls)
 
+    def test_cross_instance_writes_are_exclusive_and_submitted_upload_cannot_repeat(self):
+        second=RMFGJobs(self.temp.name,self.auth,self.client)
+        with self.jobs.guard.locked():
+            with self.assertRaises(RuntimeError):
+                second.prepare(self.snapshot)
+        job=self.ready()
+        with self.assertRaisesRegex(RMFGError,'already uploaded'):
+            second.upload(job['id'])
+        self.assertEqual(len(self.client.calls),1)
+
     def test_report_keeps_supplier_warnings_without_private_links_or_hidden_issues(self):
         job=self.ready()
         result=self.jobs.check(job['id'],[{'part_id':'part1','material_id':'aluminum'}])

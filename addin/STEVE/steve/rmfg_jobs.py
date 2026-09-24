@@ -1,11 +1,13 @@
 """Durable, revision-bound supplier jobs; no Autodesk access or arbitrary file uploads."""
 import hashlib
 import json
+import os
 from pathlib import Path
-import threading
+import tempfile
 from uuid import uuid4
 
 from .rmfg import RMFGClient, RMFGError, identifier
+from .secure_store import SecureStore
 
 
 def fields(value, names):
@@ -17,7 +19,7 @@ class RMFGJobs:
         self.folder = Path(home) / 'rmfg-jobs'
         self.auth = auth
         self.client = client or RMFGClient(auth.access_token)
-        self.lock = threading.RLock()
+        self.guard = SecureStore(home, 'rmfg-job-write')
 
     def _write(self, job):
         self.folder.mkdir(parents=True, exist_ok=True)
@@ -25,9 +27,17 @@ class RMFGJobs:
         data = json.dumps(job, allow_nan=False).encode('utf-8')
         if len(data) > 2*1024*1024:
             raise RMFGError('RMFG job metadata is too large. Inspect this report on RMFG.')
-        temporary = path.with_suffix('.tmp')
-        temporary.write_bytes(data)
-        temporary.replace(path)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=self.folder, suffix='.tmp', delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary.replace(path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     def read(self, job_id):
         path = self.folder / (identifier(job_id)+'.json')
@@ -40,7 +50,7 @@ class RMFGJobs:
 
     def prepare(self, snapshot):
         """Store exact exported bytes before approval; never accepts an input path."""
-        with self.lock:
+        with self.guard.locked():
             self.folder.mkdir(parents=True, exist_ok=True)
             files = list(self.folder.glob('*.step'))
             if len(files) >= 100 or sum(p.stat().st_size for p in files)+len(snapshot['step']) > 200*1024*1024:
@@ -54,7 +64,7 @@ class RMFGJobs:
             return job
 
     def decide(self, job_id, approved):
-        with self.lock:
+        with self.guard.locked():
             job = self.read(job_id)
             if job['state'] != 'awaiting_approval':
                 raise RMFGError('That upload request is no longer awaiting approval.')
@@ -64,8 +74,10 @@ class RMFGJobs:
                 (self.folder / (job['id']+'.step')).unlink(missing_ok=True)
 
     def upload(self, job_id):
-        with self.lock:
+        with self.guard.locked():
             job = self.read(job_id)
+            if job.get('designId'):
+                raise RMFGError('This snapshot was already uploaded. Use status for this same job; do not submit another upload.')
             if job['state'] not in ('approved', 'uploading'):
                 raise RMFGError('Approve this exact snapshot in STEVE before uploading.')
             data = (self.folder / (job['id']+'.step')).read_bytes()
@@ -88,7 +100,7 @@ class RMFGJobs:
                 **fields(result, 'has_more next_cursor')}
 
     def status(self, job_id, offset=0):
-        with self.lock:
+        with self.guard.locked():
             job = self.read(job_id)
             if job.get('reportId'):
                 report = self.client.dfm(job['reportId'])
@@ -107,7 +119,7 @@ class RMFGJobs:
             return result
 
     def check(self, job_id, parts):
-        with self.lock:
+        with self.guard.locked():
             job = self.read(job_id)
             if job.get('designState') != 'ready':
                 raise RMFGError('Read this job status until analysis is ready, then configure its returned parts.')

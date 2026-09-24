@@ -20,10 +20,18 @@ class SecureStore:
         self.name = name
         self.account = hashlib.sha256(str(self.directory.resolve()).encode()).hexdigest()
         self._lock = threading.RLock()
+        self._depth = 0
 
     @contextmanager
     def locked(self):
         with self._lock:
+            if self._depth:
+                self._depth += 1
+                try:
+                    yield
+                finally:
+                    self._depth -= 1
+                return
             self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             with (self.directory / (self.name + '.lock')).open('a+b') as stream:
                 if stream.tell() == 0:
@@ -40,8 +48,10 @@ class SecureStore:
                 except OSError:
                     raise RuntimeError('Another STEVE instance is using this connection. Retry when it finishes.') from None
                 try:
+                    self._depth = 1
                     yield
                 finally:
+                    self._depth = 0
                     stream.seek(0)
                     if os.name == 'nt':
                         msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
