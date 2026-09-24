@@ -25,6 +25,9 @@ Inspection can return inspectionDeferred with captured metadata and the active c
 If so, explain the wait and stop issuing dependent queries or changes until the user
 finishes the command or requests another attempt. Do not interpret an unknown command
 as idle. A long wait is not evidence of failure; never abort native Fusion calculations.
+When commandState.readAllowed is true, inspection and queries may proceed even if
+executionAllowed is false. Electronics GROUP is normal selection, not a command the
+user needs to finish. Query tools must still have no side effects.
 Intentional document creation/opening can transfer the task; inspect its returned context
 before modeling. Execution uses Fusion's main thread, so do not promise background edits
 while another document is active.
@@ -225,6 +228,7 @@ def tool_failure(exc, code=None, execution_started=False):
         "target_document_closed": "The original task document was closed. Stop document work and tell the user; do not reopen it, choose another document, or replay changes automatically. A new user request must establish a new target.",
         "live_context_access": "Use the pinned context: document, product, products (e.g. products['CAMProductType']), design, root, selection, and dataPanel scope IDs. Inspect that target if needed. Do not use live activeDocument/activeProduct/activeSelections/workspace/Data Panel getters or bypass this check with aliases/getattr. The script was rejected before execution.",
         "active_command": "Ask the user to finish or cancel the active Fusion command, then inspect the document again. Do not cancel their command or loop retries yourself.",
+        "electronics_selection_read_only": "Use fusion_inspect_document or fusion_query_python to read the schematic. GROUP is its normal selection mode; do not ask the user to finish it. Check the installed Electronics API for the requested capability and explain the specific editing limitation. Do not bypass this gate with a query, start UI commands, or retry the write automatically.",
         "cancelled": "Stop this operation. Do not retry or continue automatically; wait for the user's next instruction.",
         "inactive_request": "This request belongs to a finished or replaced turn. Do not execute or retry it.",
         "python_time_budget": "Use a smaller bounded operation. For queries, filter first and read at most 20 items from one library or collection per call; avoid unbounded loops and full-library traversal. Inspect current state before retrying changes.",

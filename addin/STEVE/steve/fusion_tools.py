@@ -168,9 +168,30 @@ class FusionTools:
         command = ui.activeCommand
         workspace = optional_property(ui, "activeWorkspace")
         product = self.task["product"] if self.task else self.app.activeProduct
-        return {"activeCommand": command, "workspace": optional_property(workspace, "id"),
-                "product": optional_property(product, "productType"),
-                "executionAllowed": command in ("SelectCommand", COMMAND_ID)}
+        workspace_id = optional_property(workspace, "id")
+        product_type = optional_property(product, "productType")
+        execution_allowed = command in ("SelectCommand", COMMAND_ID)
+        # GROUP is Electronics' default selection command, not an idle SelectCommand.
+        # Only the observed schematic state is verified; do not exempt editing commands
+        # or let a workspace switch authorize access to a different pinned product.
+        schematic_selection = (command == "Electron::Group"
+                               and workspace_id == "SchEditorEnvironement"
+                               and product_type == "SchematicProductType"
+                               and self.app.activeProduct == product)
+        return {"activeCommand": command, "workspace": workspace_id,
+                "product": product_type, "executionAllowed": execution_allowed,
+                "readAllowed": execution_allowed or schematic_selection}
+
+    def check_command(self, tool):
+        state = self.command_state()
+        if tool in ("fusion_query_python", "fusion_capture_viewport"):
+            return state["readAllowed"]
+        if state["readAllowed"] and not state["executionAllowed"]:
+            raise ToolError("electronics_selection_read_only",
+                            "Electronics GROUP is the normal selection mode. STEVE can inspect "
+                            "and query this schematic, but cannot launch a modifying operation "
+                            "in this command state. No code was executed.")
+        return state["executionAllowed"]
 
     def wait_for(self, job, reason):
         self.waiting = job
@@ -347,6 +368,8 @@ class FusionTools:
 
     def capture_viewport(self, job):
         self.check_target(job)
+        if not self.check_command("fusion_capture_viewport"):
+            raise ToolError("active_command", "Finish the active Fusion command before capturing its viewport.")
         viewport = self.app.activeViewport
         if viewport is None or self.app.activeDocument is None:
             raise ToolError("viewport_unavailable", "There is no active document viewport to capture.")
@@ -373,7 +396,7 @@ class FusionTools:
 
     def inspect_document(self):
         state = self.command_state()
-        if not state["executionAllowed"]:
+        if not state["readAllowed"]:
             # Metadata only: do not evaluate profiles or traverse a model while
             # the user is editing. An unfamiliar idle command is never trusted.
             return {**self.selection_context(), "commandState": state, "design": None,
@@ -480,7 +503,7 @@ class FusionTools:
                 if self.app.activeDocument != self.document:
                     self.wait_for(job, "Waiting for " + (self.task["snapshot"]["name"] or "the task document"))
                     return
-                if job["tool"] != "fusion_inspect_document" and not self.command_state()["executionAllowed"]:
+                if job["tool"] != "fusion_inspect_document" and not self.check_command(job["tool"]):
                     self.wait_for(job, "Waiting for Fusion command " + str(self.app.userInterface.activeCommand)[:160]
                                   + ". STEVE has not started this operation; Stop cancels only this request.")
                     return
@@ -495,7 +518,7 @@ class FusionTools:
                 self.finish(job, self.capture_viewport(job))
             else:
                 self.check_target(job)
-                if self.app.userInterface.activeCommand not in ("SelectCommand", COMMAND_ID):
+                if not self.check_command(job["tool"]):
                     raise ToolError("active_command", "Finish or cancel the active Fusion command, then retry this operation.")
                 querying = job["tool"] == "fusion_query_python"
                 if querying or job["arguments"].get("execution_mode", "command") == "application":

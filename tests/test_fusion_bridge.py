@@ -257,6 +257,92 @@ class FusionBridgeTests(unittest.TestCase):
         self.assertEqual(self.host.executions, 0)
         self.assertEqual(self.host.userInterface.activeCommand, "UnknownElectronicsCommand")
 
+    def schematic_selection(self):
+        self.host.activeProduct = Obj(productType="SchematicProductType")
+        self.host.activeDocument.products = Collection(self.host.activeProduct)
+        self.host.userInterface.activeWorkspace = Obj(id="SchEditorEnvironement")
+        self.host.userInterface.activeCommand = "Electron::Group"
+        return self.bridge.message_context("send")["document_id"]
+
+    def test_default_schematic_selection_allows_inspection_and_query_without_command(self):
+        token = self.schematic_selection()
+        self.bridge.submit("fusion_inspect_document", {}, self.results.append, lambda: False)
+        self.bridge.submit("fusion_query_python", {"document_id": token, "title": "Inspect schematic",
+            "code": "def run(context):\n return {'product': context['product'].productType}"},
+            self.results.append, lambda: False)
+        self.host.pump()
+        self.assertEqual(len(self.results), 2)
+        self.assertTrue(all(result["ok"] for result in self.results))
+        self.assertNotIn("inspectionDeferred", self.results[0])
+        self.assertEqual(self.results[0]["products"], ["SchematicProductType"])
+        self.assertTrue(self.results[0]["commandState"]["readAllowed"])
+        self.assertFalse(self.results[0]["commandState"]["executionAllowed"])
+        self.assertEqual(self.results[1]["result"], {"product": "SchematicProductType"})
+        self.assertEqual(self.host.executions, 0)
+        self.assertEqual(self.host.userInterface.activeCommand, "Electron::Group")
+
+    def test_schematic_selection_rejects_writes_without_waiting_or_executing(self):
+        token = self.schematic_selection()
+        for mode in ("command", "application"):
+            self.bridge.submit("fusion_execute_python", {"document_id": token, "title": "Write",
+                "execution_mode": mode, "code": "def run(context):\n raise AssertionError('Must not run')"},
+                self.results.append, lambda: False)
+        self.host.pump()
+        self.assertEqual(len(self.results), 2)
+        for result in self.results:
+            self.assertEqual(result["errorCode"], "electronics_selection_read_only")
+            self.assertFalse(result["executionStarted"])
+            self.assertIn("do not ask the user to finish", result["recovery"])
+        self.assertIsNone(self.bridge.waiting)
+        self.assertEqual(self.host.executions, 0)
+        self.assertEqual(self.host.userInterface.activeCommand, "Electron::Group")
+
+    def test_schematic_selection_allows_current_view_capture(self):
+        token = self.schematic_selection()
+        def save(path, width, height):
+            Path(path).write_bytes(b"\x89PNG\r\n\x1a\nfixture")
+            return True
+        self.host.activeViewport = Obj(width=800, height=600, refresh=lambda: True, saveAsImageFile=save)
+        self.bridge.submit("fusion_capture_viewport", {"document_id": token}, self.results.append, lambda: False)
+        self.host.pump()
+        self.assertTrue(self.results[0]["ok"])
+        self.assertTrue(self.results[0]["imageUrl"].startswith("data:image/png;base64,"))
+        self.assertEqual(self.host.executions, 0)
+        self.assertEqual(self.host.userInterface.activeCommand, "Electron::Group")
+
+    def test_schematic_editing_commands_still_defer_inspection_and_queries(self):
+        token = self.schematic_selection()
+        for command in ("Electron::Move", "Electron::Route"):
+            with self.subTest(command=command):
+                self.host.userInterface.activeCommand = command
+                with patch.object(self.bridge, "context", side_effect=AssertionError("Must not traverse")):
+                    self.assertTrue(self.bridge.inspect_document()["inspectionDeferred"])
+                    self.bridge.submit("fusion_query_python", {"document_id": token, "title": "Read",
+                        "code": "def run(context):\n return {}"}, self.results.append, lambda: False)
+                    self.host.pump()
+                self.assertIsNotNone(self.bridge.waiting)
+                self.assertFalse(self.results)
+                # Explicitly cancel the pending request before trying the next command.
+                self.bridge.waiting["cancelled"] = lambda: True
+                self.bridge.wake()
+                self.host.pump()
+                self.assertEqual(self.results.pop()["errorCode"], "cancelled")
+                self.assertEqual(self.host.userInterface.activeCommand, command)
+        self.assertEqual(self.host.executions, 0)
+
+    def test_group_exception_requires_verified_product_workspace_and_pinned_product(self):
+        self.host.userInterface.activeCommand = "Electron::Group"
+        self.assertFalse(self.bridge.command_state()["readAllowed"])
+        self.schematic_selection()
+        self.host.userInterface.activeWorkspace = Obj(id="DifferentWorkspace")
+        self.assertFalse(self.bridge.command_state()["readAllowed"])
+        self.host.userInterface.activeWorkspace = Obj(id="SchEditorEnvironement")
+        # Even another schematic product must not authorize reading the pinned one.
+        self.host.activeProduct = Obj(productType="SchematicProductType", name="Other")
+        self.assertFalse(self.bridge.command_state()["readAllowed"])
+        self.host.activeProduct = self.bridge.task["product"]
+        self.assertTrue(self.bridge.command_state()["readAllowed"])
+
     def test_long_queued_wait_never_expires_or_starts_work(self):
         self.bridge.message_context("send")
         self.host.userInterface.activeCommand = "CalculationCommand"
