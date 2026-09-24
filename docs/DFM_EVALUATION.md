@@ -255,6 +255,31 @@ revision invalidation and unavailable normals across pages.
 copying one planar face into a separate disposable surface component. Inspection
 did not change that surface; both scripts verified all pre-existing body revisions.
 
+## Manufacturing-plan currency
+
+The DFM runner now re-reads the part's full ordered plan after inspection. A
+second STEVE instance can update saved plans, so checking only the native geometry
+revision was insufficient. Changes to another process stage, stage ordering or
+plan removal now mark the result stale and preserve its raw measurements as
+unknown evidence. A contended/unreadable plan leaves the report incomplete without
+rerunning the inspection. Report metadata records the assessed plan hash, stage
+index and document. Plan reads expose current revision/hash bindings for comparing
+historical reports. The public stage snapshot cannot relabel the criteria used by
+earlier measurements through accidental dictionary edits.
+
+Queue/runner tests use a separate store instance to change, reorder and remove
+saved plans between measurement and report construction. They also cover a failed
+plan re-read, unchanged plans, later geometry changes and retained measurement
+values. The live `scripts/fusion_dfm_currency_smoke.py` uses real native geometry
+with temporary session plans: an unchanged 60 mm envelope comparison is checked;
+changing the second process stage or clearing the plan makes the same comparison
+stale. All measured values and original criteria remain in the report, and every
+existing body revision is preserved. No user settings or geometry are changed.
+
+These bindings cover recorded plans and native body geometry. They do not track
+external library edits, machine state or occurrence placement automatically, and
+do not retroactively rewrite chat history or certify a generated algorithm.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

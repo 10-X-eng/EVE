@@ -35,8 +35,12 @@ replaced body is not silently substituted.
   profile, guideline or assumption. Unconfirmed criteria remain conditional.
 - Reports separate concerns, checked measurements and unknown coverage. Failed
   execution, missing revision information and geometry changes cannot validate
-  a result. Historical chat reports refer only to their recorded body revision
-  and configuration; recheck current geometry before relying on them.
+  a result. The runner also re-reads the ordered manufacturing plan after a check;
+  changed/cleared plans make the report stale, and unavailable plan reads leave
+  its findings unknown without replaying the code. Historical reports remain
+  snapshots. Plan reads expose the current revision and plan hash for comparison
+  before reuse; a changed or unavailable binding requires a fresh check.
+  Matching bindings do not validate external tooling changes or occurrence placement.
 - Native measurement helpers provide oriented envelopes, complete cylindrical
   wall bands, and downward planar face angles. The build axes are explicit;
   assembly transforms and support/brim/raft envelopes are not implicitly included.

@@ -20,7 +20,7 @@ from .verification import Checks, snapshot, report
 from .python_helpers import FusionHelpers, helper_help
 from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
-from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body
+from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body, plan_hash, revision
 from .dfm_geometry import DfmGeometry
 from .rmfg_snapshot import export_snapshot
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
@@ -248,6 +248,7 @@ class FusionTools:
             if not plan or index >= len(plan['stages']):
                 raise ToolError('dfm_plan_required', 'No saved manufacturing plan at that stage index.')
             dfm = DfmChecks(body, plan['stages'][index])
+            assessed_plan_hash = plan_hash(plan)
             dfm.measurements = DfmGeometry(body, self.app, adsk.core, adsk.cam, job['cancelled'], fusion=adsk.fusion)
             context['dfm'] = dfm
         if job["tool"] == "fusion_execute_python":
@@ -263,7 +264,16 @@ class FusionTools:
             result = run_python(job["arguments"]["code"], context, job["cancelled"],
                                 diagnostic=record if self.debug and self.debug.enabled else None)
         if dfm is not None:
-            result['dfm'] = dfm.report(result['ok'])
+            try:
+                current_plan = self.dfm.plan(key, body, context['design'])
+                configuration_status = 'current' if plan_hash(current_plan) == assessed_plan_hash else 'stale'
+            except (OSError, RuntimeError, ValueError):
+                # A contended/read-failed store cannot turn old criteria into current evidence.
+                # Preserve the measurements and execution result; do not rerun generated code.
+                configuration_status = 'unknown'
+            result['dfm'] = {**dfm.report(result['ok'], configuration_status),
+                             'document_id': self.document_id, 'stageIndex': index,
+                             'planHash': assessed_plan_hash}
         if (self.task and job["arguments"].get("execution_mode") == "application"
                 and self.app.activeDocument != self.document):
             # An application-mode script can intentionally create/open a document.
@@ -303,9 +313,10 @@ class FusionTools:
             else:
                 self.dfm.save_plan(key, body, context['design'], arguments['stages'])
             plan = self.dfm.plan(key, body, context['design'])
-        return {'ok': True, 'body': body.name, 'partToken': body.entityToken,
+        return {'ok': True, 'document_id': self.document_id, 'body': body.name, 'partToken': body.entityToken,
+                'reportBinding': {'revision': revision(body), 'planHash': plan_hash(plan)},
                 'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',
-                'scope': 'Native body definition. Occurrence placement, assembly context and build orientation require explicit checks.'}
+                'scope': 'Native body definition. Compare reportBinding with historical reports before reuse; changed or unavailable revision/planHash requires a new check. Occurrence placement, assembly context and build orientation require explicit checks.'}
 
     def rmfg_snapshot(self, arguments):
         context = self.context()

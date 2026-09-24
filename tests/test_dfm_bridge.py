@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from test_fusion_bridge import bridge, Host
 from test_dfm import stages
+from steve.dfm import DfmStore
 from steve.tool_protocol import validate_call
 
 
@@ -91,6 +92,69 @@ class DfmBridgeTests(unittest.TestCase):
                 'title': 'x', 'code': 'def run(c): pass', 'stage': True})
         with self.assertRaises(ValueError):
             validate_call('fusion_dfm_plan', {'document_id': 'd', 'part_token': 'body', 'enabled': True})
+
+    def test_other_instance_edit_or_clear_during_check_invalidates_result(self):
+        self.host.activeDocument.dataFile = Obj(id='saved-document')
+        self.tools.dfm.set_enabled(True)
+        other = DfmStore(self.folder.name)
+        original_run = bridge.run_python
+        original_stages = stages() + [{'process': 'fdm'}]
+        for replacement in (stages() + [{'process': 'resin'}], list(reversed(original_stages)), []):
+            with self.subTest(replacement=replacement):
+                before = self.call('fusion_dfm_plan', stages=original_stages)[0]
+                def change_after_measurement(*args, **kwargs):
+                    result = original_run(*args, **kwargs)
+                    if replacement:
+                        other.save_plan('saved-document', self.body, self.design, replacement)
+                    else:
+                        other.clear_plan('saved-document', self.body, self.design)
+                    return result
+                with patch.object(bridge, 'run_python', side_effect=change_after_measurement):
+                    result = self.call('fusion_dfm_check', stage=0, title='Check', code=
+                        "def run(context):\n context['dfm'].compare('Radius', 4, 'cutter_radius', '>=', 'mm')")[0]
+                self.assertTrue(result['ok'])
+                self.assertEqual(result['dfm']['status'], 'stale')
+                self.assertEqual(result['dfm']['findings'][0]['status'], 'unknown')
+                self.assertEqual(result['dfm']['findings'][0]['limit'], 3)
+                self.assertEqual(result['dfm']['planHash'], before['reportBinding']['planHash'])
+                after = self.call('fusion_dfm_plan')[0]
+                self.assertNotEqual(after['reportBinding']['planHash'], result['dfm']['planHash'])
+                self.assertEqual(after['reportBinding']['revision'], result['dfm']['revision'])
+                self.assertEqual(self.host.executions, 0)
+
+    def test_unreadable_plan_after_execution_retains_unknown_report_without_replay(self):
+        self.tools.dfm.set_enabled(True)
+        self.call('fusion_dfm_plan', stages=stages())
+        original_plan = self.tools.dfm.plan
+        count = 0
+        def read_plan(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 2:
+                raise RuntimeError('Another process holds the plan lock')
+            return original_plan(*args, **kwargs)
+        with patch.object(self.tools.dfm, 'plan', side_effect=read_plan):
+            with patch.object(bridge, 'run_python', wraps=bridge.run_python) as run:
+                result = self.call('fusion_dfm_check', stage=0, title='Check', code=
+                    "def run(context):\n context['dfm'].compare('Radius', 4, 'cutter_radius', '>=', 'mm')")[0]
+                self.assertEqual(run.call_count, 1)
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['dfm']['status'], 'incomplete')
+        self.assertEqual(result['dfm']['configurationStatus'], 'unknown')
+        self.assertEqual(result['dfm']['findings'][0]['status'], 'unknown')
+
+    def test_historical_binding_changes_with_geometry_and_preserves_unchanged_plan(self):
+        self.tools.dfm.set_enabled(True)
+        before = self.call('fusion_dfm_plan', stages=stages())[0]
+        result = self.call('fusion_dfm_check', stage=0, title='Check', code=
+            "def run(context):\n context['dfm'].compare('Radius', 4, 'cutter_radius', '>=', 'mm')")[0]
+        self.assertEqual(result['dfm']['status'], 'checked')
+        self.assertEqual(result['dfm']['planHash'], before['reportBinding']['planHash'])
+        self.assertEqual(result['dfm']['document_id'], before['document_id'])
+        self.body.revisionId = 'r2'
+        after = self.call('fusion_dfm_plan')[0]
+        self.assertNotEqual(after['reportBinding']['revision'], result['dfm']['revision'])
+        self.assertEqual(after['reportBinding']['planHash'], result['dfm']['planHash'])
 
 
 if __name__ == '__main__':
