@@ -73,6 +73,16 @@ class DfmBridgeTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertEqual(result['dfm']['findings'][0]['status'], 'unknown')
 
+    def test_explicit_applicability_runs_through_report_contract(self):
+        self.tools.dfm.set_enabled(True)
+        self.call('fusion_dfm_plan', stages=stages())
+        result = self.call('fusion_dfm_check', stage=0, title='Check applicability', code=
+            "def run(context):\n context['dfm'].not_applicable('Excluded check', 'Confirmed process scope', 'Fixture evidence')")[0]
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['dfm']['status'], 'not_applicable')
+        self.assertEqual(result['dfm']['configurationStatus'], 'current')
+        self.assertEqual(self.host.executions, 0)
+
     def test_requested_clear_removes_plan_and_next_check_requires_new_intent(self):
         self.tools.dfm.set_enabled(True)
         self.call('fusion_dfm_plan',stages=stages())

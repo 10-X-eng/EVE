@@ -33,7 +33,10 @@ replaced body is not silently substituted.
   conventions and relevant process guidance without expanding every prompt.
 - Criteria record units, source and whether they are a requirement, confirmed
   profile, guideline or assumption. Unconfirmed criteria remain conditional.
-- Reports separate concerns, checked measurements and unknown coverage. Failed
+- Reports separate concerns, checked measurements, unknown coverage and explicit
+  not-applicable findings. Not-applicable judgments require both a reason and
+  evidence; they must not substitute for missing information or unsupported checks.
+  A report containing only those judgments is not a manufacturing pass. Failed
   execution, missing revision information and geometry changes cannot validate
   a result. The runner also re-reads the ordered manufacturing plan after a check;
   changed/cleared plans make the report stale, and unavailable plan reads leave
@@ -85,6 +88,9 @@ Optional RMFG sheet-metal checks are described in [RMFG.md](RMFG.md). Native
 checks remain available without a supplier account or geometry upload.
 
 ## Validation
+
+See [DFM_READINESS.md](DFM_READINESS.md) for the process-by-process qualification
+gaps and the draft stack's review order.
 
 Automated tests cover plan persistence and token resolution, unit/provenance
 validation, conditional criteria, body revisions, bounded findings, switch

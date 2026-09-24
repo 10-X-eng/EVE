@@ -370,6 +370,16 @@ loaded and contained their expected API details. Unit tests cover naming, unsafe
 or unsupported paths, the unverified flag, and discovery without method invocation
 or network access. This verifies these references, not every generated candidate.
 
+## Explicit applicability reporting
+
+The evidence contract now supports `not_applicable` with a required reason and
+evidence string. An all-not-applicable report retains that distinct status; it
+does not become checked. Unknowns, concerns, failed execution and stale geometry
+or plans retain precedence. Unit and queue/runner tests exercise those combinations
+and evidence preservation. This validates the reporting contract, not the truth
+of a model-written applicability judgment; unsupported measurements and missing
+settings must still be reported as unknown.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
