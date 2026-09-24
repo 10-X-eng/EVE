@@ -298,7 +298,7 @@ class FusionBridgeTests(unittest.TestCase):
         self.assertEqual(self.bridge.selection_context()["name"], "Created by STEVE")
         self.assertEqual(self.bridge.message_context("resume:" + snapshot["task_key"])["name"], "Created by STEVE")
 
-    def test_goal_restores_original_pin_after_working_in_another_chat(self):
+    def test_job_restores_original_pin_after_working_in_another_chat(self):
         original = self.host.activeDocument
         original.isValid = True
         snapshot = self.bridge.message_context("send")

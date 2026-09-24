@@ -36,7 +36,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 
 - **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
 - **See tool activity and Python.** Expandable code cards show the actual Python STEVE submits to Fusion, with running, waiting, and completion states. A compact indicator also names the current Fusion or saved-image tool. Scripts appear when submitted; the runtime does not stream partial tool arguments.
-- **Work toward a goal.** Use `/goal <objective>` for tasks that need multiple turns. Codex manages continuation, completion, and optional token budgets; STEVE provides status, edit, pause, resume, and clear controls.
+- **Work toward a job.** Use `/jobs <objective>` for tasks that need multiple turns. Codex manages continuation, completion, and optional token budgets; STEVE provides status, edit, pause, resume, and clear controls.
 - **Get notified about updates.** STEVE checks for new releases on startup and every 12 hours while running. Choose **Update STEVE** to download and verify the latest complete release, then install automatically after you save your work and quit Fusion. No terminal command is needed. **Download only** remains available, and the account menu also has **Check for updates**.
 - **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
 - **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
@@ -50,22 +50,22 @@ STEVE has a dockable dark interface, readable Markdown and code blocks, and incr
 
 The account menu includes a remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
 
-### Goals
+### Jobs
 
-Click **◎** beside the composer or use these commands, matching [Codex's goal workflow](https://learn.chatgpt.com/use-cases/follow-goals):
+Click **◎** beside the composer or use these commands. STEVE calls each one a job; Codex still stores it with its [goal workflow](https://learn.chatgpt.com/use-cases/follow-goals):
 
 | Command | Action |
 | --- | --- |
-| `/goal <objective>` | Create or replace the goal and start working. |
-| `/goal` | Show status, usage, and controls. |
-| `/goal edit` | Edit the objective and optional token budget. Pause running work first. |
-| `/goal pause` | Pause the goal and interrupt the current response. |
-| `/goal resume` | Continue the goal. |
-| `/goal clear` | Remove the goal and stop its work, keeping the chat. |
+| `/jobs <objective>` | Create or replace the job and start working. |
+| `/jobs` | Show status, usage, and controls. |
+| `/jobs edit` | Edit the objective and optional token budget. Pause running work first. |
+| `/jobs pause` | Pause the job and interrupt the current response. |
+| `/jobs resume` | Continue the job. |
+| `/jobs clear` | Remove the job and stop its work, keeping the chat. |
 
-Goals belong to individual chats and use the selected provider, model, and effort. The model receives Codex's native create/get/update goal tools. **Stop also pauses the goal.** A changed objective starts fresh usage tracking; resuming retains usage. After reaching a token limit, increase or remove the budget in goal controls before resuming.
+Jobs belong to individual chats and use the selected provider, model, and effort. The model receives Codex's native `create_goal`, `get_goal`, and `update_goal` tools. **Stop also pauses the job.** A changed objective starts fresh usage tracking; resuming retains usage. After reaching a token limit, increase or remove the budget in job controls before resuming.
 
-Automatic turns keep their Fusion document and selection pinned. STEVE waits while another document or command is active. Within the same Fusion session, resuming a goal restores its saved target; a closed target is rejected. Opening a saved chat leaves its goal paused. After restarting STEVE, open the intended Fusion document before resuming—the goal controls explain that this establishes a new document binding. STEVE and Fusion must remain running for work to continue.
+Automatic turns keep their Fusion document and selection pinned. STEVE waits while another document or command is active. Within the same Fusion session, resuming a job restores its saved target; a closed target is rejected. Opening a saved chat leaves its job paused. After restarting STEVE, open the intended Fusion document before resuming—the job controls explain that this establishes a new document binding. STEVE and Fusion must remain running for work to continue.
 
 ### Grok / X — new in 0.3.0
 

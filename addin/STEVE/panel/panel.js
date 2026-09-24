@@ -277,7 +277,7 @@ function render() {
 }
 
 function renderControls() {
-  renderGoal();
+  renderJob();
   const connected=state.connection==="ready" && !state.codexRestarting;
   const local=state.provider==="ollama";
   const claude=state.provider==="claude";
@@ -291,7 +291,7 @@ function renderControls() {
   $("login").disabled=!connected || !state.accountChecked || state.loginPending;
   const grok=state.provider==="grok";
   const providerName=local?"Ollama":grok?"Grok / X":claude?"Claude":"ChatGPT";
-  for(const id of ["provider","welcome-provider"]){$(id).value=state.provider||"chatgpt";$(id).disabled=!!state.busy || !!state.goalBusy || !!state.loginPending || state.connection==="starting";}
+  for(const id of ["provider","welcome-provider"]){$(id).value=state.provider||"chatgpt";$(id).disabled=!!state.busy || !!state.jobBusy || !!state.loginPending || state.connection==="starting";}
   $("login").textContent=claude?(!state.accountChecked?"Checking Claude Code…":"Check connection"):local?(!state.accountChecked?"Checking Ollama…":"Refresh models"):state.loginPending?"Signing in…":!state.accountChecked?"Checking your account…":grok?"Sign in with X / Grok ↗":"Sign in with ChatGPT ↗";
   $("sign-in-heading").textContent=local?"Your tools. Your local model.":"Your tools. Your AI.";
   $("sign-in-description").textContent=claude?(state.localStatus||"Sign in to Claude Code outside Fusion, then check the connection here."):local?(state.localStatus||"Start Ollama and choose a downloaded model. No sign-in needed."):"Connect your account and bring your thinking partner into Fusion.";
@@ -314,22 +314,22 @@ function renderControls() {
   $("device-code").textContent=state.device?.code||"";
   $("message").disabled=!signed || !connected;
   $("message").placeholder=signed?(state.busy?"Add a correction or steer STEVE…":"What are you working on?"):local?"Connect a local model to begin":"Sign in to start a conversation";
-  const goalCommand = /^\/goal(?:\s|$)/.test($("message").value.trim());
-  $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || !!clipboardRequest || submitting || (state.busy && !state.canSteer && !goalCommand) || !!state.goalBusy;
+  const jobCommand = /^\/jobs(?:\s|$)/.test($("message").value.trim());
+  $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || !!clipboardRequest || submitting || (state.busy && !state.canSteer && !jobCommand) || !!state.jobBusy;
   const selectedModel=state.models.find(m=>m.id===state.model) || state.models.find(m=>m.isDefault);
   $("attach-images").disabled=!signed || !connected || draftImages.length>=4 || (local && selectedModel?.supportsImages===false);
   $("send").hidden=false;
-  $("send").title=goalCommand?"Manage goal":state.busy?"Steer current response":"Send message";
+  $("send").title=jobCommand?"Manage job":state.busy?"Steer current response":"Send message";
   $("send").setAttribute("aria-label",$("send").title);
-  $("stop").hidden=!state.busy && !state.goalBusy;
+  $("stop").hidden=!state.busy && !state.jobBusy;
   $("stop").disabled=state.status==="Opening conversation";
-  $("new-chat").disabled=state.busy || !!state.goalBusy || !hasMessages;
-  $("model").disabled=!signed || state.busy || !!state.goalBusy;
-  $("effort").disabled=!signed || state.busy || !!state.goalBusy || !(state.effortOptions||[]).length;
+  $("new-chat").disabled=state.busy || !!state.jobBusy || !hasMessages;
+  $("model").disabled=!signed || state.busy || !!state.jobBusy;
+  $("effort").disabled=!signed || state.busy || !!state.jobBusy || !(state.effortOptions||[]).length;
   $("logout").hidden=local || claude || !signed;
-  $("logout").disabled=state.busy || !!state.goalBusy;
+  $("logout").disabled=state.busy || !!state.jobBusy;
   $("chatgpt-refresh").hidden=local || grok || claude;
-  $("chatgpt-refresh").disabled=state.busy || !!state.goalBusy || !connected;
+  $("chatgpt-refresh").disabled=state.busy || !!state.jobBusy || !connected;
   $("codex-version").textContent=state.codexVersion?`Codex ${state.codexVersion}`:"Codex runtime";
   $("codex-update-status").textContent=state.codexPendingVersion?`Codex ${state.codexPendingVersion} is ready. Restart STEVE to use it and refresh models.`:state.codexUpdateStatus||"Checks OpenAI for updates automatically.";
   $("check-codex-updates").disabled=!!state.codexUpdateChecking || !!state.codexUpdating;
@@ -339,9 +339,9 @@ function renderControls() {
   $("update-codex").textContent=state.codexUpdating?"Updating Codex…":state.codexUpdateInfo?`Update Codex to ${state.codexUpdateInfo.version}`:"Update Codex";
   $("bundled-codex").hidden=!state.codexManaged && !state.codexPendingVersion && !state.runtimeIssue;
   $("bundled-codex").disabled=!!state.codexUpdating;
-  $("restart-steve").disabled=!!state.busy || !!state.goalBusy || !!state.loginPending || !!state.codexUpdating || !!state.codexRestarting || state.connection==="starting";
+  $("restart-steve").disabled=!!state.busy || !!state.jobBusy || !!state.loginPending || !!state.codexUpdating || !!state.codexRestarting || state.connection==="starting";
   $("restart-steve").textContent=state.codexRestarting?"Restarting STEVE…":"Restart STEVE";
-  $("restart-steve").title=state.busy || state.goalBusy?"Finish or pause the current task before restarting":"Restart STEVE's conversation engine and reopen this chat";
+  $("restart-steve").title=state.busy || state.jobBusy?"Finish or pause the current task before restarting":"Restart STEVE's conversation engine and reopen this chat";
   $("debug-logging").checked=!!state.debugLogging;
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
@@ -445,40 +445,40 @@ window.fusionJavaScriptHandler={handle(action,data){
   return "OK";
 }};
 
-function renderGoal() {
-  const goal = state.goal;
+function renderJob() {
+  const job = state.job;
   const labels = {active:"Working", paused:"Paused", blocked:"Blocked", budgetLimited:"Token limit reached", usageLimited:"Usage limit reached", complete:"Complete"};
-  const label = goal ? labels[goal.status] || goal.status : "No goal yet";
-  $("goal-strip").hidden = !goal;
-  $("goal-strip-title").textContent = goal?.objective || "";
-  $("goal-strip-status").textContent = label;
-  $("goal-summary").textContent = goal ? `${label} · ${goal.objective}` : state.goalNotice || "Set an objective with a clear stopping point.";
-  $("goal-usage").textContent = goal ? `${Number(goal.tokensUsed || 0).toLocaleString()}${goal.tokenBudget == null ? "" : ` / ${Number(goal.tokenBudget).toLocaleString()}`} tokens · ${Math.floor((goal.timeUsedSeconds || 0) / 60)} min` : "";
-  $("goal-target-note").textContent = goal && state.goalHasTarget ? "Resuming keeps this goal’s original document and selection." : "Starting or resuming uses the active Fusion document. Open the intended document first.";
-  const unavailable = !state.account || state.connection !== "ready" || !!state.goalBusy;
-  $("goal-button").disabled = unavailable;
-  $("goal-pause").hidden = !goal || (goal.status !== "active" && !state.busy);
-  $("goal-pause").disabled = unavailable;
-  $("goal-resume").hidden = !goal || goal.status === "active" || goal.status === "complete";
-  $("goal-resume").disabled = unavailable || !!state.busy;
-  $("goal-resume").textContent = goal?.status === "budgetLimited" ? "Resume with budget below" : "Resume";
-  $("goal-clear").hidden = !goal;
-  $("goal-clear").disabled = unavailable;
-  $("goal-save").disabled = unavailable || !!state.busy;
-  $("goal-save").textContent = goal ? "Save and start" : "Start goal";
+  const label = job ? labels[job.status] || job.status : "No job yet";
+  $("job-strip").hidden = !job;
+  $("job-strip-title").textContent = job?.objective || "";
+  $("job-strip-status").textContent = label;
+  $("job-summary").textContent = job ? `${label} · ${job.objective}` : state.jobNotice || "Set an objective with a clear stopping point.";
+  $("job-usage").textContent = job ? `${Number(job.tokensUsed || 0).toLocaleString()}${job.tokenBudget == null ? "" : ` / ${Number(job.tokenBudget).toLocaleString()}`} tokens · ${Math.floor((job.timeUsedSeconds || 0) / 60)} min` : "";
+  $("job-target-note").textContent = job && state.jobHasTarget ? "Resuming keeps this job’s original document and selection." : "Starting or resuming uses the active Fusion document. Open the intended document first.";
+  const unavailable = !state.account || state.connection !== "ready" || !!state.jobBusy;
+  $("job-button").disabled = unavailable;
+  $("job-pause").hidden = !job || (job.status !== "active" && !state.busy);
+  $("job-pause").disabled = unavailable;
+  $("job-resume").hidden = !job || job.status === "active" || job.status === "complete";
+  $("job-resume").disabled = unavailable || !!state.busy;
+  $("job-resume").textContent = job?.status === "budgetLimited" ? "Resume with budget below" : "Resume";
+  $("job-clear").hidden = !job;
+  $("job-clear").disabled = unavailable;
+  $("job-save").disabled = unavailable || !!state.busy;
+  $("job-save").textContent = job ? "Save and start" : "Start job";
 }
 
-function openGoal(edit = false) {
-  $("goal-objective").value = state.goal?.objective || "";
-  $("goal-budget").value = state.goal?.tokenBudget ?? "";
-  renderGoal();
-  if (!$("goal-dialog").open) $("goal-dialog").showModal();
-  if (edit || !state.goal) $("goal-objective").focus();
-  act("goal", {command:"status"});
+function openJob(edit = false) {
+  $("job-objective").value = state.job?.objective || "";
+  $("job-budget").value = state.job?.tokenBudget ?? "";
+  renderJob();
+  if (!$("job-dialog").open) $("job-dialog").showModal();
+  if (edit || !state.job) $("job-objective").focus();
+  act("job", {command:"status"});
 }
 
-function goalBudget() {
-  const value = $("goal-budget").value.trim();
+function jobBudget() {
+  const value = $("job-budget").value.trim();
   const budget = value ? Number(value) : null;
   if (budget !== null && (!Number.isSafeInteger(budget) || budget <= 0)) throw new Error("Enter a positive whole token budget, or leave it blank.");
   return budget;
@@ -492,19 +492,19 @@ $("update-codex").onclick=()=>act("updateCodex");
 $("bundled-codex").onclick=()=>act("useBundledCodex");
 $("restart-steve").onclick=()=>act("restartRuntime");
 $("install-claude").onclick=()=>act("setupHelp",{page:"claude"});
-$("goal-button").onclick=()=>openGoal();
-$("goal-strip").onclick=()=>openGoal();
-$("goal-close").onclick=()=>$("goal-dialog").close();
-$("goal-pause").onclick=()=>act("goal",{command:"pause"});
-$("goal-clear").onclick=()=>act("goal",{command:"clear"});
-$("goal-resume").onclick=()=>{
-  try { act("goal",{command:"resume",tokenBudget:goalBudget()}); $("goal-dialog").close(); }
-  catch(error) { state.error=error.message; $("goal-dialog").close(); render(); }
+$("job-button").onclick=()=>openJob();
+$("job-strip").onclick=()=>openJob();
+$("job-close").onclick=()=>$("job-dialog").close();
+$("job-pause").onclick=()=>act("job",{command:"pause"});
+$("job-clear").onclick=()=>act("job",{command:"clear"});
+$("job-resume").onclick=()=>{
+  try { act("job",{command:"resume",tokenBudget:jobBudget()}); $("job-dialog").close(); }
+  catch(error) { state.error=error.message; $("job-dialog").close(); render(); }
 };
-$("goal-form").onsubmit=(event)=>{
+$("job-form").onsubmit=(event)=>{
   event.preventDefault();
-  try { act("goal",{command:"set",objective:$("goal-objective").value.trim(),tokenBudget:goalBudget()}); $("goal-dialog").close(); }
-  catch(error) { state.error=error.message; $("goal-dialog").close(); render(); }
+  try { act("job",{command:"set",objective:$("job-objective").value.trim(),tokenBudget:jobBudget()}); $("job-dialog").close(); }
+  catch(error) { state.error=error.message; $("job-dialog").close(); render(); }
 };
 $("local-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
 $("install-ollama").onclick=()=>act("setupHelp",{page:"ollama"});
@@ -575,9 +575,9 @@ $("image-viewer").onclick=(event)=>{if(event.target===$("image-viewer"))$("image
 $("image-viewer").onclose=()=>$("expanded-image").removeAttribute("src");
 $("composer").onsubmit=async(event)=>{
   event.preventDefault();const text=$("message").value.trim();
-  const goalCommand=/^\/goal(?:\s|$)/.test(text);
-  if((!text&&!draftImages.length)||draftImages.some(item=>!item.url)||clipboardRequest||(state.busy&&!state.canSteer&&!goalCommand)||submitting||state.goalBusy||!state.account||state.connection!=="ready")return;
-  if(/^\/goal(?:\s+(?:edit|status|help))?$/.test(text) && !draftImages.length){$("message").value="";resize();openGoal(text.endsWith("edit"));return;}
+  const jobCommand=/^\/jobs(?:\s|$)/.test(text);
+  if((!text&&!draftImages.length)||draftImages.some(item=>!item.url)||clipboardRequest||(state.busy&&!state.canSteer&&!jobCommand)||submitting||state.jobBusy||!state.account||state.connection!=="ready")return;
+  if(/^\/jobs(?:\s+(?:edit|status|help))?$/.test(text) && !draftImages.length){$("message").value="";resize();openJob(text.endsWith("edit"));return;}
   const sentImages=draftImages.slice();const draftText=$("message").value;
   dismissedError="";submitting=true;render();
   try{

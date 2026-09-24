@@ -44,7 +44,7 @@ def _repair(stage, old, new):
     providers = {old.name.lower() + "_" + kind: "steve_" + kind for kind in ("grok", "ollama")}
     for database in _runtime_files(stage, "*.sqlite"):
         with closing(sqlite3.connect(database, timeout=1)) as connection, connection:
-            # Leave messages, goal records, IDs, and all other state unchanged.
+            # Leave messages, Codex goal records, IDs, and all other state unchanged.
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if "threads" not in tables:
                 continue

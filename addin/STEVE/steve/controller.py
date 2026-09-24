@@ -24,7 +24,7 @@ from .runtime_updates import RuntimeUpdater
 from .downloads import UpdateDownloader
 from .app_update import stage_update, launch_update, previous_install_result
 from .version import VERSION
-from .goals import goal_command, validate_goal
+from .jobs import job_command, validate_job
 from .images import ImageStore, validate_images, MAX_STORED_IMAGE_BYTES
 from .tool_protocol import INSTRUCTIONS, TOOLS, ToolError, tool_failure, tool_response, validate_call
 
@@ -160,13 +160,13 @@ class Controller:
         self._lock = threading.RLock()
         self._commands = queue.Queue()
         self._active_tools = {}
-        self._goal_revision = 0
+        self._job_revision = 0
         self._task_context = None
-        self._goal_contexts = {}
+        self._job_contexts = {}
         self.state = {"connection": "starting", "provider": self.provider_choice.provider, "account": None, "models": [], "model": "",
                       "effort": "", "effortOptions": [], "defaultEffort": "", "preferenceNotice": "",
                       "taskDocument": None, "waitingForFusion": False, "waitingReason": "",
-                      "goal": None, "goalBusy": False, "goalNotice": "", "goalHasTarget": False,
+                      "job": None, "jobBusy": False, "jobNotice": "", "jobHasTarget": False,
                       "messages": [], "busy": False, "loginPending": False, "device": None,
                       "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
@@ -238,45 +238,45 @@ class Controller:
     def dispatch(self, action, payload=None, capture_context=None):
         payload = payload or {}
         if action in ("send", "steer"):
-            command = goal_command(str(payload.get("text", "")))
+            command = job_command(str(payload.get("text", "")))
             if command:
                 if payload.get("images"):
-                    raise ValueError("Send reference images as a chat message before setting a goal.")
-                action, payload = "goal", command
-        if action == "goal":
-            payload = validate_goal(payload)
+                    raise ValueError("Send reference images as a chat message before setting a job.")
+                action, payload = "job", command
+        if action == "job":
+            payload = validate_job(payload)
         with self._lock:
             if self._closed:
                 return
             if self.state["codexRestarting"] and action not in ("sync", "debugLogging", "openLogs", "setupHelp"):
                 return False
             if action == "restartRuntime":
-                if (self.state["busy"] or self._send_queued or self.state["goalBusy"] or self.state["loginPending"]
+                if (self.state["busy"] or self._send_queued or self.state["jobBusy"] or self.state["loginPending"]
                         or self.state["codexUpdating"] or self.state["connection"] == "starting"):
                     return False
                 self.state["codexRestarting"] = True
             if action == "provider" and (self.state["busy"] or self._send_queued or self.state["loginPending"]):
                 return False
-            if action == "goal":
+            if action == "job":
                 command = payload["command"]
-                if self.state["goalBusy"]:
+                if self.state["jobBusy"]:
                     return False
                 if command in ("set", "resume"):
                     if self.state["busy"] or self._send_queued:
-                        raise ValueError("Pause the current task before creating, editing, or resuming a goal.")
-                    if command == "resume" and not self.state["goal"]:
-                        raise ValueError("No goal to resume. Use /goal <objective> to create one.")
+                        raise ValueError("Pause the current task before creating, editing, or resuming a job.")
+                    if command == "resume" and not self.state["job"]:
+                        raise ValueError("No job to resume. Use /jobs <objective> to create one.")
                     if capture_context:
-                        target = self._goal_contexts.get((self.state["provider"], self.thread_id)) if command == "resume" else None
+                        target = self._job_contexts.get((self.state["provider"], self.thread_id)) if command == "resume" else None
                         capture = "resume:" + target["task_key"] if target and target.get("task_key") else "send"
                         payload["fusionContext"] = capture_context(capture)
                     self._cancel = False
                     self._send_queued = True
-                if command in ("pause", "clear") and self.state["goal"]:
+                if command in ("pause", "clear") and self.state["job"]:
                     self._cancel = True
                     if self.fusion_tools and hasattr(self.fusion_tools, "wake"):
                         self.fusion_tools.wake()
-                self.state["goalBusy"] = True
+                self.state["jobBusy"] = True
             if action == "accountRefresh":
                 if self._account_check_queued and not (payload or {}).get("afterLogin"):
                     return
@@ -286,7 +286,7 @@ class Controller:
             if action in ("send", "steer"):
                 validate_images((payload or {}).get("images"))
             if action == "send":
-                if self._send_queued or self.state["busy"] or self.state["goalBusy"]:
+                if self._send_queued or self.state["busy"] or self.state["jobBusy"]:
                     return False
                 if capture_context:
                     payload = {**(payload or {}), "fusionContext": capture_context(action)}
@@ -363,7 +363,7 @@ class Controller:
                         self.state["connection"] = "disconnected"
                 with self._lock:
                     self.state["error"] = str(exc)
-                    if action not in ("steer", "goal", "stop"):
+                    if action not in ("steer", "job", "stop"):
                         self.state.update(busy=False, waitingForFusion=False, status="Needs attention")
                     if action == "send" and self.state["messages"]:
                         for message in reversed(self.state["messages"]):
@@ -381,12 +381,12 @@ class Controller:
                             self.state["status"] = "Codex setup needed"
                 self.emit()
             finally:
-                if action == "send" or action == "goal" and payload["command"] in ("set", "resume"):
+                if action == "send" or action == "job" and payload["command"] in ("set", "resume"):
                     with self._lock:
                         self._send_queued = False
-                if action == "goal":
+                if action == "job":
                     with self._lock:
-                        self.state["goalBusy"] = False
+                        self.state["jobBusy"] = False
                     self.emit()
                 if action == "accountRefresh":
                     with self._lock:
@@ -518,8 +518,8 @@ class Controller:
                                   require_account=bool(payload.get("afterLogin")), refresh_models=bool(payload.get("refreshModels")))
         elif action == "send":
             self._send(str(payload.get("text", "")).strip(), payload.get("fusionContext"), payload.get("images"))
-        elif action == "goal":
-            self._goal_action(payload)
+        elif action == "job":
+            self._job_action(payload)
         elif action == "steer":
             self._steer(payload)
         elif action == "viewportImage":
@@ -532,8 +532,8 @@ class Controller:
             self._open_history(str(payload.get("threadId", "")))
         elif action == "stop":
             try:
-                if self.thread_id and self.state["goal"] and self.state["goal"]["status"] == "active":
-                    self._goal_rpc("set", {"status": "paused"})
+                if self.thread_id and self.state["job"] and self.state["job"]["status"] == "active":
+                    self._job_rpc("set", {"status": "paused"})
             finally:
                 self._interrupt_turn()
         elif action == "new":
@@ -542,7 +542,7 @@ class Controller:
             self.thread_id = None
             self._task_context = None
             with self._lock:
-                self.state.update(messages=[], threadId=None, goal=None, goalNotice="", goalHasTarget=False,
+                self.state.update(messages=[], threadId=None, job=None, jobNotice="", jobHasTarget=False,
                                   taskDocument=None, error="", status="Ready" if self.state["account"] else "Sign in to begin")
             self.emit()
         elif action in ("model", "effort"):
@@ -570,13 +570,13 @@ class Controller:
             self.client.request("account/logout")
             self.thread_id = None
             with self._lock:
-                self.state.update(account=None, messages=[], models=[], model="", threadId=None, goal=None, goalHasTarget=False,
+                self.state.update(account=None, messages=[], models=[], model="", threadId=None, job=None, jobHasTarget=False,
                                   history=[], historyCursor=None, error="", status="Sign in to begin")
             self.emit()
 
     def _restart_runtime(self):
         """Restart only our conversation engine; restore the current idle chat."""
-        if self.state["busy"] or self.state["goalBusy"] or self.state["loginPending"] or self.state["codexUpdating"]:
+        if self.state["busy"] or self.state["jobBusy"] or self.state["loginPending"] or self.state["codexUpdating"]:
             return
         thread_id = self.thread_id
         account = copy.deepcopy(self.state["account"])
@@ -607,7 +607,7 @@ class Controller:
             self._task_context = None
             self.default_model = None
             self.state.update(connection="starting", busy=False, error="", messages=[], threadId=None,
-                              goal=None, goalBusy=False, goalNotice="", goalHasTarget=False, taskDocument=None,
+                              job=None, jobBusy=False, jobNotice="", jobHasTarget=False, taskDocument=None,
                               history=[], historyCursor=None, historyLoading=False, runtimeIssue=False,
                               account=None, models=[], accountChecked=False, loginPending=False, device=None,
                               localStatus="", providerVersion="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
@@ -640,29 +640,29 @@ class Controller:
             self.client.request("turn/interrupt", {"threadId": self.thread_id, "turnId": self.turn_id})
         else:
             with self._lock:
-                self.state.update(busy=False, status="Goal paused" if self.state["goal"] else "Stopped")
+                self.state.update(busy=False, status="Job paused" if self.state["job"] else "Stopped")
             self.emit()
 
-    def _set_goal_state(self, goal):
-        previous = self.state["goal"]
-        self.state["goal"] = goal
+    def _set_job_state(self, job):
+        previous = self.state["job"]
+        self.state["job"] = job
         key = (self.state["provider"], self.thread_id)
-        if not goal:
-            self._goal_contexts.pop(key, None)
-        elif self._task_context and (key not in self._goal_contexts or
-                                    previous and previous["objective"] != goal["objective"]):
-            self._goal_contexts[key] = copy.deepcopy(self._task_context)
-        self.state["goalHasTarget"] = bool(self._goal_contexts.get(key))
+        if not job:
+            self._job_contexts.pop(key, None)
+        elif self._task_context and (key not in self._job_contexts or
+                                    previous and previous["objective"] != job["objective"]):
+            self._job_contexts[key] = copy.deepcopy(self._task_context)
+        self.state["jobHasTarget"] = bool(self._job_contexts.get(key))
         if not self.turn_id:
-            active = bool(goal and goal["status"] == "active" and not self._cancel)
-            self.state.update(busy=active, status="Continuing goal" if active else "Ready")
+            active = bool(job and job["status"] == "active" and not self._cancel)
+            self.state.update(busy=active, status="Continuing job" if active else "Ready")
 
-    def _goal_rpc(self, operation, params=None):
-        revision = self._goal_revision
+    def _job_rpc(self, operation, params=None):
+        revision = self._job_revision
         result = self.client.request("thread/goal/" + operation, {"threadId": self.thread_id, **(params or {})})
         with self._lock:
-            if revision == self._goal_revision:
-                self._set_goal_state(result.get("goal"))
+            if revision == self._job_revision:
+                self._set_job_state(result.get("goal"))
         self.emit()
         return result.get("goal")
 
@@ -686,49 +686,49 @@ class Controller:
             self.state["threadId"] = self.thread_id
             self._effort_options()
 
-    def _goal_action(self, payload):
+    def _job_action(self, payload):
         command = payload["command"]
         if command in ("status", "help", "edit"):
             if self.thread_id:
-                self._goal_rpc("get")
-            self.state["goalNotice"] = "" if self.state["goal"] else "No goal yet. Describe an objective to get started."
+                self._job_rpc("get")
+            self.state["jobNotice"] = "" if self.state["job"] else "No job yet. Describe an objective to get started."
             return
         if not self.state["account"] or self.state["connection"] != "ready":
-            raise ValueError("Connect your provider before managing a goal.")
+            raise ValueError("Connect your provider before managing a job.")
         if command in ("pause", "clear"):
-            if not self.state["goal"]:
-                self.state["goalNotice"] = "No goal to " + command + "."
+            if not self.state["job"]:
+                self.state["jobNotice"] = "No job to " + command + "."
                 return
             try:
-                if self.thread_id and self.state["goal"]:
-                    self._goal_rpc("clear" if command == "clear" else "set", {} if command == "clear" else {"status": "paused"})
-                self.state["goalNotice"] = "Goal cleared. Chat history is kept." if command == "clear" else "Goal paused."
+                if self.thread_id and self.state["job"]:
+                    self._job_rpc("clear" if command == "clear" else "set", {} if command == "clear" else {"status": "paused"})
+                self.state["jobNotice"] = "Job cleared. Chat history is kept." if command == "clear" else "Job paused."
             finally:
                 self._interrupt_turn()
             return
         if self.state["busy"]:
-            raise ValueError("Pause the current task before changing the goal.")
-        if command == "resume" and (not self.state["goal"] or self.state["goal"]["status"] == "complete"):
-            raise ValueError("Create a new goal to start more work; this goal is complete or missing.")
+            raise ValueError("Pause the current task before changing the job.")
+        if command == "resume" and (not self.state["job"] or self.state["job"]["status"] == "complete"):
+            raise ValueError("Create a new job to start more work; this job is complete or missing.")
         context = payload.get("fusionContext")
         self._task_context = context
         self.state.update(taskDocument={"id": context.get("document_id"), "name": context.get("name")} if context else None,
-                          goalNotice="", error="", busy=True, status="Preparing goal")
+                          jobNotice="", error="", busy=True, status="Preparing job")
         self.emit()
         try:
             self._ensure_thread()
             if context:
-                self._goal_contexts[(self.state["provider"], self.thread_id)] = copy.deepcopy(context)
+                self._job_contexts[(self.state["provider"], self.thread_id)] = copy.deepcopy(context)
             if command == "set":
-                previous = self.state["goal"]
+                previous = self.state["job"]
                 if previous and (previous["objective"] != payload["objective"] or previous["status"] == "complete"):
                     # The pinned runtime retains usage on an objective-only update.
-                    # Clear the old goal so replacement starts with fresh accounting.
-                    self._goal_rpc("clear")
+                    # Clear the old job so replacement starts with fresh accounting.
+                    self._job_rpc("clear")
                 params = {"objective": payload["objective"], "status": "paused"}
                 if "tokenBudget" in payload:
                     params["tokenBudget"] = payload["tokenBudget"]
-                self._goal_rpc("set", params)
+                self._job_rpc("set", params)
             # Configure the next automatic turn while paused, before activation can start it.
             params = thread_start_params(self.client.home)
             params.pop("dynamicTools")
@@ -741,21 +741,21 @@ class Controller:
             if effort:
                 params["config"]["model_reasoning_effort"] = effort
             self.client.request("thread/resume", params)
-            text = "Goal: " + payload["objective"] if command == "set" else "Resume the current goal. Inspect the pinned Fusion document before continuing."
+            text = "Job: " + payload["objective"] if command == "set" else "Resume the current job. Inspect the pinned Fusion document before continuing."
             content = [{"type": "input_text", "text": part["text"]} for part in message_input(text, context)]
             self.client.request("thread/inject_items", {"threadId": self.thread_id,
                                 "items": [{"type": "message", "role": "user", "content": content}]})
-            self.state["messages"].append({"id": "goal-" + uuid4().hex, "role": "user", "text": text})
+            self.state["messages"].append({"id": "job-" + uuid4().hex, "role": "user", "text": text})
             if self._cancel:
-                return  # Stop during startup leaves the new goal paused.
+                return  # Stop during startup leaves the new job paused.
             params = {"status": "active"}
             if command == "resume" and "tokenBudget" in payload:
                 params["tokenBudget"] = payload["tokenBudget"]
-            self._goal_rpc("set", params)
+            self._job_rpc("set", params)
         finally:
             with self._lock:
                 if not self.turn_id:
-                    self._set_goal_state(self.state["goal"])
+                    self._set_job_state(self.state["job"])
             self.emit()
 
     def _tool_request(self, client, request_id, method, params):
@@ -856,7 +856,7 @@ class Controller:
             if identity_changed and not local:
                 self.thread_id = self.turn_id = None
                 self._task_context = None
-                self.state.update(threadId=None, messages=[], history=[], historyCursor=None, goal=None, goalHasTarget=False)
+                self.state.update(threadId=None, messages=[], history=[], historyCursor=None, job=None, jobHasTarget=False)
             self.state.update(account=public, accountChecked=True, localStatus=result.get("localStatus", ""),
                               providerVersion=result.get("providerVersion", ""))
             if account:
@@ -935,10 +935,10 @@ class Controller:
         # Tools are restored by Codex from the original session.
         params.pop("dynamicTools")
         params["threadId"] = thread_id
-        # Never resume a persisted active goal before a Fusion target is available.
-        goal = self.client.request("thread/goal/get", {"threadId": thread_id}).get("goal")
-        if goal and goal["status"] == "active":
-            goal = self.client.request("thread/goal/set", {"threadId": thread_id, "status": "paused"}).get("goal")
+        # Never resume a persisted active job before a Fusion target is available.
+        job = self.client.request("thread/goal/get", {"threadId": thread_id}).get("goal")
+        if job and job["status"] == "active":
+            job = self.client.request("thread/goal/set", {"threadId": thread_id, "status": "paused"}).get("goal")
         result = self.client.request("thread/resume", params)
         thread = result["thread"]
         messages = conversation_messages(thread, self.images)
@@ -948,9 +948,9 @@ class Controller:
             self._cancel = True
             self._task_context = None
             self.default_model = result.get("model")
-            self.state.update(threadId=self.thread_id, messages=messages, busy=False, status="Ready", goal=goal,
-                              goalHasTarget=bool(self._goal_contexts.get((self.state["provider"], self.thread_id))),
-                              goalNotice="Resume to continue this goal." if goal else "", taskDocument=None)
+            self.state.update(threadId=self.thread_id, messages=messages, busy=False, status="Ready", job=job,
+                              jobHasTarget=bool(self._job_contexts.get((self.state["provider"], self.thread_id))),
+                              jobNotice="Resume to continue this job." if job else "", taskDocument=None)
             self._choose_preferences()
         self.emit()
 
@@ -1163,13 +1163,13 @@ class Controller:
                 elif params.get("authMode") is None:
                     self.thread_id = self.turn_id = None
                     self._task_context = None
-                    self.state.update(account=None, models=[], model="", messages=[], threadId=None, goal=None, goalHasTarget=False,
+                    self.state.update(account=None, models=[], model="", messages=[], threadId=None, job=None, jobHasTarget=False,
                                       history=[], historyCursor=None)
             elif params.get("threadId") != self.thread_id or not self.thread_id:
                 return
             elif method in ("thread/goal/updated", "thread/goal/cleared"):
-                self._goal_revision += 1
-                self._set_goal_state(params.get("goal") if method.endswith("updated") else None)
+                self._job_revision += 1
+                self._set_job_state(params.get("goal") if method.endswith("updated") else None)
             elif method == "turn/started":
                 self.turn_id = params["turn"]["id"]
                 self.state.update(busy=True, status="Stopping" if self._cancel else "Thinking")
@@ -1197,8 +1197,8 @@ class Controller:
                     return
                 self._active_tools.clear()
                 self._finish_code_activity()
-                continuing = bool(self.state["goal"] and self.state["goal"]["status"] == "active" and not self._cancel)
-                self.state.update(busy=continuing, status="Continuing goal" if continuing else
+                continuing = bool(self.state["job"] and self.state["job"]["status"] == "active" and not self._cancel)
+                self.state.update(busy=continuing, status="Continuing job" if continuing else
                                   "Stopped" if turn.get("status") == "interrupted" else "Ready")
                 if turn.get("error"):
                     self.state["error"] = turn["error"].get("message", "The response failed. Try again.")

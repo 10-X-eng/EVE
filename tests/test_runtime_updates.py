@@ -95,8 +95,8 @@ class RuntimeUpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "checksum|size"):
             self.install(data=b"bad archive")
         def incompatible(*_):
-            raise RuntimeError("missing goal protocol")
-        with self.assertRaisesRegex(RuntimeError, "goal protocol"):
+            raise RuntimeError("missing job protocol")
+        with self.assertRaisesRegex(RuntimeError, "job protocol"):
             self.install(probe=incompatible)
         with self.assertRaises(InterruptedError):
             self.install(cancelled=lambda: True)

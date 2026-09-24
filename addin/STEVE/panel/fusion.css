@@ -138,24 +138,24 @@ html, html body {
 .code-card pre code { display:block; padding:0; background:none; color:inherit; font:11px/1.65 Consolas,"SFMono-Regular",monospace; white-space:pre; tab-size:4; }
 @keyframes code-pulse { 50% { opacity:.4; } }
 @media (prefers-reduced-motion:reduce) { .code-card[data-status="running"] .code-symbol { animation:none; } }
-.goal-strip { width:100%; display:flex; align-items:center; gap:8px; padding:9px 11px; margin:0 0 8px; border:1px solid #35483f; border-radius:10px; background:#1d2b24; color:#add8c4; text-align:left; }
-#goal-strip-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
-#goal-strip-status { color:#a7b9af; font-size:10px; white-space:nowrap; }
-.goal-dialog { box-sizing:border-box; width:calc(100% - 28px); max-width:440px; max-height:90vh; overflow:auto; border:1px solid #506258; border-radius:16px; padding:20px; background:#192220; color:#e3e8df; }
-.goal-dialog::backdrop { background:#0009; }
-.goal-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.goal-heading h2 { margin:8px 0; font-size:23px; }
-.goal-heading .eyebrow { font-size:8px; }
-#goal-summary { font-size:12px; line-height:1.6; overflow-wrap:anywhere; max-height:110px; overflow:auto; }
-.goal-note { color:#a5b6ac; font-size:11px; line-height:1.5; }
-.goal-actions { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
-#goal-form { display:flex; flex-direction:column; gap:8px; }
-#goal-form label { font-size:12px; color:#d5dfd7; }
-#goal-objective, #goal-budget { box-sizing:border-box; width:100%; background:#101916; border:1px solid #4a6053; border-radius:8px; padding:10px; color:#e3e8df; font:12px/1.5 inherit; }
-#goal-objective { resize:vertical; min-height:86px; max-height:180px; }
-#goal-form .primary-button { width:100%; }
-.goal-help { border-top:1px solid #35483f; margin-top:18px; padding-top:12px; font-size:11px; line-height:1.9; color:#a5b6ac; }
-.goal-help summary { cursor:pointer; }
-.goal-help code { color:#b9dcc8; }
+.job-strip { width:100%; display:flex; align-items:center; gap:8px; padding:9px 11px; margin:0 0 8px; border:1px solid #35483f; border-radius:10px; background:#1d2b24; color:#add8c4; text-align:left; }
+#job-strip-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+#job-strip-status { color:#a7b9af; font-size:10px; white-space:nowrap; }
+.job-dialog { box-sizing:border-box; width:calc(100% - 28px); max-width:440px; max-height:90vh; overflow:auto; border:1px solid #506258; border-radius:16px; padding:20px; background:#192220; color:#e3e8df; }
+.job-dialog::backdrop { background:#0009; }
+.job-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.job-heading h2 { margin:8px 0; font-size:23px; }
+.job-heading .eyebrow { font-size:8px; }
+#job-summary { font-size:12px; line-height:1.6; overflow-wrap:anywhere; max-height:110px; overflow:auto; }
+.job-note { color:#a5b6ac; font-size:11px; line-height:1.5; }
+.job-actions { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+#job-form { display:flex; flex-direction:column; gap:8px; }
+#job-form label { font-size:12px; color:#d5dfd7; }
+#job-objective, #job-budget { box-sizing:border-box; width:100%; background:#101916; border:1px solid #4a6053; border-radius:8px; padding:10px; color:#e3e8df; font:12px/1.5 inherit; }
+#job-objective { resize:vertical; min-height:86px; max-height:180px; }
+#job-form .primary-button { width:100%; }
+.job-help { border-top:1px solid #35483f; margin-top:18px; padding-top:12px; font-size:11px; line-height:1.9; color:#a5b6ac; }
+.job-help summary { cursor:pointer; }
+.job-help code { color:#b9dcc8; }
 .image-viewer img { display:block; width:100%; max-height:75vh; object-fit:contain; }
 #close-image { position:absolute; right:8px; top:5px; padding:0; width:26px; height:26px; background:transparent; border:0; color:#edece5; font-size:24px; }

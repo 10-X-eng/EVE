@@ -154,7 +154,7 @@ def install_release(release, publish, cancelled, home=None, opener=urlopen, prob
             raise ValueError("Codex download checksum or size mismatch. Try again.")
         if cancelled():
             raise InterruptedError("Codex update cancelled.")
-        publish("Verifying Codex startup, models, Fusion tool declarations, and goals…")
+        publish("Verifying Codex startup, models, Fusion tool declarations, and jobs…")
         candidate = staging / "runtime"
         candidate.mkdir()
         extract_package(archive, candidate, version, target, digest)
