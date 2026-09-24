@@ -2,8 +2,8 @@
 
 Uses STEVE's existing ChatGPT sign-in and app-server, with ephemeral conversations.
 No credentials are copied. The development MCP is a test adapter only, never a
-STEVE product dependency. Default trials are read-only. --repair explicitly creates
-two disposable child fixtures and allows model edits confined to those trials.
+STEVE product dependency. Default trials are read-only. --repair or --pocket-repair
+explicitly creates two disposable child fixtures and allows edits confined to them.
 """
 import argparse
 import json
@@ -23,7 +23,7 @@ from steve.tool_protocol import validate_call, tool_failure, tool_response, Tool
 
 
 class FusionProbe:
-    def __init__(self, url, repair=False):
+    def __init__(self, url, repair=False, pocket_repair=False):
         parsed = urlsplit(url)
         if parsed.scheme != 'http' or parsed.hostname not in ('127.0.0.1','localhost','::1'):
             raise ValueError('Use the explicitly supplied loopback development MCP endpoint.')
@@ -33,7 +33,8 @@ class FusionProbe:
             'clientInfo':{'name':'steve-dfm-probe','version':'1'}})
         self.rpc('notifications/initialized', {}, notification=True)
         self.package = 'steve_model_probe_' + uuid4().hex
-        self.repair = repair
+        self.repair = repair or pocket_repair
+        self.pocket_repair = pocket_repair
 
     def rpc(self, method, params, notification=False):
         with self.lock:
@@ -82,7 +83,22 @@ class FusionProbe:
     sys.modules[package] = module
     spec.loader.exec_module(module)
     module.protected = [(b, b.revisionId) for c in design.allComponents for b in c.bRepBodies]
-    if {self.repair!r}:
+    if {self.pocket_repair!r}:
+        original = next(c for c in design.allComponents if c.name == 'DFM rounded pocket fixture')
+        assert original.bRepBodies.count == 1
+        temporary = adsk.fusion.TemporaryBRepManager.get().copy(original.bRepBodies.item(0))
+        component = design.rootComponent.occurrences.addNewComponent(adsk.core.Matrix3D.create()).component
+        component.name = 'DFM pocket repair ' + ('on' if {enabled!r} else 'off') + ' ' + package[-8:]
+        base = component.features.baseFeatures.add()
+        assert base.startEdit()
+        try:
+            assert component.bRepBodies.add(temporary, base) is not None
+        finally:
+            assert base.finishEdit()
+        body = component.bRepBodies.item(0)
+        body.name = 'DFM pocket repair trial'
+        module.component = component
+    elif {self.repair!r}:
         component = design.rootComponent.occurrences.addNewComponent(adsk.core.Matrix3D.create()).component
         component.name = 'DFM repair ' + ('on' if {enabled!r} else 'off') + ' ' + package[-8:]
         sketch = component.sketches.add(component.xYConstructionPlane)
@@ -154,6 +170,8 @@ class FusionProbe:
 
     def verify_repair(self):
         """Independent geometry assertions, not the generating model's self-grade."""
+        if self.pocket_repair:
+            return self.verify_pocket_repair()
         return self.script(f'''def run(_context):
     import sys, json, math
     import adsk.core
@@ -182,6 +200,45 @@ class FusionProbe:
         'ceiling_mm':dimensions[2]-span,'protectedBodiesUnchanged':True,'independentGeometryChecks':'passed'}}))
 ''')
 
+    def verify_pocket_repair(self):
+        """Check the specified rounded rectangle directly, without DFM measurement helpers."""
+        return self.script(f'''def run(_context):
+    import sys, json, math
+    import adsk.core
+    module = sys.modules[{self.package!r}]
+    assert all(b.isValid and b.revisionId == rev for b,rev in module.protected), 'Protected geometry changed'
+    component = module.component
+    assert component.bRepBodies.count == 1 and component.occurrences.count == 0, 'Keep one solid in the selected component'
+    body = component.bRepBodies.item(0)
+    assert body.isSolid and body.revisionId != module.originalRevision
+    box = body.boundingBox
+    for k, maximum in zip(('x','y','z'), (4,3,1)):
+        assert abs(getattr(box.minPoint,k)) < 1e-7 and abs(getattr(box.maxPoint,k)-maximum) < 1e-7, 'Outer block changed'
+    corners, planes = [], []
+    for face in body.faces:
+        cylinder = adsk.core.Cylinder.cast(face.geometry)
+        if cylinder:
+            assert abs(cylinder.radius-.3) < 1e-7, 'Wrong corner radius'
+            assert abs(abs(cylinder.axis.z)-1) < 1e-7, 'Wrong corner axis'
+            assert abs(face.boundingBox.minPoint.z-.5) < 1e-7 and abs(face.boundingBox.maxPoint.z-1) < 1e-7, 'Pocket depth changed'
+            assert abs(face.area-math.pi/2*.3*.5) < 1e-7, 'Not a quarter-cylinder corner'
+            corners.append((round(cylinder.origin.x,6), round(cylinder.origin.y,6)))
+        else:
+            assert adsk.core.Plane.cast(face.geometry) is not None, 'Unexpected nonplanar surface'
+            planes.append(face)
+    assert sorted(corners) == [(1.3,1.3),(1.3,1.7),(2.7,1.3),(2.7,1.7)], corners
+    assert len(planes) == 11 and body.faces.count == 15, 'Unexpected topology'
+    expected = 40*30*10-(20*10-(4-math.pi)*3**2)*5
+    assert abs(body.volume*1000-expected) < 1e-5, 'Unexpected material removal/addition'
+    floor = [f for f in planes if abs(f.boundingBox.minPoint.z-.5)<1e-7 and abs(f.boundingBox.maxPoint.z-.5)<1e-7]
+    assert len(floor)==1
+    for k,lo,hi in [('x',1,3),('y',1,2)]:
+        assert abs(getattr(floor[0].boundingBox.minPoint,k)-lo)<1e-7 and abs(getattr(floor[0].boundingBox.maxPoint,k)-hi)<1e-7, 'Pocket bounds changed'
+    print(json.dumps({{'passed':True,'cornerRadius_mm':3,'pocketDepth_mm':5,'pocketBounds_mm':[10,10,30,20],
+        'blockDimensions_mm':[40,30,10],'volume_mm3':body.volume*1000,'expectedVolume_mm3':expected,
+        'protectedBodiesUnchanged':True,'independentGeometryChecks':'passed'}}))
+''')
+
     def close(self):
         self.script(f'''def run(_context):
     import sys, json
@@ -199,7 +256,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mcp-url')
     parser.add_argument('--account-only',action='store_true')
-    parser.add_argument('--repair',action='store_true',help='Allow edits on two new disposable child fixtures in the named test document.')
+    repairs = parser.add_mutually_exclusive_group()
+    repairs.add_argument('--repair',action='store_true',help='Allow blind-hole ceiling repairs on two new disposable child fixtures.')
+    repairs.add_argument('--pocket-repair',action='store_true',help='Allow R1-to-R3 pocket-corner repairs on two new base-body fixtures without source sketches.')
     parser.add_argument('--output',type=Path,default=ROOT/'.cache'/'dfm-model-probe.json')
     args = parser.parse_args()
     done = threading.Event()
@@ -226,7 +285,7 @@ def main():
         model = next((item for item in models if item.get('isDefault')),models[0])
         model_id = model['model']
         effort = 'medium' if any(e['reasoningEffort']=='medium' for e in model['supportedReasoningEfforts']) else model['defaultReasoningEffort']
-        probe = FusionProbe(args.mcp_url, repair=args.repair)
+        probe = FusionProbe(args.mcp_url, repair=args.repair, pocket_repair=args.pocket_repair)
         def request(request_id, method, params):
             if method != 'item/tool/call':
                 client.reply(request_id,error={'code':-32601,'message':'Unsupported benchmark request'})
@@ -261,7 +320,15 @@ def main():
                           "Inspect before editing, make the authorized repair, then remeasure actual geometry and report the requirement and preserved interfaces. "
                           "Only edit the selected body's component; leave all other components and documents untouched. No exports, uploads, saves or document switching. "
                           "The manufacturing requirement and repair permission are confirmed; no setup questions are needed.")
+            if args.pocket_repair:
+                prompt = ("Inspect and repair ONLY the selected disposable block for milling. Our confirmed shop requirement is R3 mm at all four vertical internal pocket corners. "
+                          "Preserve the 40 x 30 x 10 mm outer block at origin, the pocket's bounding rectangle X=10..30,Y=10..20 mm, flat floor Z=5 mm and opening at Z=10 mm. "
+                          "The pocket is a rounded rectangle, initially R1; change only its four corner radii to exactly 3 mm while retaining its specified bounds and depth. "
+                          "This is a base body without source sketch parameters. Inspect before editing, perform the authorized repair and remeasure actual geometry. "
+                          "Only edit this body's component; leave all other components and documents untouched. No exports, uploads, saves or document switching. "
+                          "The radius requirement and repair permission are confirmed. Report preserved dimensions and important unchecked manufacturing concerns.")
             print('Starting DFM',enabled,'model',model_id,'effort',effort,flush=True)
+            started = time.monotonic()
             turn = client.request('turn/start',{'threadId':thread,'model':model_id,'effort':effort,'input':message_input(prompt,context)})['turn']['id']
             deadline = time.monotonic()+300
             while not done.wait(1):
@@ -269,8 +336,10 @@ def main():
                     client.request('turn/interrupt',{'threadId':thread,'turnId':turn})
                     raise RuntimeError('The bounded model probe timed out; no benchmark conclusion recorded.')
             trials.append({'dfmEnabled':enabled,'model':model_id,'effort':effort,'outcome':outcomes[-1],
+                           'scenario':'pocket-repair' if args.pocket_repair else 'hole-repair' if args.repair else 'inspection',
+                           'elapsedSeconds':round(time.monotonic()-started,3),
                            'tools':list(records),'answer':''.join(text)})
-            if args.repair:
+            if probe.repair:
                 try:
                     trials[-1]['independentVerification'] = probe.verify_repair()
                 except Exception as error:
@@ -282,7 +351,7 @@ def main():
         args.output.write_text(json.dumps(trials,ensure_ascii=False,indent=2),encoding='utf-8')
         print('Paired probe recorded:',args.output,flush=True)
         if any(trial['outcome'] != 'completed' or
-               (args.repair and trial['independentVerification'].get('passed') is not True)
+               (probe.repair and trial['independentVerification'].get('passed') is not True)
                for trial in trials):
             raise RuntimeError('A trial did not complete or failed independent geometry checks; inspect the recorded evidence.')
     finally:
