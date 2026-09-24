@@ -548,6 +548,32 @@ do not establish real-model instruction following or manufacturing quality.
 ChatGPT live model evidence is recorded separately above. Native Fusion and
 independent manufacturing qualification remain separate gates.
 
+## Sourced machine definitions and nominal FDM envelopes
+
+Machine capabilities now load from separate JSON files and are selected per stage
+by ID/content hash. There are no printer limits in the DFM execution code. The
+first two definitions record official nominal XYZ envelopes for MK4S and the
+original CORE One, with scope/source/date and explicit unverified areas; see
+[MACHINES.md](MACHINES.md). Catalog discovery uses existing API help, not another
+tool. Machine comparisons preserve source/scope and reject relation inversion,
+reserved-key overrides, missing definitions, changed hashes and wrong processes.
+
+On Fusion 2705.1.25, `scripts/fusion_sourced_envelope_smoke.py` created three
+guarded test bodies and separately measured eight machine/orientation cases.
+The 218 × 200 × 10 mm plate measured 436,000 mm³. At a quarter turn, its build
+Y extent of 218 mm exceeded MK4S's 210 mm but fit CORE One's 220 mm. Upright fit
+both nominal envelopes. A 250 × 20 × 10 mm boundary body fit nominal X exactly;
+a 251 × 20 × 10 mm body exceeded both. Native volumes were 50,000 and 50,200 mm³.
+All measured dimensions matched analytic fixture expectations. Every report kept
+printing outcome unknown; fitting dimensions did not produce a printability pass.
+Setup preserved existing bodies and inspection preserved every body revision.
+
+Unit/runner checks cover definition validation, persisted old references, explicit
+refresh, unavailable files, change during a check, historical binding status,
+source/scope, and attempts to replace or invert limits. These validate selected
+nominal capabilities; no physical printer, slicer outcome or complete machine
+capability profile has been qualified.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

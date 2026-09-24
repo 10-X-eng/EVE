@@ -31,6 +31,9 @@ replaced body is not silently substituted.
   execution path and return a report from measured comparisons.
 - `fusion_api_help` at `steve.dfm` or `steve.dfm.<process>`: retrieve calling
   conventions and relevant process guidance without expanding every prompt.
+- One file per machine supplies sourced capabilities through `steve.machines`.
+  Plan stages select an exact definition hash; missing/changed definitions cannot
+  silently reuse old limits. See [machine definitions](MACHINES.md).
 - Criteria record units, source and whether they are a requirement, confirmed
   profile, guideline or assumption. Unconfirmed criteria remain conditional.
 - Reports separate concerns, checked measurements, unknown coverage and explicit

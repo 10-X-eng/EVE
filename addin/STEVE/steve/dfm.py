@@ -13,6 +13,7 @@ import tempfile
 import threading
 
 from .secure_store import SecureStore
+from . import machines
 
 
 GUIDES = {
@@ -59,7 +60,8 @@ def guide(process=None):
     common = {
         'experimental': True,
         'workflow': 'Inspect the target and resolve a BRepBody token. Read/set its plan with fusion_dfm_plan; pass stages=[] only when the user asks to forget that part\'s manufacturing plan. Repeated instances share the native part plan. Use fusion_dfm_check for a selected stage. Derive criteria from user requirements or a documented profile, never invent availability or limits. Preserve functional requirements; recheck after relevant edits.',
-        'historicalReports': 'Reports are snapshots, not live certifications. Before reusing one, read fusion_dfm_plan for the same document and resolved native body. Its reportBinding.revision and planHash must both be available and match the report revision and planHash. The hash covers all ordered stages, including material, notes and criteria. Changed/removed plans, edited geometry or unavailable bindings require a new check. A matching binding alone does not validate external machine/tool settings, occurrence placement, build orientation or the correctness/completeness of the prior inspection.',
+        'historicalReports': 'Reports are snapshots, not live certifications. Before reusing one, read fusion_dfm_plan for the same document and resolved native body. Its reportBinding.revision and planHash must both match the report, and machineStatus must be current. The hash covers all ordered stages, including material, notes and criteria. Changed/removed plans, edited geometry or unavailable bindings require a new check. A matching binding alone does not validate external machine/tool settings, occurrence placement, build orientation or the correctness/completeness of the prior inspection.',
+        'machines': 'Discover definitions with fusion_api_help steve.machines; read steve.machines.<id> and confirm the intended machine before copying its selection into a stage machine field. Each file defines sourced capabilities, scope and unknowns. context[\'dfm\'].machine returns the selected snapshot or None. compare uses machine.<capability> with its declared relation/units; these reserved limits cannot be overridden by stage criteria. Unknown capabilities require separate sourced setup criteria, not guesses. Definitions are hash-bound; changed/missing definitions require review and explicit plan refresh. A machine envelope excludes tooling/supports/fixtures and does not establish manufacturing success.',
         'assemblyFrames': 'Plans and dfm.body describe the native part definition; repeated occurrences share that plan. They do not share placement or automatically share a print orientation. For an explicitly chosen assembly build frame, retain the intended BRepBody proxy, obtain its assemblyContext occurrence in the root context (including nested childOccurrences), copy occurrence.transform2 and invert it. Transform build-direction Vector3D objects by that inverse before passing their components to native envelope/overhang helpers. Use Point3D for axis origins so translation is included; Fusion point coordinates are cm, while rotational_surfaces takes an origin in mm. Do not use the retired occurrence.transform. Record the occurrence, chosen axes and measured revision; changing placement requires a new orientation-dependent assessment. Do not silently measure every occurrence with native XYZ or infer a build orientation from assembly placement.',
         'signatures': [
             "context['dfm'].body: selected native BRepBody (component coordinates; account for assembly/build transforms)",
@@ -93,10 +95,12 @@ def validate_stages(stages):
     if not isinstance(stages, list) or not 1 <= len(stages) <= 8:
         raise ValueError('Provide 1 to 8 ordered manufacturing stages.')
     for stage in stages:
-        if not isinstance(stage, dict) or set(stage) - {'process', 'material', 'notes', 'criteria'}:
-            raise ValueError('Stages contain process, material, notes and criteria only.')
+        if not isinstance(stage, dict) or set(stage) - {'process', 'material', 'notes', 'criteria', 'machine'}:
+            raise ValueError('Stages contain process, material, notes, criteria and optional machine only.')
         if stage.get('process') not in GUIDES:
             raise ValueError('Choose a supported DFM process.')
+        if 'machine' in stage:
+            machines.validate_reference(stage['machine'])
         for key in ('material', 'notes'):
             if key in stage:
                 short(stage[key], key)
@@ -105,6 +109,8 @@ def validate_stages(stages):
             raise ValueError('Use at most 24 named criteria per stage.')
         for key, criterion in criteria.items():
             short(key, 'Criterion key', 80)
+            if key.startswith('machine.'):
+                raise ValueError('machine.* criteria come from the selected definition; use another key for part/setup requirements.')
             if not isinstance(criterion, dict) or set(criterion) != {'value', 'units', 'source', 'basis'}:
                 raise ValueError('Each criterion requires value, units, source and basis.')
             finite(criterion['value'])
@@ -222,6 +228,9 @@ class DfmStore:
 
     def save_plan(self, document_key, body, design, stages):
         stages = validate_stages(stages)
+        for stage in stages:
+            if 'machine' in stage:
+                machines.resolve(stage['machine'], stage['process'])
         body = native(body)
         short(body.entityToken, 'Part token', 4096)
         with self._lock, self._file_lock():
@@ -267,6 +276,11 @@ class DfmChecks:
         self.body = native(body)
         self._stage = validate_stages([stage])[0]
         self._criteria = copy.deepcopy(self._stage.get('criteria', {}))
+        self._machine = machines.resolve(self._stage['machine'], self._stage['process']) if 'machine' in self._stage else None
+        if self._machine:
+            for key, entry in self._machine['capabilities'].items():
+                self._criteria['machine.' + key] = {'value': entry['value'], 'units': entry['units'],
+                    'basis': 'profile', 'source': self._machine['sources'][entry['source']]}
         self._revision = revision(self.body)
         self._findings = []
 
@@ -274,6 +288,16 @@ class DfmChecks:
     def stage(self):
         """The assessed stage snapshot; editing the returned value cannot change evidence."""
         return copy.deepcopy(self._stage)
+
+    @property
+    def machine(self):
+        """Immutable-by-copy capability snapshot selected for this check, or None."""
+        return copy.deepcopy(self._machine)
+
+    def machine_status(self):
+        if self._machine is None:
+            return 'current'
+        return machines.status(self._stage['machine'])
 
     def _add(self, value):
         if len(self._findings) >= 24:
@@ -295,6 +319,10 @@ class DfmChecks:
         finite(actual)
         if relation not in ('<=', '>=', '=='):
             raise ValueError('Use <=, >= or ==; encode a tolerance as explicit upper/lower criteria.')
+        if isinstance(criterion, str) and criterion.startswith('machine.') and self._machine:
+            capability = self._machine['capabilities'].get(criterion[len('machine.'):])
+            if capability and relation != capability['relation']:
+                raise ValueError('Use the selected machine capability relation; it cannot be inverted to produce a pass.')
         if evidence:
             short(evidence, 'Evidence', 400)
         limit = self._criteria.get(criterion)
@@ -319,6 +347,8 @@ class DfmChecks:
         result = {'label': label, 'actual': actual, 'criterion': criterion, 'relation': relation,
                   'limit': expected, 'units': units, 'source': limit['source'], 'basis': limit['basis'],
                   'status': 'pass' if passed else 'concern', 'evidence': evidence}
+        if isinstance(criterion, str) and criterion.startswith('machine.') and self._machine:
+            result['capabilityScope'] = self._machine['capabilities'][criterion[len('machine.'):]]['scope']
         if numerical is not None:
             result['numericalComparison'] = numerical
         if limit['basis'] in ('assumption', 'guideline'):
@@ -349,4 +379,6 @@ class DfmChecks:
                 'configurationHash': hashlib.sha256(json.dumps(self._stage, sort_keys=True).encode('utf-8')).hexdigest(),
                 'configurationStatus': configuration_status,
                 'findings': findings, 'coverage': 'Only the listed measurements for this body and revision. Generated inspection code is not independently certified.',
-                'unchecked': GUIDES[self._stage['process']]['unchecked']}
+                'unchecked': GUIDES[self._stage['process']]['unchecked'],
+                'machine': self._stage.get('machine'),
+                'machineUnchecked': self._machine['unverified'] if self._machine else []}

@@ -22,6 +22,7 @@ from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
 from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body, plan_hash, revision
 from .dfm_geometry import DfmGeometry
+from . import machines
 from .documentation import reference_candidate
 from .rmfg_snapshot import export_snapshot
 from .tool_protocol import API_GUIDANCE, PYTHON_CONTEXT, ToolError, tool_failure
@@ -268,6 +269,9 @@ class FusionTools:
             try:
                 current_plan = self.dfm.plan(key, body, context['design'])
                 configuration_status = 'current' if plan_hash(current_plan) == assessed_plan_hash else 'stale'
+                machine_status = dfm.machine_status()
+                if configuration_status == 'current':
+                    configuration_status = machine_status
             except (OSError, RuntimeError, ValueError):
                 # A contended/read-failed store cannot turn old criteria into current evidence.
                 # Preserve the measurements and execution result; do not rerun generated code.
@@ -314,8 +318,10 @@ class FusionTools:
             else:
                 self.dfm.save_plan(key, body, context['design'], arguments['stages'])
             plan = self.dfm.plan(key, body, context['design'])
+        machine_statuses = [machines.status(stage['machine']) for stage in (plan or {}).get('stages', []) if 'machine' in stage]
+        machine_status = 'stale' if 'stale' in machine_statuses else 'unknown' if 'unknown' in machine_statuses else 'current'
         return {'ok': True, 'document_id': self.document_id, 'body': body.name, 'partToken': body.entityToken,
-                'reportBinding': {'revision': revision(body), 'planHash': plan_hash(plan)},
+                'reportBinding': {'revision': revision(body), 'planHash': plan_hash(plan), 'machineStatus': machine_status},
                 'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',
                 'scope': 'Native body definition. Compare reportBinding with historical reports before reuse; changed or unavailable revision/planHash requires a new check. Occurrence placement, assembly context and build orientation require explicit checks.'}
 
@@ -502,6 +508,8 @@ class FusionTools:
                       if not module.name.startswith("_"))
 
     def api_help(self, path):
+        if path == 'steve.machines' or path.startswith('steve.machines.'):
+            return {'ok': True, **machines.help(path[len('steve.machines.'):] if path != 'steve.machines' else None)}
         if path == 'steve.python':
             return {'ok': True, 'path': path, 'documentation': PYTHON_CONTEXT,
                     'related': ['steve.helpers', 'steve.dfm']}
