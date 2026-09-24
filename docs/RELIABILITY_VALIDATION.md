@@ -25,3 +25,16 @@ Fixtures cover this selection state, editing commands, product/workspace mismatc
 and write rejection. Live verification of the fix remains required, along with
 inspection during Design/CAM commands and a long native calculation. These checks
 do not establish that native calculations are interruptible.
+
+## Product summaries (#11)
+
+Design summaries include bounded component, occurrence, sketch constraint, feature
+health, and parameter details. CAM summaries read setup/operation state without
+typed parameter values. Electronics summaries cast the pinned product through the
+installed namespace and describe board, schematic, or library collections with the
+documented read-only limitation. Missing properties are explicitly unavailable.
+Collections report completeness and offsets, and the combined report is bounded.
+
+Fixture tests cover large and empty collections, missing properties, profile-free
+inspection, CAM parameter avoidance, and Electronics capability reporting. Native
+Fusion validation of all three product summaries remains required.
