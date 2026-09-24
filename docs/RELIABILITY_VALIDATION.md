@@ -14,7 +14,14 @@ Automated host fixtures cover metadata-only inspection, long waits, cancellation
 document transitions, command completion, and exactly-once results. Runner tests
 cover a native wait longer than the Python budget and a Python loop afterward.
 
-Live Fusion verification remains required: reproduce the Electronics idle command,
-record its ID, inspect during Design/CAM commands, and run a long native calculation.
-The Electronics command ID has not been verified, so no new idle command is allowlisted.
-These checks do not establish that native calculations are interruptible.
+A live blank schematic reported `Electron::Group`, `SchematicProductType`, and
+`SchEditorEnvironement`. Autodesk documents [GROUP as active by default](https://help.autodesk.com/cloudhelp/ENU/Fusion-ECAD/files/ECD-LAYOUT-EDITOR-REF.htm).
+That exact state now permits inspection, queries, and current-view capture when the
+active product matches the task's product. Writes still cannot preempt GROUP and
+receive an actionable read-only-state error instead of waiting forever. Query code
+is instructed to be read-only; it is not a security sandbox.
+
+Fixtures cover this selection state, editing commands, product/workspace mismatches,
+and write rejection. Live verification of the fix remains required, along with
+inspection during Design/CAM commands and a long native calculation. These checks
+do not establish that native calculations are interruptible.
