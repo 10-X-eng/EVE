@@ -21,6 +21,10 @@ Inspect the target before editing, including after resuming a saved chat; reuse 
 while it remains sufficient. If the target closes or cannot be resolved, stop and explain.
 Calls wait automatically while another document or a user command is active. Do not
 switch workspaces/documents, cancel their commands, or pump events to force progress.
+Inspection can return inspectionDeferred with captured metadata and the active command.
+If so, explain the wait and stop issuing dependent queries or changes until the user
+finishes the command or requests another attempt. Do not interpret an unknown command
+as idle. A long wait is not evidence of failure; never abort native Fusion calculations.
 Intentional document creation/opening can transfer the task; inspect its returned context
 before modeling. Execution uses Fusion's main thread, so do not promise background edits
 while another document is active.

@@ -246,6 +246,35 @@ class FusionBridgeTests(unittest.TestCase):
         self.host.pump()
         self.assertTrue(self.results[0]["ok"])
 
+    def test_inspection_reports_unknown_command_without_model_traversal(self):
+        self.bridge.message_context("send")
+        self.host.userInterface.activeCommand = "UnknownElectronicsCommand"
+        with patch.object(self.bridge, "context", side_effect=AssertionError("Must not traverse")):
+            self.bridge.submit("fusion_inspect_document", {}, self.results.append, lambda: False)
+            self.host.pump()
+        self.assertTrue(self.results[0]["inspectionDeferred"])
+        self.assertEqual(self.results[0]["commandState"]["activeCommand"], "UnknownElectronicsCommand")
+        self.assertEqual(self.host.executions, 0)
+        self.assertEqual(self.host.userInterface.activeCommand, "UnknownElectronicsCommand")
+
+    def test_long_queued_wait_never_expires_or_starts_work(self):
+        self.bridge.message_context("send")
+        self.host.userInterface.activeCommand = "CalculationCommand"
+        cancelled = [False]
+        self.operation(cancelled=lambda: cancelled[0])
+        self.host.pump()
+        self.bridge.waiting["queuedAt"] -= 3600
+        self.bridge.wake()
+        self.host.pump()
+        self.assertFalse(self.results)
+        self.assertEqual(self.host.executions, 0)
+        cancelled[0] = True
+        self.bridge.wake()
+        self.host.pump()
+        self.assertEqual(len(self.results), 1)
+        self.assertEqual(self.results[0]["errorCode"], "cancelled")
+        self.assertEqual(self.host.userInterface.activeCommand, "CalculationCommand")
+
     def test_tab_change_between_command_queue_and_execute_defers_before_code_runs(self):
         original = self.host.activeDocument
         self.bridge.message_context("send")

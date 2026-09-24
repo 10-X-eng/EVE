@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import pkgutil
 import queue
+import time
 from uuid import uuid4
 
 import adsk.core
@@ -157,6 +158,23 @@ class FusionTools:
             self.bind(event, DocumentWake(self), self.handlers)
         self.bind(app.userInterface.commandTerminated, CommandWake(self), self.handlers)
 
+    def command_state(self):
+        ui = self.app.userInterface
+        command = ui.activeCommand
+        workspace = optional_property(ui, "activeWorkspace")
+        product = self.task["product"] if self.task else self.app.activeProduct
+        return {"activeCommand": command, "workspace": optional_property(workspace, "id"),
+                "product": optional_property(product, "productType"),
+                "executionAllowed": command in ("SelectCommand", COMMAND_ID)}
+
+    def wait_for(self, job, reason):
+        self.waiting = job
+        state = self.command_state()
+        if self.debug:
+            self.debug.record("fusion.queued", tool=job["tool"], reason=reason,
+                              elapsedSeconds=round(time.monotonic() - job["queuedAt"], 1), **state)
+        self.on_wait(reason, self.task_label())
+
     def wake(self):
         # Safe from the controller worker as well as Fusion event callbacks.
         if not self.closed:
@@ -219,7 +237,8 @@ class FusionTools:
         if self.closed:
             complete(tool_failure(ToolError("cancelled", "STEVE is shutting down.")))
             return
-        job = {"tool": tool, "arguments": arguments, "complete": complete, "cancelled": cancelled}
+        job = {"tool": tool, "arguments": arguments, "complete": complete, "cancelled": cancelled,
+               "queuedAt": time.monotonic()}
         self.queue.put(job)
         try:
             self.app.fireCustomEvent(EVENT_ID)
@@ -327,9 +346,19 @@ class FusionTools:
             path.unlink(missing_ok=True)
 
     def inspect_document(self):
+        state = self.command_state()
+        if not state["executionAllowed"]:
+            # Metadata only: do not evaluate profiles or traverse a model while
+            # the user is editing. An unfamiliar idle command is never trusted.
+            return {**self.selection_context(), "commandState": state, "design": None,
+                    "inspectionDeferred": True,
+                    "guidance": "Only captured context is available while this command is active. "
+                    "STEVE has not interrupted it. Generated queries and changes remain queued; "
+                    "Stop cancels STEVE's pending request only. If this persists while Fusion is idle, "
+                    "report the activeCommand and workspace shown here; do not retry or cancel Fusion commands automatically."}
         context = self.context()
         result = {**self.selection_context(), "products": list(context["products"]),
-                  "apiNamespaces": self.namespaces(), "design": None}
+                  "apiNamespaces": self.namespaces(), "commandState": state, "design": None}
         design = context["design"]
         if design:
             result["design"] = {"units": design.unitsManager.defaultLengthUnits,
@@ -395,12 +424,11 @@ class FusionTools:
                 if job["arguments"].get("document_id", self.document_id) != self.document_id:
                     raise ToolError("document_changed", "The tool request does not match the task's pinned document.")
                 if self.app.activeDocument != self.document:
-                    self.waiting = job
-                    self.on_wait("Waiting for " + (self.task["snapshot"]["name"] or "the task document"), self.task_label())
+                    self.wait_for(job, "Waiting for " + (self.task["snapshot"]["name"] or "the task document"))
                     return
-                if self.app.userInterface.activeCommand not in ("SelectCommand", COMMAND_ID):
-                    self.waiting = job
-                    self.on_wait("Waiting for your Fusion command to finish", self.task_label())
+                if job["tool"] != "fusion_inspect_document" and not self.command_state()["executionAllowed"]:
+                    self.wait_for(job, "Waiting for Fusion command " + str(self.app.userInterface.activeCommand)[:160]
+                                  + ". STEVE has not started this operation; Stop cancels only this request.")
                     return
                 self.on_wait("", self.task_label())
             if job["tool"] == "fusion_inspect_document":
