@@ -484,6 +484,40 @@ and completed the inspection. No one-off warning was added to every tool for tha
 recovered API mistake. These are integration observations, not a latency or model
 quality benchmark; no complete absence of ambiguity is claimed.
 
+## Counterbores, intersecting bores and an open pocket
+
+`scripts/fusion_milling_topology_smoke.py` creates three guarded disposable
+fixtures. A separate read-only `measure(design)` invocation passed on Fusion
+2705.1.25, preserving all body revisions. Independent analytic volumes matched
+native geometry within 0.00001 mm³:
+
+- A 20 × 20 × 12 mm block with a 4 mm through bore and an 8 mm counterbore
+  3 mm deep measured 4536.106217098447 mm³. Full-band inspection returned
+  internal diameter/span pairs of 4/9 and 8/3 mm, including one-item pagination.
+  The narrow band's 9 mm span is not the complete 12 mm through-hole path.
+  Native hole recognition returned unknown because the Manufacturing Extension
+  was inactive; the result included the supported-band recovery guidance.
+- A 10 mm cube with intersecting perpendicular 4 mm bores measured
+  791.3392543794886 mm³, matching the cylinder subtraction plus their analytic
+  intersection volume. All four cylindrical faces retained measurable R2
+  internal surfaces, but every trimmed band was unsupported. No complete hole
+  or full-band depth was inferred from those partial faces.
+- A 20 × 20 × 10 mm block with an open 10 × 10 × 5 mm pocket measured
+  3500 mm³. All faces were planar, so the cylinder helpers returned no candidates.
+  Separate edge geometry and point containment established the two sharp inner
+  corners and the open side for this fixture. Native pocket recognition returned
+  one pocket, depth 5 mm, `isClosed=false`, `isThrough=false`. This is a successful
+  installed native pocket-recognition call; it does not establish hole-recognition
+  access or arbitrary pocket coverage.
+
+Each actual DFM runner report retained an explicit unknown for complete machining
+coverage. A second open-pocket query returned zero cylindrical candidates and
+recorded no findings: its report correctly remained incomplete. Empty candidates
+therefore did not create a passing report. These checks exercise existing behavior;
+they add no prompt text, tools or manufacturing thresholds. Tool approach, reach,
+holder clearance, workholding, NURBS corners and broader feature recognition remain
+unqualified. No customer geometry was changed during fixture setup.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

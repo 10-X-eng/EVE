@@ -24,7 +24,7 @@ not a passing manufacturing assessment.
 | Issue | Implemented and exercised | Remaining qualification or implementation |
 | --- | --- | --- |
 | #24 Foundation | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases | Broader provider/panel workflows and independently reviewed outcome corpus; live macOS Fusion |
-| #25 Milling/drilling | Full cylindrical bands, partial cylindrical radii, native recognition adapters with missing-extension handling; native and SAT-imported pocket/shaft measurements; library-derived cutter criterion; two paired model repair cases | Entitled recognition, intersecting/counterbore/open-pocket coverage, tooling/reach/workholding qualification, sharp/NURBS cases and measured design-quality improvement |
+| #25 Milling/drilling | Full cylindrical bands, partial cylindrical radii; native and SAT-imported pocket/shaft measurements; counterbore spans and intersected-band rejection; successful native open-pocket recognition, missing-extension hole handling and sharp-pocket empty-candidate reporting; library-derived cutter criterion; two paired model repair cases | Broader recognition and entitled hole recognition, tooling/reach/workholding qualification, general sharp/NURBS corner detection and measured design-quality improvement |
 | #26 FDM/FFF | Explicit build-frame envelopes, rotated/repeated assemblies, planar underside slopes, sampled walls and open-surface rejection; selected trimmed-face distances on known slots before/after rigid placement; synthetic boundary profiles | A confirmed printer/material profile; broader fine-feature, directional/assembly clearance and support/bridge coverage; paired additive design outcomes and independent printing review |
 | #27 Sheet metal/RMFG | Native rule and existing flat-pattern metadata; paged native bend lines on a 2 mm bent-strip fixture (R3 inside, 90 degrees, 20 mm bend lines); single-body STEP export; optional OAuth, protected storage, upload approval, immutable retry jobs and scoped reports | Multi-bend/relief/sequence and tooling qualification; real account authorization and approved supplier upload/report with an actionable finding; live macOS export |
 | #28 Turning | Axis/trimming classification and full bands on native/SAT stepped shafts with a groove and bore; wrong-axis rejection and sourced diameter boundaries | Machine/tool/workholding profile, tool approach/reach/groove fit, interrupted and more complex turning fixtures, paired design outcomes |
@@ -60,7 +60,8 @@ The draft PRs form one ordered stack: foundation (#31), optional supplier path
 (#35), build orientation (#36), report currency (#37), imported solids (#38),
 paired pocket repair (#39), reference discovery (#40), applicability/readiness
 (#41), existing-pattern bend inspection (#42), selected face distances (#43),
-and the tool-contract/on-demand-context review. Later branches include
+the tool-contract/on-demand-context review (#44), and milling topology fixtures.
+Later branches include
 their predecessors. Review each PR against its declared base; do not merge later
 branches out of order or interpret a green package build as process qualification.
 
