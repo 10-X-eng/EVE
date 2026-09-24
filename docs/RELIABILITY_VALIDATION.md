@@ -38,3 +38,17 @@ Collections report completeness and offsets, and the combined report is bounded.
 Fixture tests cover large and empty collections, missing properties, profile-free
 inspection, CAM parameter avoidance, and Electronics capability reporting. Native
 Fusion validation of all three product summaries remains required.
+
+## Operation evidence (#12)
+
+Modification results include a bounded Design feature-health comparison and up to
+20 explicitly measured scalar checks supplied through `context['verification']`.
+The report separates newly introduced, existing, and unclassified problems. Entity
+tokens are resolved to objects before comparison. This is not a full geometry diff:
+unchanged health/name metadata cannot prove a body's shape is unchanged. Missing
+coverage or measurements remains incomplete, and failed checks do not abort a
+completed Fusion command or replay it. Other products require explicit checks.
+
+Fixtures cover new/pre-existing warnings, changed tokens, deleted features, partial
+coverage, invalid measurements, and a failed check after a completed command. Native
+feature-health and Undo behavior still need live verification.

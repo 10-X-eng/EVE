@@ -16,6 +16,7 @@ import adsk.cam
 
 from .python_runner import run_python, bounded_result
 from .document_summary import design_summary, cam_summary, electronics_summary
+from .verification import Checks, snapshot, report
 from .cam_guard import protect_cam_values
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
@@ -132,6 +133,7 @@ class DestroyHandler(adsk.core.CommandEventHandler):
                 result["document"] = owner.inspect_document()
             except Exception as exc:
                 result["inspectionError"] = str(exc)
+            owner.verify(job, result)
             owner.finish(job, result)
 
 
@@ -232,13 +234,18 @@ class FusionTools:
         collection.append((event, handler))
 
     def run_script(self, job):
+        context = self.context()
+        if job["tool"] == "fusion_execute_python":
+            job["before"] = snapshot(context["design"])
+            job["checks"] = Checks()
+            context["verification"] = job["checks"]
         script_id = str(uuid4())
         def record(event, **details):
             if self.debug:
                 self.debug.record(event, scriptId=script_id, title=job["arguments"]["title"], **details)
         record("python.started", code=job["arguments"]["code"], crashGuard="cam-probe-v1")
         with protect_cam_values(getattr(adsk.cam, "CAMParameter", None), record):
-            result = run_python(job["arguments"]["code"], self.context(), job["cancelled"],
+            result = run_python(job["arguments"]["code"], context, job["cancelled"],
                                 diagnostic=record if self.debug and self.debug.enabled else None)
         if (self.task and job["arguments"].get("execution_mode") == "application"
                 and self.app.activeDocument != self.document):
@@ -252,6 +259,17 @@ class FusionTools:
             self.on_wait("", self.task_label())
         record("python.completed", ok=result["ok"])
         return result
+
+    def verify(self, job, result):
+        if "before" not in job:
+            return
+        try:
+            healthy = adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState
+            result["verification"] = report(job["before"], snapshot(self.context()["design"]),
+                job["checks"].results, result["ok"], healthy)
+        except (AttributeError, RuntimeError) as exc:
+            result["verification"] = {"status": "incomplete", "unavailable": str(exc)[:200],
+                                      "checks": job["checks"].results}
 
     def submit(self, tool, arguments, complete, cancelled):
         # Called from the transport reader. fireCustomEvent is the only Fusion
@@ -477,6 +495,7 @@ class FusionTools:
                         result["document"] = self.inspect_document()
                     except Exception as exc:
                         result["inspectionError"] = str(exc)
+                    self.verify(job, result)
                     self.finish(job, result)
                     return
                 self.definition.name = "STEVE: " + job["arguments"]["title"]
