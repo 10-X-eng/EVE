@@ -66,6 +66,7 @@ def guide(process=None):
             "context['dfm'].stage: copied process/material/notes/criteria",
             "context['dfm'].compare(label, actual, criterion, relation, units, evidence=''): relation is <=, >= or ==; units must exactly match the criterion",
             "context['dfm'].unknown(label, reason): explicit missing/unsupported coverage",
+            "context['dfm'].not_applicable(label, reason, evidence): a check excluded by verified part/process context; both reason and evidence are required. Missing settings, unsupported geometry, incomplete scans and failed measurements are unknown, never not applicable. This is a stated applicability judgment, not independent certification",
             "context['dfm'].measurements.envelope(x_axis, y_axis): explicit perpendicular directions in native body coordinates; returns oriented dimensions_mm and excluded geometry",
             "context['dfm'].measurements.cylindrical_walls(offset=0, limit=10): full cylindrical bands with diameter_mm, axial_span_mm, side, faceToken; NOT complete-hole recognition; page by returned nextOffset",
             "context['dfm'].measurements.cylindrical_surfaces(offset=0, limit=10): radius_mm and solid-face internal/external side for analytic cylindrical faces, including partial rounded corners. No trimming or pocket recognition. First establish pocket membership and the applicable tool axis/approach; do not confuse bores with corners or infer a safe strategy from radius equality. Page by nextOffset. Sharp edges and non-cylindrical surfaces are unassessed; no matches does not prove no tight corners",
@@ -283,6 +284,10 @@ class DfmChecks:
         self._add({'label': short(label, 'Label', 100), 'status': 'unknown',
                    'reason': short(reason, 'Reason')})
 
+    def not_applicable(self, label, reason, evidence):
+        self._add({'label': short(label, 'Label', 100), 'status': 'not_applicable',
+                   'reason': short(reason, 'Reason'), 'evidence': short(evidence, 'Evidence')})
+
     def compare(self, label, actual, criterion, relation, units, evidence=''):
         short(label, 'Label', 100)
         finite(actual)
@@ -335,7 +340,8 @@ class DfmChecks:
                     'Execution or geometry revision was not verified; remeasure before relying on this result.')
         status = ('stale' if stale else 'incomplete' if not verified or not findings else
                   'concerns' if any(f['status'] == 'concern' for f in findings) else
-                  'incomplete' if any(f['status'] == 'unknown' for f in findings) else 'checked')
+                  'incomplete' if any(f['status'] == 'unknown' for f in findings) else
+                  'not_applicable' if all(f['status'] == 'not_applicable' for f in findings) else 'checked')
         return {'status': status, 'process': self._stage['process'], 'body': str(self.body.name)[:200],
                 'bodyToken': self.body.entityToken, 'revision': self._revision,
                 'configurationHash': hashlib.sha256(json.dumps(self._stage, sort_keys=True).encode('utf-8')).hexdigest(),

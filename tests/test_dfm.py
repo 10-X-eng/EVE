@@ -173,6 +173,34 @@ class DfmTests(unittest.TestCase):
         checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
         self.assertEqual(checks.report(True)['status'], 'incomplete')
 
+    def test_not_applicable_requires_evidence_and_does_not_claim_a_pass(self):
+        checks = self.checks()
+        for reason, evidence in [('', 'Measured context'), ('Confirmed context', ''), (' ', 'x')]:
+            with self.assertRaises(ValueError):
+                checks.not_applicable('Excluded check', reason, evidence)
+        checks.not_applicable('Excluded check', 'Not required by this selected process', 'Confirmed process context in the fixture')
+        report = checks.report(True)
+        self.assertEqual(report['status'], 'not_applicable')
+        self.assertEqual(report['findings'][0]['status'], 'not_applicable')
+        checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
+        self.assertEqual(checks.report(True)['status'], 'checked')
+        checks.unknown('Missing coverage', 'Profile was not supplied')
+        self.assertEqual(checks.report(True)['status'], 'incomplete')
+        checks.compare('Tight corner', 1, 'cutter_radius', '>=', 'mm')
+        self.assertEqual(checks.report(True)['status'], 'concerns')
+
+    def test_applicability_judgments_are_invalidated_with_other_findings(self):
+        checks = self.checks()
+        checks.not_applicable('Excluded check', 'Confirmed process scope', 'Fixture evidence')
+        for execution, configuration in [(False, 'current'), (True, 'stale'), (True, 'unknown')]:
+            report = checks.report(execution, configuration)
+            self.assertEqual(report['findings'][0]['status'], 'unknown')
+            self.assertEqual(report['findings'][0]['evidence'], 'Fixture evidence')
+        self.body.revisionId = 'r2'
+        report = checks.report(True)
+        self.assertEqual(report['status'], 'stale')
+        self.assertEqual(report['findings'][0]['status'], 'unknown')
+
     def test_public_stage_copy_cannot_relabel_measured_criteria(self):
         original = stages()[0]
         checks = self.checks(original)
