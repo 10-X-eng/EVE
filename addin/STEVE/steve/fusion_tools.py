@@ -14,7 +14,8 @@ import adsk.core
 import adsk.fusion
 import adsk.cam
 
-from .python_runner import run_python
+from .python_runner import run_python, bounded_result
+from .document_summary import design_summary, cam_summary, electronics_summary
 from .cam_guard import protect_cam_values
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
@@ -361,17 +362,21 @@ class FusionTools:
                   "apiNamespaces": self.namespaces(), "commandState": state, "design": None}
         design = context["design"]
         if design:
-            result["design"] = {"units": design.unitsManager.defaultLengthUnits,
-                "componentCount": design.allComponents.count,
-                "components": [{"name": component.name, "bodyCount": component.bRepBodies.count,
-                                "bodies": [body.name for body in items(component.bRepBodies, 30)],
-                                "sketchCount": component.sketches.count,
-                                "sketches": [{"name": sketch.name, "curves": sketch.sketchCurves.count,
-                                              "profiles": sketch.profiles.count} for sketch in items(component.sketches, 30)]}
-                               for component in items(design.allComponents, 30)],
-                "parameters": [{"name": parameter.name, "expression": parameter.expression,
-                                "unit": parameter.unit} for parameter in items(design.userParameters, 60)]}
-        return result
+            result["design"] = design_summary(design)
+        cam = context["products"].get("CAMProductType")
+        if cam is not None:
+            result["cam"] = cam_summary(adsk.cam.CAM.cast(cam) if hasattr(adsk.cam, "CAM") else cam)
+        product = context["product"]
+        if "adsk.electron" in result["apiNamespaces"]:
+            module = importlib.import_module("adsk.electron")
+            for kind in ("Schematic", "Board", "Library", "EcadDesign"):
+                cls = getattr(module, kind, None)
+                electronic = cls.cast(product) if cls and product else None
+                if electronic is not None:
+                    result["electronics"] = electronics_summary(electronic)
+                    break
+        bounded = bounded_result(result)
+        return {**bounded.pop("result"), **bounded}
 
     @staticmethod
     def namespaces():
