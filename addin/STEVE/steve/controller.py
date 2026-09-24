@@ -17,6 +17,8 @@ from .debug_log import DebugLog
 from .documentation import Documentation
 from .preferences import ProviderChoice
 from .dfm import DfmStore
+from .rmfg_connection import RMFGConnection
+from .rmfg_service import RMFGService
 from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
 from .claude_transport import ClaudeTransport
@@ -187,7 +189,10 @@ class Controller:
                       "codexUpdateChecking": False, "codexUpdateStatus": "", "codexUpdating": False, "codexPendingVersion": "", "codexRestarting": False,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
                       "runtimeIssue": False, "debugLogging": self.debug.enabled, "dfmEnabled": self.dfm.enabled,
+                      "rmfgState": "unchecked", "rmfgBusy": False, "rmfgError": "", "rmfgCode": "", "rmfgUpload": None,
                       "debugLogPath": str(self.debug.path)}
+        self.rmfg = RMFGConnection(self.debug.folder.parent, self._update_state, self.open_browser)
+        self.rmfg_service = RMFGService(self.debug.folder.parent, self.rmfg.auth, self._update_state, self.fusion_tools)
         self._worker = threading.Thread(target=self._work, name="STEVE-Actions", daemon=True)
         self._worker.start()
         self.updates = UpdateChecker(self._update_state)
@@ -248,6 +253,14 @@ class Controller:
 
     def dispatch(self, action, payload=None, capture_context=None):
         payload = payload or {}
+        if action == 'rmfgUploadDecision':
+            if not self._closed:
+                self.rmfg_service.decide(payload.get('jobId'), payload.get('approved'))
+            return True
+        if action in ('rmfgConnect', 'rmfgRefresh', 'rmfgDisconnect', 'rmfgCancel'):
+            if not self._closed:
+                self.rmfg.action(action)
+            return True
         if action in ("send", "steer"):
             command = job_command(str(payload.get("text", "")))
             if command:
@@ -823,7 +836,7 @@ class Controller:
             if tool in {entry["name"] for entry in TOOLS}:
                 self.debug.record("tool.started", **identifiers, arguments=arguments)
             validate_call(tool, arguments)
-            if tool in ('fusion_dfm_plan', 'fusion_dfm_check') and not self.dfm.enabled:
+            if tool in ('fusion_dfm_plan', 'fusion_dfm_check', 'fusion_rmfg', 'rmfg_materials') and not self.dfm.enabled:
                 raise ToolError('dfm_disabled', 'DFM is off in STEVE.')
             with self._lock:
                 if cancelled():
@@ -834,10 +847,18 @@ class Controller:
                         "fusion_capture_viewport": "Capture model view",
                         "list_chat_images": "Find pictures in this chat",
                         "view_chat_image": "Reopen saved picture",
+                        "fusion_rmfg": "RMFG sheet-metal check",
+                        "rmfg_materials": "Read RMFG material catalog",
                     }.get(tool, tool)})
                 code_message = python_activity(tool, arguments, uuid4().hex)
                 if code_message:
                     self.state["messages"].append(code_message)
+            if tool in ('fusion_rmfg', 'rmfg_materials'):
+                with self._lock:
+                    self.state['status'] = 'Checking with RMFG'
+                self.emit()
+                self.rmfg_service.submit(tool, arguments, complete, cancelled)
+                return
             if tool in ("list_chat_images", "view_chat_image"):
                 with self._lock:
                     self.state["status"] = "Looking up chat images" if tool == "list_chat_images" else "Reopening saved image"
@@ -1270,6 +1291,8 @@ class Controller:
 
     def close(self):
         self._closed = True
+        self.rmfg_service.close()
+        self.rmfg.close()
         self.updates.close()
         self.downloader.close()
         self.runtime_updater.close()

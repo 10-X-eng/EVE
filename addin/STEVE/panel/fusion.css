@@ -159,3 +159,6 @@ html, html body {
 .job-help code { color:#b9dcc8; }
 .image-viewer img { display:block; width:100%; max-height:75vh; object-fit:contain; }
 #close-image { position:absolute; right:8px; top:5px; padding:0; width:26px; height:26px; background:transparent; border:0; color:#edece5; font-size:24px; }
+.rmfg-upload { padding:12px; margin-bottom:10px; border:1px solid var(--accent, #b5dfcd); border-radius:12px; background:#23312c; font-size:12px; }
+.rmfg-upload p { margin:6px 0; line-height:1.4; overflow-wrap:anywhere; }
+#rmfg-settings { margin-top:14px; }
