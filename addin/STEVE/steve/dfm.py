@@ -17,7 +17,7 @@ from .secure_store import SecureStore
 
 GUIDES = {
     'milling': {
-        'checks': 'Measure supported holes/pockets. Compare minimum internal corner radius with the chosen cutter radius; compare axial depth with confirmed cutting reach. Inspect installed adsk.cam recognition APIs and extension availability first. A cylindrical face alone is not a complete hole.',
+        'checks': 'Measure supported holes/pockets. Compare minimum internal corner radius with the chosen cutter radius; compare axial depth with confirmed cutting reach. Read adsk.cam.Tool help for library-derived dimensions and units; a library entry does not establish physical availability, and flute length alone is not safe reach. Inspect installed adsk.cam recognition APIs and extension availability first. A cylindrical face alone is not a complete hole.',
         'unchecked': 'Holder/fixture collision, workholding, chatter, rigidity, full tool approach, and unseen/intersecting features require separate evidence.',
     },
     'turning': {

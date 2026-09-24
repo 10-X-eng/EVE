@@ -123,7 +123,10 @@ Use adsk.cam.CAMManager.get().libraryManager for libraries and the pinned docume
 CAM product for setups and document tools. Start with library names/URLs and counts;
 inspect one relevant library at a time. For tools, start with name/number/type/diameter/units.
 Filter before collecting details, page with stable ordering, and stop traversal when a
-page is full. Check documented CAM units rather than assuming design geometry units.
+page is full. CAM numeric ParameterValue lengths use cm, but angles use degrees;
+CAM expression strings use explicit suffixes or active CAM document units when bare.
+Do not feed CAM expressions into the Design expression helper or evaluate them yourself.
+For one selected tool's dimensions, consult adsk.cam.Tool guidance and its explicit JSON unit.
 Never discover types through parameter.value.objectType or bulk-read typed parameter
 values. Read bounded names and expressions; consult installed API help for a specific
 parameter's value class. Probe-related CAMParameter.value access is temporarily blocked.
@@ -131,6 +134,17 @@ Use scalar expressions where possible; if typed probe geometry is required, expl
 specific limitation. Never bypass the guard through private wrappers, _cam, or aliases.
 Native calls can crash Fusion even in queries; try/except does not protect against that.
 After an interruption, inspect existing state before any further changes.""",
+    'adsk.cam.Tool': """For one selected library tool, toJson() exposes its own unit and geometry.
+Parse locally, check payload size before parsing, and return only relevant scalar fields;
+never dump an entire library. Convert dimensions using the JSON's explicit unit
+(millimeters or inches), not Design internal units or the current document's display units.
+Unknown/missing units or nonfinite/missing dimensions remain unknown; do not guess.
+For a verified flat end mill, geometry.DC is diameter and LCF is flute length. Retain
+tool type, library URL/item identity, original unit and source fields with derived criteria.
+Different cutter shapes need their documented geometry; do not treat every tool as flat.
+Flute length, shoulder length and overall length do not establish holder/fixture-safe reach.
+Library presence does not establish physical availability or installation in a machine.
+Reading a tool for DFM must not change a setup or select it for machining.""",
     'adsk.core.Data': """For Data Panel searches, use context['data'] (app.data), authenticated through the user's
 existing Autodesk session. The attached dataPanel snapshot identifies the current hub,
 project and folder when available. Search the requested project/folder, or start in the

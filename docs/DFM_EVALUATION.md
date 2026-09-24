@@ -213,6 +213,25 @@ and unavailable normals retain unknown inside/outside classification.
 
 Reference: [Autodesk B-Rep geometry and solid-face normals](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/BRepGeometry_UM.htm).
 
+## Library-derived cutter criterion
+
+A read-only local Fusion test retrieved one selected flat end mill from an existing
+tool library. Its JSON declared `inches`: `geometry.DC` of 0.5 and `LCF` of 1
+converted to a 12.7 mm diameter and 25.4 mm flute length. A temporary DFM plan
+retained the library/item provenance, source field and unit, and used the derived
+6.35 mm cutter radius against the four independently identified R1 pocket corners.
+All four comparisons raised concerns. Setup safety remained unknown; flute length
+was not treated as safe reach. All existing body revisions were unchanged, and no
+tool, setup or user DFM plan was changed.
+
+This checks the measurement/report path with a real library entry; it is not a
+model tool-selection trial or evidence that the cutter is physically available.
+CAM help now distinguishes numeric parameter units (cm/degrees), expression
+units, and a tool JSON's own declared units. Unsupported tool types and missing
+units still require investigation rather than guessed conversions.
+
+Reference: [Autodesk CAM parameters and tool JSON](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CAMParameters_UM.htm).
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
