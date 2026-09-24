@@ -16,6 +16,7 @@ from .transport import Transport, RuntimeUnavailable, data_home
 from .debug_log import DebugLog
 from .documentation import Documentation
 from .preferences import ProviderChoice
+from .dfm import DfmStore
 from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
 from .claude_transport import ClaudeTransport
@@ -57,6 +58,12 @@ def message_input(text, context=None, images=None):
         public_context = {key: value for key, value in context.items() if key != "task_key"}
         result.append({"type": "text", "text": CONTEXT_PREFIX + json.dumps(public_context, ensure_ascii=False), "text_elements": []})
     return result
+
+
+def manufacturing_context(context, enabled):
+    # Real Fusion messages always carry context. Preserve context-free callers
+    # when DFM is off while explicitly refreshing the switch in bound chats.
+    return {**(context or {}), 'dfmEnabled': enabled} if context is not None or enabled else None
 
 
 def thread_config():
@@ -121,7 +128,7 @@ def conversation_messages(thread, image_store=None):
 
 def python_activity(tool, arguments, identifier):
     """Display submitted Fusion Python, never internal model reasoning or tool results."""
-    if tool not in ("fusion_execute_python", "fusion_query_python") or not isinstance(arguments, dict):
+    if tool not in ("fusion_execute_python", "fusion_query_python", "fusion_dfm_check") or not isinstance(arguments, dict):
         return None
     code = arguments.get("code")
     if not isinstance(code, str) or not code or len(code) > 60000:
@@ -144,6 +151,7 @@ class Controller:
         self.debug = debug_log or DebugLog(data_home())
         self.provider_choice = ProviderChoice(self.debug.folder.parent)
         self.preferences = self.provider_choice.preferences()
+        self.dfm = getattr(fusion_tools, 'dfm', None) or DfmStore(self.debug.folder.parent)
         self.images = ImageStore(self.debug.folder.parent)
         if self.fusion_tools is not None:
             self.fusion_tools.debug = self.debug
@@ -178,7 +186,7 @@ class Controller:
                       "codexVersion": "", "codexManaged": False, "codexUpdateInfo": None,
                       "codexUpdateChecking": False, "codexUpdateStatus": "", "codexUpdating": False, "codexPendingVersion": "", "codexRestarting": False,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
-                      "runtimeIssue": False, "debugLogging": self.debug.enabled,
+                      "runtimeIssue": False, "debugLogging": self.debug.enabled, "dfmEnabled": self.dfm.enabled,
                       "debugLogPath": str(self.debug.path)}
         self._worker = threading.Thread(target=self._work, name="STEVE-Actions", daemon=True)
         self._worker.start()
@@ -260,6 +268,9 @@ class Controller:
                 self.state["codexRestarting"] = True
             if action == "provider" and (self.state["busy"] or self._send_queued or self.state["loginPending"]):
                 return False
+            if action == 'dfm' and (self.state['busy'] or self._send_queued or self.state['jobBusy']
+                                    or (self.state['job'] or {}).get('status') == 'active'):
+                raise ValueError('Finish or pause the current task before changing DFM.')
             if action == "job":
                 command = payload["command"]
                 if self.state["jobBusy"]:
@@ -480,6 +491,11 @@ class Controller:
                         raise RuntimeError("Browser unavailable")
                 except Exception:
                     self._update_state({"updateStatus": "Couldn’t open your browser. Visit github.com/10-X-eng/STEVE/releases."})
+        elif action == 'dfm':
+            self.dfm.set_enabled(payload.get('enabled'))
+            with self._lock:
+                self.state['dfmEnabled'] = self.dfm.enabled
+            self.emit()
         elif action == "debugLogging":
             self.debug.set_enabled(payload.get("enabled"))
             with self._lock:
@@ -713,7 +729,7 @@ class Controller:
             raise ValueError("Pause the current task before changing the job.")
         if command == "resume" and (not self.state["job"] or self.state["job"]["status"] == "complete"):
             raise ValueError("Create a new job to start more work; this job is complete or missing.")
-        context = payload.get("fusionContext")
+        context = manufacturing_context(payload.get("fusionContext"), self.dfm.enabled)
         self._task_context = context
         self.state.update(taskDocument={"id": context.get("document_id"), "name": context.get("name")} if context else None,
                           jobNotice="", error="", busy=True, status="Preparing job")
@@ -807,6 +823,8 @@ class Controller:
             if tool in {entry["name"] for entry in TOOLS}:
                 self.debug.record("tool.started", **identifiers, arguments=arguments)
             validate_call(tool, arguments)
+            if tool in ('fusion_dfm_plan', 'fusion_dfm_check') and not self.dfm.enabled:
+                raise ToolError('dfm_disabled', 'DFM is off in STEVE.')
             with self._lock:
                 if cancelled():
                     raise ToolError("inactive_request", "This Fusion request is no longer active.")
@@ -853,6 +871,8 @@ class Controller:
             with self._lock:
                 self.state["status"] = {"fusion_execute_python": "Working in Fusion",
                                         "fusion_query_python": "Querying Fusion",
+                                        "fusion_dfm_plan": "Reading manufacturing context",
+                                        "fusion_dfm_check": "Checking manufacturability",
                                         "fusion_capture_viewport": "Looking at the model",
                                         "fusion_api_help": "Reading Fusion API",
                                         "fusion_search_docs": "Searching installed Fusion documentation",
@@ -1015,6 +1035,7 @@ class Controller:
             raise
 
     def _send(self, text, context=None, images=None):
+        context = manufacturing_context(context, self.dfm.enabled)
         images = validate_images(images)
         if (not text and not images) or self.state["busy"]:
             return
@@ -1083,7 +1104,7 @@ class Controller:
                     or payload.get("threadId") != self.thread_id or payload.get("turnId") != self.turn_id):
                 raise RuntimeError("That response has ended or is stopping. Send this message again to start a new turn.")
             self.client.request("turn/steer", {"threadId": self.thread_id, "expectedTurnId": self.turn_id,
-                                               "input": message_input(text, payload.get("fusionContext"), images)})
+                                               "input": message_input(text, manufacturing_context(payload.get("fusionContext"), self.dfm.enabled), images)})
             with self._lock:
                 message["delivery"] = "sent"
             self._record_chat_images(payload["threadId"], payload["turnId"], images, message=text)
