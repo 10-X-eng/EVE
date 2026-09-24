@@ -32,6 +32,14 @@ replaced body is not silently substituted.
   execution, missing revision information and geometry changes cannot validate
   a result. Historical chat reports refer only to their recorded body revision
   and configuration; recheck current geometry before relying on them.
+- Native measurement helpers provide oriented envelopes, complete cylindrical
+  wall bands, and downward planar face angles. The build axes are explicit;
+  assembly transforms and support/brim/raft envelopes are not implicitly included.
+  Partial/intersected cylindrical faces and curved overhangs are reported as
+  unsupported. A cylindrical band's axial span is not a complete-hole depth.
+- Native hole and pocket recognition adapters report missing APIs or extension
+  access as unknown. Paging bounds results, not the duration of native Fusion
+  calculations. No automatic cancellation of native recognition is attempted.
 
 Process guidance currently covers milling/drilling, turning, sheet metal, FDM,
 resin and powder printing. Guidance is not a qualified algorithm library for all
@@ -57,7 +65,16 @@ runner in an isolated document with a 60 x 40 x 8 mm block. The checker measured
 60 mm, correctly flagged a deliberately unmet 65 mm requirement, passed a 70 mm
 envelope criterion, and reported unknown tool access. The body revision stayed
 unchanged. `scripts/fusion_dfm_smoke.py` repeats this check inside Fusion against
-that explicitly named fixture; it does not create or modify geometry.
+that explicitly named fixture; it does not create or modify geometry. Its expanded
+fixture includes a bottom-opening 4 mm diameter, 5 mm deep blind hole.
+
+The live cylindrical-wall helper measured 4 mm diameter, 5 mm axial span and
+62.831853 mm² area. Oriented envelope measurements were 60 x 40 x 8 mm and
+40 x 60 x 8 mm with swapped build axes. Native hole recognition required an
+inactive Manufacturing Extension on this installation and correctly returned
+unknown. Successful native recognition is currently covered by contract fixtures,
+not a live entitled run. Planar overhangs have analytic unit fixtures; their live
+test and the printer-orientation report comparison are still pending.
 
 This is direct integration evidence, not a model-driven design benchmark or
 macOS live qualification. Broader process fixtures, paired DFM-off/on tasks,

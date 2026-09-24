@@ -2,7 +2,8 @@
 
 This is a developer check, not an add-in entry point. It imports STEVE under an
 isolated package name so a running add-in is not reloaded. No network, document
-save, or modification occurs. Create the 60 x 40 x 8 mm test block separately.
+save, or modification occurs. Create the 60 x 40 x 8 mm test block with a
+4 mm diameter, 5 mm deep blind hole opening on its bottom face separately.
 """
 import importlib.util
 import json
@@ -58,8 +59,44 @@ def run(_context):
         assert result['result']['length_mm'] == 60, result
         assert [f['status'] for f in result['dfm']['findings']] == ['concern', 'pass', 'unknown'], result
         assert before == body.revisionId, 'Read-only DFM changed the body'
+        geometry = bridge.DfmGeometry(body, app, adsk.core, bridge.adsk.cam)
+        walls = geometry.cylindrical_walls()
+        assert len(walls['items']) == 1, walls
+        assert abs(walls['items'][0]['diameter_mm'] - 4) < 1e-6, walls
+        assert abs(walls['items'][0]['axial_span_mm'] - 5) < 1e-6, walls
+        assert walls['items'][0]['side'] == 'internal', walls
+        envelope = geometry.envelope([1,0,0], [0,1,0])
+        assert all(abs(a-b) < 1e-6 for a,b in zip(envelope['dimensions_mm'], [60,40,8])), envelope
+        rotated = geometry.envelope([0,1,0], [1,0,0])
+        assert all(abs(a-b) < 1e-6 for a,b in zip(rotated['dimensions_mm'], [40,60,8])), rotated
+        overhangs = geometry.planar_overhangs([1,0,0], [0,1,0])
+        assert len(overhangs['items']) == 2, overhangs
+        assert sorted(v['lowestHorizontalFace'] for v in overhangs['items']) == [False, True], overhangs
+        plan = tools.dfm_plan(arguments)['plan']['stages']
+        plan.append({'process': 'fdm', 'criteria': {key: {'value': size, 'units': 'mm',
+            'source': 'Explicit fixture printer envelope', 'basis': 'profile'}
+            for key, size in zip(('build_x','build_y','build_z'), (62,45,10))}})
+        tools.dfm_plan({**arguments, 'stages': plan})
+        orientation_results = []
+        for x, y in (([0,1,0], [1,0,0]), ([1,0,0], [0,1,0])):
+            code = """def run(context):
+    dfm = context['dfm']
+    measurement = dfm.measurements.envelope(X_AXIS, Y_AXIS)
+    for key, value in zip(('build_x', 'build_y', 'build_z'), measurement['dimensions_mm']):
+        dfm.compare(key, value, key, '<=', 'mm', 'Native oriented envelope for the explicitly proposed build frame')
+    return measurement
+""".replace('X_AXIS', repr(x)).replace('Y_AXIS', repr(y))
+            outcome = tools.run_script({'tool': 'fusion_dfm_check', 'arguments': {**arguments,
+                'stage': 1, 'title': 'Check printer envelope', 'code': code}, 'cancelled': lambda: False})
+            assert outcome['ok'], outcome
+            orientation_results.append(outcome['dfm']['status'])
+        assert orientation_results == ['concerns', 'checked'], orientation_results
+        assert before == body.revisionId, 'Measurements changed the body'
         print(json.dumps({'fusionVersion': app.version, 'unchanged': True,
-                          'test': 'Actual STEVE run_script and DFM plan on real Fusion geometry', 'result': result}, ensure_ascii=False))
+                          'test': 'Actual STEVE run_script and DFM plan on real Fusion geometry',
+                          'walls': walls, 'envelope': envelope, 'rotatedEnvelope': rotated,
+                          'planarOverhangs': overhangs, 'printerOrientationResults': orientation_results,
+                          'holes': geometry.holes(), 'result': result}, ensure_ascii=False))
 
 
 if __name__ == '__main__':

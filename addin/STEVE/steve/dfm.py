@@ -60,6 +60,11 @@ def guide(process=None):
             "context['dfm'].stage: copied process/material/notes/criteria",
             "context['dfm'].compare(label, actual, criterion, relation, units, evidence=''): relation is <=, >= or ==; units must exactly match the criterion",
             "context['dfm'].unknown(label, reason): explicit missing/unsupported coverage",
+            "context['dfm'].measurements.envelope(x_axis, y_axis): explicit perpendicular directions in native body coordinates; returns oriented dimensions_mm and excluded geometry",
+            "context['dfm'].measurements.cylindrical_walls(offset=0, limit=10): full cylindrical bands with diameter_mm, axial_span_mm, side, faceToken; NOT complete-hole recognition; page by returned nextOffset",
+            "context['dfm'].measurements.holes(offset=0, limit=10): native recognized holes/segments or status unknown when API/extension unavailable; honor warnings and segmentsComplete",
+            "context['dfm'].measurements.pockets(attack_direction, offset=0, limit=10): native pocket depths for a downward tool direction; may require an extension; no inferred corner radius or tool clearance",
+            "context['dfm'].measurements.planar_overhangs(x_axis, y_axis, offset=0, limit=10): downward planar faces; tilt is 0 degrees for a horizontal underside, 90 for a vertical wall. Lowest horizontal faces are potential bed contact, not automatically unsupported; curved surfaces remain unassessed",
         ],
         'limits': 'Read-only Python, at most 24 findings. Query actual state, not desired dimensions. Measurements and criteria are not independently certified. A checked report covers only its listed checks and geometry revision.',
     }

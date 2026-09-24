@@ -21,6 +21,7 @@ from .python_helpers import FusionHelpers, helper_help
 from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
 from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body
+from .dfm_geometry import DfmGeometry
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
 
@@ -246,6 +247,7 @@ class FusionTools:
             if not plan or index >= len(plan['stages']):
                 raise ToolError('dfm_plan_required', 'No saved manufacturing plan at that stage index.')
             dfm = DfmChecks(body, plan['stages'][index])
+            dfm.measurements = DfmGeometry(body, self.app, adsk.core, adsk.cam, job['cancelled'])
             context['dfm'] = dfm
         if job["tool"] == "fusion_execute_python":
             job["before"] = snapshot(context["design"])
