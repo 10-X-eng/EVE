@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace as Obj
 from test_fusion_bridge import bridge, Host
-from steve.documentation import Documentation, BASE, Page, Redirects, allowed_url, MAX_BYTES
+from steve.documentation import Documentation, BASE, Page, Redirects, allowed_url, MAX_BYTES, reference_candidate
 from steve.tool_protocol import TOOLS, validate_call
 
 
@@ -68,5 +68,31 @@ class DocumentationTests(unittest.TestCase):
                 result = tools.search_docs('createInput')
             self.assertEqual(result['matches'][0]['path'], 'adsk.fusion.ExtrudeFeature')
             self.assertEqual(result['matches'][0]['matchingMembers'], ['createInput'])
+            self.assertEqual(result['matches'][0]['webReference']['url'], BASE+'fusion_ExtrudeFeature.htm')
+        finally:
+            tools.close()
+
+    def test_reference_candidates_are_explicitly_unverified_and_bounded_to_known_namespaces(self):
+        for path, filename in [('adsk.core.ImportManager.importToTarget', 'core_ImportManager_importToTarget.htm'),
+                               ('adsk.fusion.TemporaryBRepManager', 'fusion_TemporaryBRepManager.htm'),
+                               ('adsk.cam.Tool.toJson', 'cam_Tool_toJson.htm')]:
+            result = reference_candidate(path)
+            self.assertEqual(result['url'], BASE+filename)
+            self.assertFalse(result['verified'])
+            self.assertTrue(allowed_url(result['url']))
+        for path in ('steve.dfm', 'adsk.fusion', 'adsk.electron.Board', 'adsk.fusion.Body._private',
+                     'adsk.fusion.Body.name.extra', 'adsk.fusion.Body/../../secret', 'adsk.fusion.Body?data=private'):
+            self.assertIsNone(reference_candidate(path))
+
+    def test_api_help_supplies_reference_without_network_or_method_execution(self):
+        tools = bridge.FusionTools(Host())
+        tools.namespaces = lambda: ['adsk.core']
+        cls = type('ImportManager', (), {'importToTarget': lambda *args: self.fail('must not invoke')})
+        try:
+            with patch('steve.documentation.build_opener', side_effect=AssertionError('No network on Fusion thread')), \
+                    patch.object(bridge.importlib, 'import_module', return_value=Obj(ImportManager=cls)):
+                result = tools.api_help('adsk.core.ImportManager.importToTarget')
+            self.assertEqual(result['webReference']['url'], BASE+'core_ImportManager_importToTarget.htm')
+            self.assertFalse(result['webReference']['verified'])
         finally:
             tools.close()

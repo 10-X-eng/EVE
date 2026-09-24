@@ -11,6 +11,17 @@ BASE = "https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/"
 MAX_BYTES = 2_000_000
 
 
+def reference_candidate(path):
+    """Build a public reference candidate from an installed API path, without I/O."""
+    parts = path.split('.')
+    if (len(parts) not in (3, 4) or parts[0] != 'adsk'
+            or parts[1] not in ('core', 'fusion', 'cam')
+            or any(not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', name) for name in parts[2:])):
+        return None
+    return {'url': BASE + '_'.join(parts[1:]) + '.htm', 'verified': False,
+            'guidance': 'Candidate uses the current namespace-prefixed reference naming. Fetch with fusion_fetch_docs to verify availability; installed signatures remain authoritative for this Fusion version. If a member page is unavailable, inspect its class page and follow returned links rather than guessing older filenames.'}
+
+
 def allowed_url(url):
     value = urlsplit(url)
     return (value.scheme == "https" and value.netloc == "help.autodesk.com" and not value.query

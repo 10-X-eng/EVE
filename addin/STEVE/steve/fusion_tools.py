@@ -22,6 +22,7 @@ from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
 from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body, plan_hash, revision
 from .dfm_geometry import DfmGeometry
+from .documentation import reference_candidate
 from .rmfg_snapshot import export_snapshot
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
@@ -519,6 +520,7 @@ class FusionTools:
         except (ValueError, TypeError):
             signature = None
         return {"ok": True, "path": path, "signature": signature,
+                "webReference": reference_candidate(path),
                 "documentation": (inspect.getdoc(value) or "")[:18000],
                 **({"guidance": API_GUIDANCE[path]} if path in API_GUIDANCE else {}),
                 "members": [name for name in dir(value) if not name.startswith("_")][:250]}
@@ -538,6 +540,7 @@ class FusionTools:
             members = [name for name in dir(value) if not name.startswith("_")]
             if all(word in (path + " " + doc + " " + " ".join(members)).casefold() for word in words):
                 matches.append({"path": path, "description": doc[:600],
+                                "webReference": reference_candidate(path),
                                 "matchingMembers": [name for name in members if any(word in name.casefold() for word in words)][:12]})
                 if len(matches) >= 10:
                     break
