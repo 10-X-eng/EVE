@@ -17,6 +17,7 @@ import adsk.cam
 from .python_runner import run_python, bounded_result
 from .document_summary import design_summary, cam_summary, electronics_summary
 from .verification import Checks, snapshot, report
+from .python_helpers import FusionHelpers, helper_help
 from .cam_guard import protect_cam_values
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
@@ -283,7 +284,7 @@ class FusionTools:
         design = adsk.fusion.Design.cast(products.get("DesignProductType"))
         selection = self.task["selection"] if self.task else [entry.entity for entry in items(self.app.userInterface.activeSelections)]
         valid_selection = [entity for entity in selection if optional_property(entity, "isValid") is not False]
-        return {"app": self.app, "data": optional_property(self.app, "data"),
+        context = {"app": self.app, "data": optional_property(self.app, "data"),
                 "targetPinned": bool(self.task), "dataPanel": copy.deepcopy(self.task["snapshot"]["dataPanel"]) if self.task else self.data_context(),
                 "ui": self.app.userInterface, "document": document,
                 "product": self.task["product"] if self.task else self.app.activeProduct,
@@ -292,6 +293,8 @@ class FusionTools:
                 "units": design.unitsManager if design else None,
                 "selection": valid_selection, "selectionInvalidCount": len(selection) - len(valid_selection),
                 "selectionCount": self.task["snapshot"]["selectionCount"] if self.task else self.app.userInterface.activeSelections.count}
+        context["helpers"] = FusionHelpers(context, selection)
+        return context
 
     def selection_context(self):
         """Capture a small, serializable snapshot on Fusion's main thread at Send."""
@@ -402,6 +405,8 @@ class FusionTools:
                       if not module.name.startswith("_"))
 
     def api_help(self, path):
+        if path == "steve.helpers":
+            return helper_help()
         parts = path.split(".")
         if path == "adsk":
             return {"ok": True, "namespaces": self.namespaces()}
