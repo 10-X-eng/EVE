@@ -24,7 +24,7 @@ from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body,
 from .dfm_geometry import DfmGeometry
 from .documentation import reference_candidate
 from .rmfg_snapshot import export_snapshot
-from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
+from .tool_protocol import API_GUIDANCE, PYTHON_CONTEXT, ToolError, tool_failure
 from .transport import data_home
 
 EVENT_ID = "10X_STEVE_Tool"
@@ -502,6 +502,9 @@ class FusionTools:
                       if not module.name.startswith("_"))
 
     def api_help(self, path):
+        if path == 'steve.python':
+            return {'ok': True, 'path': path, 'documentation': PYTHON_CONTEXT,
+                    'related': ['steve.helpers', 'steve.dfm']}
         if path == "steve.helpers":
             return helper_help()
         if path == 'steve.dfm' or path.startswith('steve.dfm.'):
