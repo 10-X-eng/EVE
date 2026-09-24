@@ -145,6 +145,24 @@ local, and another instance's preference change does not toggle an active task.
 Tests cover interleaved saves, preserved preferences, lock contention and retry.
 The exact live repaired-part check also passed through the updated store.
 
+## Stepped turning fixture
+
+`scripts/fusion_turned_profile_smoke.py` creates a separate full-revolve fixture:
+outside bands Ø20 × 10 mm, Ø15 × 10 mm, Ø12 × 2 mm (groove floor), and
+Ø15 × 18 mm, with a Ø4 × 40 mm axial through bore. All five native cylindrical
+bands matched independently specified dimensions, including when read in pages
+of two. Its measured volume matched the analytic radial-profile volume
+**7813.140929478 mm³**. All ten faces were compatible with the intended axis;
+an axis offset by 1 mm correctly produced nonrotational evidence.
+
+The same measured maximum outside diameter was checked against explicit fixture
+limits of 19, 20 and 21 mm: concern, pass and pass, respectively. Unspecified
+workholding, stock, approach, reach and groove-tool fit remained unknown in every
+report. These are synthetic supplied limits, not general turning recommendations.
+All pre-existing bodies and the checked fixture's revision were unchanged by
+inspection. This extends measured feature coverage; it does not prove a safe
+turning setup, tool fit, imported-geometry coverage or improved generated parts.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
