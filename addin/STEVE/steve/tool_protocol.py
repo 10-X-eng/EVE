@@ -104,6 +104,14 @@ is blocked for native stability. Do not evade runtime guards or retry blocked ac
 
 # Detailed recipes are returned by API help only for the relevant workflow.
 API_GUIDANCE = {
+    'adsk.core.ImportManager': """importToTarget cannot run inside Command-related events.
+For an authorized import, use fusion_execute_python with execution_mode='application'
+and the pinned target component. This mode has no grouped Undo or automatic rollback.
+An import is a modification, not a query. Do not move it into fusion_query_python to
+avoid the command limitation. Inspect for partial imports before retrying a failure;
+reuse or remove only the specifically authorized target, never a neighboring part.
+Imported bodies may have no parametric feature history. Verify their geometry and
+component placement through native B-Rep measurements instead of assuming source features survived.""",
     'adsk.fusion.BRepShell': """For sealed-cavity queries, inspect isClosed and isVoid on every relevant lump/shell.
 A valid freshly evaluated shell's entityToken or volume may raise InternalValidationError in Fusion.
 Identify such findings by body token, body revision and lump/shell indices instead; do not

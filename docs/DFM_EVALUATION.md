@@ -280,6 +280,35 @@ These bindings cover recorded plans and native body geometry. They do not track
 external library edits, machine state or occurrence placement automatically, and
 do not retroactively rewrite chat history or certify a generated algorithm.
 
+## Imported neutral-format solids
+
+`scripts/fusion_imported_dfm_smoke.py` exported the rounded pocket and stepped shaft
+to temporary SAT files with `TemporaryBRepManager.exportToFile`, read them back
+with `createFromFile`, and persisted each returned solid in its own base feature.
+The resulting bodies have no source sketch/extrude history. This is an actual
+native file round trip, not a copy-only geometry mock.
+
+The imported pocket retained four internal R1 cylindrical corners and the
+independently expected **11004.292036732051 mm³** volume. The imported shaft
+retained its five expected cylindrical bands, including the Ø4 × 40 mm axial
+bore, and **7813.140929477482 mm³** volume. All ten shaft faces were compatible
+with the intended turning axis; paged band and face queries completed. Every
+pre-existing body revision and each imported body's inspected revision remained
+unchanged. Only the two explicitly named disposable import components were added.
+
+This covers these analytic SAT solids, not arbitrary supplier files, healing,
+split/NURBS replacements or STEP import. The separate STEP ImportManager method
+cannot run in Command events. A development idle-event dispatch was rejected;
+its event was unregistered and inspection confirmed no STEP imports were created.
+No native computation was cancelled. STEVE's on-demand ImportManager guidance now
+directs authorized imports through its application execution mode and requires
+inspection of possible partial results before retrying; that STEP path still
+needs a live test outside the development MCP's command callback.
+
+References: [temporary B-Rep file import](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_TemporaryBRepManager_createFromFile.htm),
+[temporary B-Rep export](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_TemporaryBRepManager_exportToFile.htm),
+[ImportManager command-event limitation](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_ImportManager_importToTarget.htm).
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
