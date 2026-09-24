@@ -165,8 +165,11 @@ TOOLS = [
          "image_id": {"type": "string", "description": "imageId returned by list_chat_images."}},
          "required": ["image_id"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_capture_viewport", "deferLoading": False,
-     "description": "Capture the task document's current model viewport for visual inspection. Returns an image to the conversation plus metadata. Use at meaningful visual checkpoints or for visual questions, alongside API verification. Preserves the camera, shows the current view only (not menus/palettes), and requires document_id from attached context or inspection.",
-     "inputSchema": {"type": "object", "properties": {"document_id": {"type": "string"}},
+     "description": "Capture one labeled view of the pinned document. Optional named views follow Fusion's ViewCube; Design/CAM only. Frame a captured selection_index or resolved entity_token for a close-up (bodies/faces/edges/occurrences). Restores the original camera on completion, cancellation, or error. Request a few views at meaningful checkpoints alongside API measurements, not after every step. Current view is the default; no menus/palettes.",
+     "inputSchema": {"type": "object", "properties": {"document_id": {"type": "string"},
+        "view": {"type": "string", "enum": ["current", "front", "top", "right", "left", "back", "bottom", "isometric"]},
+        "selection_index": {"type": "integer", "minimum": 0, "maximum": 11},
+        "entity_token": {"type": "string"}},
                      "required": ["document_id"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_inspect_document", "deferLoading": False,
      "description": "Inspect the pinned task document, captured workspace/selection, products, and design summary. With no pinned task, inspect the active document. Returns document_id required by the query and execution tools, including when no document is open. Use fusion_query_python for detailed questions or library queries.",
@@ -211,6 +214,7 @@ def tool_failure(exc, code=None, execution_started=False):
                 "api_member_unavailable" if isinstance(exc, AttributeError) else
                 "api_signature_mismatch" if isinstance(exc, TypeError) else "execution_error")
     recovery = {
+        "camera_restore_failed": "The capture changed the view but Fusion rejected camera restoration. Tell the user and stop camera operations; do not retry capture or modify geometry to compensate.",
         "entity_unavailable": "The pinned entity is stale, missing, ambiguous, or has the wrong type. Inspect the original document and resolve the intended target before changes. Do not use a later UI selection or arbitrarily choose the first match.",
         "documentation_unavailable": "The documentation read failed, not a Fusion operation. Use installed fusion_api_help or another official sample link. Check connectivity for network errors; do not interpret a missing page as an unavailable API or retry in a loop.",
         "invalid_python": "Correct the Python syntax at the reported line, keep work inside def run(context), and submit the corrected code without Markdown fences.",
@@ -278,8 +282,16 @@ def validate_call(tool, arguments):
             raise ValueError("Use image_id from list_chat_images in the current conversation.")
         return
     if tool == "fusion_capture_viewport":
-        if set(arguments) != {"document_id"} or not isinstance(arguments["document_id"], str) or not 1 <= len(arguments["document_id"]) <= 100:
+        if set(arguments) - {"document_id", "view", "selection_index", "entity_token"} or not isinstance(arguments.get("document_id"), str) or not 1 <= len(arguments["document_id"]) <= 100:
             raise ValueError("Capture requires document_id from attached context or inspection.")
+        if arguments.get("view", "current") not in ("current", "front", "top", "right", "left", "back", "bottom", "isometric"):
+            raise ValueError("Choose a supported viewport orientation.")
+        if "selection_index" in arguments and (type(arguments["selection_index"]) is not int or not 0 <= arguments["selection_index"] <= 11):
+            raise ValueError("Use a captured selection index from 0 to 11.")
+        if "entity_token" in arguments and (not isinstance(arguments["entity_token"], str) or not 1 <= len(arguments["entity_token"]) <= 2048):
+            raise ValueError("Use an entity token from the pinned Design.")
+        if "entity_token" in arguments and "selection_index" in arguments:
+            raise ValueError("Choose either a captured selection or an entity token.")
         return
     if tool == "fusion_inspect_document":
         if arguments:
