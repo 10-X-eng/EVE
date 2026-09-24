@@ -4,6 +4,7 @@ Uses STEVE's existing ChatGPT sign-in and app-server, with ephemeral conversatio
 No credentials are copied. The development MCP is a test adapter only, never a
 STEVE product dependency. Default trials are read-only. --repair or --pocket-repair
 explicitly creates two disposable child fixtures and allows edits confined to them.
+--fdm-envelope reads the existing sourced FDM fixture without geometry edits.
 """
 import argparse
 import json
@@ -23,7 +24,9 @@ from steve.tool_protocol import validate_call, tool_failure, tool_response, Tool
 
 
 class FusionProbe:
-    def __init__(self, url, repair=False, pocket_repair=False):
+    def __init__(self, url, repair=False, pocket_repair=False, fdm_envelope=False):
+        if fdm_envelope and (repair or pocket_repair):
+            raise ValueError('The envelope inspection cannot enable geometry edits.')
         parsed = urlsplit(url)
         if parsed.scheme != 'http' or parsed.hostname not in ('127.0.0.1','localhost','::1'):
             raise ValueError('Use the explicitly supplied loopback development MCP endpoint.')
@@ -35,6 +38,7 @@ class FusionProbe:
         self.package = 'steve_model_probe_' + uuid4().hex
         self.repair = repair or pocket_repair
         self.pocket_repair = pocket_repair
+        self.fdm_envelope = fdm_envelope
 
     def rpc(self, method, params, notification=False):
         with self.lock:
@@ -83,6 +87,10 @@ class FusionProbe:
     sys.modules[package] = module
     spec.loader.exec_module(module)
     module.protected = [(b, b.revisionId) for c in design.allComponents for b in c.bRepBodies]
+    if {self.fdm_envelope!r}:
+        component = next(c for c in design.allComponents if c.name == 'DFM sourced FDM envelope fixture')
+        body = next(b for b in component.bRepBodies if b.name == 'DFM orientation plate')
+        assert body.isSolid
     if {self.pocket_repair!r}:
         original = next(c for c in design.allComponents if c.name == 'DFM rounded pocket fixture')
         assert original.bRepBodies.count == 1
@@ -167,6 +175,23 @@ class FusionProbe:
         assert module.originalBody.revisionId == module.originalRevision, 'Inspection changed the fixture'
     print(json.dumps(result))
 ''', read_only=tool != 'fusion_execute_python')
+
+    def verify_envelope(self):
+        """Independent native bounds and volume; never grade the model's prose as geometry."""
+        return self.script(f'''def run(_context):
+    import sys, json
+    module = sys.modules[{self.package!r}]
+    assert module.tools.app.activeDocument == module.tools.document, 'Test document changed'
+    assert all(b.isValid and b.revisionId == rev for b,rev in module.protected), 'Protected geometry changed'
+    body = module.originalBody
+    assert body.isSolid and body.revisionId == module.originalRevision
+    box = body.boundingBox
+    dimensions = [10*(getattr(box.maxPoint,k)-getattr(box.minPoint,k)) for k in ('x','y','z')]
+    assert all(abs(a-b)<1e-6 for a,b in zip(dimensions,[218,200,10])), dimensions
+    assert abs(body.volume*1000-436000)<1e-4
+    print(json.dumps({{'passed':True,'nativeDimensions_mm':dimensions,'volume_mm3':body.volume*1000,
+        'quarterTurnDimensions_mm':[dimensions[1],dimensions[0],dimensions[2]],'protectedBodiesUnchanged':True}}))
+''')
 
     def verify_repair(self):
         """Independent geometry assertions, not the generating model's self-grade."""
@@ -259,6 +284,7 @@ def main():
     repairs = parser.add_mutually_exclusive_group()
     repairs.add_argument('--repair',action='store_true',help='Allow blind-hole ceiling repairs on two new disposable child fixtures.')
     repairs.add_argument('--pocket-repair',action='store_true',help='Allow R1-to-R3 pocket-corner repairs on two new base-body fixtures without source sketches.')
+    repairs.add_argument('--fdm-envelope',action='store_true',help='Read the existing FDM orientation plate and compare explicitly selected machine envelopes.')
     parser.add_argument('--output',type=Path,default=ROOT/'.cache'/'dfm-model-probe.json')
     args = parser.parse_args()
     done = threading.Event()
@@ -285,7 +311,7 @@ def main():
         model = next((item for item in models if item.get('isDefault')),models[0])
         model_id = model['model']
         effort = 'medium' if any(e['reasoningEffort']=='medium' for e in model['supportedReasoningEfforts']) else model['defaultReasoningEffort']
-        probe = FusionProbe(args.mcp_url, repair=args.repair, pocket_repair=args.pocket_repair)
+        probe = FusionProbe(args.mcp_url, repair=args.repair, pocket_repair=args.pocket_repair, fdm_envelope=args.fdm_envelope)
         def request(request_id, method, params):
             if method != 'item/tool/call':
                 client.reply(request_id,error={'code':-32601,'message':'Unsupported benchmark request'})
@@ -327,6 +353,15 @@ def main():
                           "This is a base body without source sketch parameters. Inspect before editing, perform the authorized repair and remeasure actual geometry. "
                           "Only edit this body's component; leave all other components and documents untouched. No exports, uploads, saves or document switching. "
                           "The radius requirement and repair permission are confirmed. Report preserved dimensions and important unchecked manufacturing concerns.")
+            if args.fdm_envelope:
+                prompt = ("Inspect ONLY the selected plate for FDM nominal build-envelope fit. I select the Original Prusa MK4S and original Prusa CORE One; "
+                          "use their installed machine definitions and measure the actual selected body. Compare three cases: "
+                          "MK4S with build X=[1,0,0], Y=[0,1,0]; MK4S with build X=[0,1,0], Y=[-1,0,0]; "
+                          "and original CORE One with build X=[0,1,0], Y=[-1,0,0]. These axes are in the native part frame, Z is upward. "
+                          "Report measured XYZ extents and the relevant sourced machine limits for each case. "
+                          "This is only a nominal envelope inspection, not a request to certify printability. "
+                          "Keep all geometry unchanged. Do not move bodies, export, upload, save or switch documents. "
+                          "Machine choices and orientations are confirmed; no setup questions are needed.")
             print('Starting DFM',enabled,'model',model_id,'effort',effort,flush=True)
             started = time.monotonic()
             turn = client.request('turn/start',{'threadId':thread,'model':model_id,'effort':effort,'input':message_input(prompt,context)})['turn']['id']
@@ -336,12 +371,12 @@ def main():
                     client.request('turn/interrupt',{'threadId':thread,'turnId':turn})
                     raise RuntimeError('The bounded model probe timed out; no benchmark conclusion recorded.')
             trials.append({'dfmEnabled':enabled,'model':model_id,'effort':effort,'outcome':outcomes[-1],
-                           'scenario':'pocket-repair' if args.pocket_repair else 'hole-repair' if args.repair else 'inspection',
+                           'scenario':'fdm-envelope' if args.fdm_envelope else 'pocket-repair' if args.pocket_repair else 'hole-repair' if args.repair else 'inspection',
                            'elapsedSeconds':round(time.monotonic()-started,3),
                            'tools':list(records),'answer':''.join(text)})
-            if probe.repair:
+            if probe.repair or args.fdm_envelope:
                 try:
-                    trials[-1]['independentVerification'] = probe.verify_repair()
+                    trials[-1]['independentVerification'] = probe.verify_envelope() if args.fdm_envelope else probe.verify_repair()
                 except Exception as error:
                     trials[-1]['independentVerification'] = {'passed':False,'error':str(error)}
             args.output.parent.mkdir(parents=True,exist_ok=True)
@@ -351,7 +386,7 @@ def main():
         args.output.write_text(json.dumps(trials,ensure_ascii=False,indent=2),encoding='utf-8')
         print('Paired probe recorded:',args.output,flush=True)
         if any(trial['outcome'] != 'completed' or
-               (probe.repair and trial['independentVerification'].get('passed') is not True)
+               ((probe.repair or args.fdm_envelope) and trial['independentVerification'].get('passed') is not True)
                for trial in trials):
             raise RuntimeError('A trial did not complete or failed independent geometry checks; inspect the recorded evidence.')
     finally:

@@ -41,7 +41,9 @@ are in [RMFG.md](RMFG.md).
 
 ## Evidence that cannot be inferred
 
-- Three paired model cases have exercised inspection and two authorized repairs.
+- Five paired model runs have exercised milling inspection (including a repeat
+  after the tool-description audit), two authorized milling repairs and FDM
+  machine/envelope discovery on unchanged geometry.
   Both modes succeeded in every recorded pair. The results support integration;
   they do **not** establish better design quality with DFM enabled. The overall
   improvement target needs a manufacturing-reviewed, held-out task set and frozen
