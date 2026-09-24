@@ -17,7 +17,7 @@ class GeometryTests(unittest.TestCase):
                         Plane=Obj(cast=lambda geo: geo if getattr(geo, 'kind', '') == 'plane' else None),
                         Cylinder=Obj(cast=lambda geo: geo if getattr(geo, 'kind', '') == 'cylinder' else None),
                         Circle3D=Obj(cast=lambda geo: geo if getattr(geo, 'kind', '') == 'circle' else None))
-        self.body = Obj(revisionId='r1', faces=Collection())
+        self.body = Obj(revisionId='r1', faces=Collection(), isSolid=True)
         self.cam = Obj()
         self.app = Obj(measureManager=Obj(getOrientedBoundingBox=lambda body, x, y: Obj(length=6, width=4, height=.8, centerPoint=vector(3,2,.4))))
         self.geo = DfmGeometry(self.body, self.app, self.core, self.cam)
@@ -133,6 +133,35 @@ class GeometryTests(unittest.TestCase):
         report = self.geo.cylindrical_walls()
         self.assertFalse(report['items'])
         self.assertEqual(len(report['unsupported']), 2)
+
+    def test_partial_cylinder_radius_is_distinct_from_complete_band_recognition(self):
+        internal,external=self.wall(radius=.1),self.wall(radius=.3,inward=False)
+        internal.loops=Collection(Obj(edges=Collection(Obj(geometry=Obj(kind='arc')))))
+        internal.area /= 4
+        self.body.faces=Collection(Obj(geometry=Obj(kind='plane')),internal,external)
+        first=self.geo.cylindrical_surfaces(limit=1)
+        self.assertEqual(first['nextOffset'],2)
+        self.assertEqual(first['nonCylindricalFaces'],1)
+        self.assertEqual(first['items'][0]['radius_mm'],1)
+        self.assertEqual(first['items'][0]['side'],'internal')
+        self.assertNotIn('axial_span_mm',first['items'][0])
+        second=self.geo.cylindrical_surfaces(offset=first['nextOffset'])
+        self.assertEqual(second['items'][0]['side'],'external')
+        self.assertIsNone(second['nextOffset'])
+        self.assertEqual(len(self.geo.cylindrical_walls()['unsupported']),1)
+
+    def test_open_or_unoriented_cylinders_keep_radius_but_never_claim_internal(self):
+        face=self.wall()
+        self.body.faces=Collection(face)
+        self.body.isSolid=False
+        self.assertEqual(self.geo.cylindrical_surfaces()['items'][0]['side'],'unknown')
+        self.assertEqual(self.geo.cylindrical_walls()['items'][0]['side'],'unknown')
+        self.body.isSolid=True
+        face.evaluator=Obj(getNormalAtPoint=lambda point:(False,None))
+        item=self.geo.cylindrical_surfaces()['items'][0]
+        self.assertEqual(item['radius_mm'],2)
+        self.assertEqual(item['side'],'unknown')
+        self.assertIn('unavailable',item['sideReason'])
 
     def test_page_offset_counts_faces_not_only_matches(self):
         self.body.faces = Collection(Obj(geometry=Obj(kind='plane')), self.wall(), self.wall())

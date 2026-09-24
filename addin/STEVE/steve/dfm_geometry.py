@@ -108,6 +108,39 @@ class DfmGeometry:
         return {**result, 'revision': self._revision,
                 'scope': 'Configured component rule, not measured wall thickness or supplier capability. Existing component flat-pattern presence does not prove its currency, bend sequence or tooling clearance. No geometry was created.'}
 
+    def cylindrical_surfaces(self, offset=0, limit=10):
+        """Analytic radii, including partial pocket-corner faces; no feature recognition."""
+        page(offset, limit)
+        self._check()
+        faces = self.body.faces
+        values, scanned, other = [], 0, 0
+        for index in range(offset, min(faces.count, offset+200)):
+            self._check()
+            face = faces.item(index)
+            cylinder = self.core.Cylinder.cast(face.geometry)
+            scanned += 1
+            if cylinder is None:
+                other += 1
+                continue
+            radius = finite(cylinder.radius)
+            if radius <= 0:
+                values.append({'faceIndex':index,'status':'unknown','reason':'Cylinder radius is not positive.'})
+            else:
+                side, reason = self._cylinder_side(face, cylinder)
+                item = {'faceIndex':index,'faceToken':face.entityToken,'status':'measured',
+                    'radius_mm':10*radius,'axis':unit(xyz(cylinder.axis)),
+                    'axisOrigin_mm':[10*v for v in xyz(cylinder.origin)],'side':side}
+                if reason:
+                    item['sideReason'] = reason
+                values.append(item)
+            if len(values) >= limit:
+                break
+        self._check()
+        return {'status':'measured','items':values,'scannedFaces':scanned,'nonCylindricalFaces':other,
+            'totalFaces':faces.count,'nextOffset':offset+scanned if offset+scanned<faces.count else None,
+            'revision':self._revision,
+            'scope':'Analytic cylindrical surface radii in native body coordinates, including partial faces. Internal/external uses solid-face normals; open surfaces remain unknown. Sharp edges, non-cylindrical faces, trimming, pocket membership, complete-hole diameter/depth, cutter approach/reach and collision clearance are unassessed. No matches does not prove there are no tight or sharp corners. Confirm that a face is an intended pocket corner before comparing its radius with a cutter; an internal cylinder can instead be a bore. Radius equality alone does not establish a suitable machining strategy.'}
+
     def normal_thickness(self, face_index):
         """One inward normal ray at Fusion's interior face sample, not a global minimum."""
         self._check()
@@ -326,18 +359,25 @@ class DfmGeometry:
         expected_area = 2*math.pi*cylinder.radius*span
         if not math.isclose(face.area, expected_area, rel_tol=1e-7, abs_tol=1e-9):
             return None
+        side, reason = self._cylinder_side(face, cylinder)
+        return {'diameter_mm': 20*finite(cylinder.radius), 'axial_span_mm': 10*span,
+                'area_mm2': 100*finite(face.area), 'axis': axis,
+                'side': side, **({'sideReason':reason} if reason else {})}
+
+    def _cylinder_side(self, face, cylinder):
+        if not self.body.isSolid:
+            return 'unknown', 'The body is not solid; face orientation does not establish inside versus outside.'
         point = face.pointOnFace
         ok, normal = face.evaluator.getNormalAtPoint(point)
         if not ok:
-            return None
-        offset = [p-o for p,o in zip(xyz(point), xyz(cylinder.origin))]
+            return 'unknown', 'The solid-face normal is unavailable.'
+        axis = unit(xyz(cylinder.axis))
+        offset = [p-o for p,o in zip(xyz(point),xyz(cylinder.origin))]
         radial = [v-dot(offset,axis)*a for v,a in zip(offset,axis)]
-        side = dot(unit(radial), unit(xyz(normal)))
-        if abs(side) < .999999:
-            return None
-        return {'diameter_mm': 20*finite(cylinder.radius), 'axial_span_mm': 10*span,
-                'area_mm2': 100*finite(face.area), 'axis': axis,
-                'side': 'internal' if side < 0 else 'external'}
+        side = dot(unit(radial),unit(xyz(normal)))
+        if abs(side)<.999999:
+            return 'unknown', 'The face normal is not consistent with a radial cylindrical normal.'
+        return ('internal' if side<0 else 'external'), None
 
     def holes(self, offset=0, limit=10):
         page(offset, limit)

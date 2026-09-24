@@ -188,6 +188,31 @@ All pre-existing body revisions and both checked fixture bodies were unchanged b
 inspection. Sampled wall thickness is not a global minimum, a validated print
 profile, a strength calculation or slicer certification.
 
+## Partial cylindrical pocket corners
+
+`scripts/fusion_pocket_radius_smoke.py` creates a 40 × 30 × 10 mm block with a
+20 × 10 × 5 mm rounded pocket and independently specified R1 corners. The new
+`cylindrical_surfaces` helper measured all four partial cylindrical radii as
+1 mm, classified them as internal using solid-face normals, and returned the
+expected vertical axes through paged queries. Independent quarter-cylinder areas,
+axial bounds and analytic remaining volume matched. The original full-band query
+still rejected all four partial faces, so this does not weaken its recognition.
+
+The test identified the intended pocket faces from the fixture and compared their
+radii with supplied cutter radii of 0.5, 1 and 3 mm: all four dimensional comparisons
+passed for the first two tools and raised concerns for the 3 mm radius. Every
+report retained unknown machining-strategy/clearance coverage, including at equal
+radius. Those are synthetic fixture tool inputs, not general recommendations.
+All pre-existing bodies and the inspected fixture revision were preserved.
+
+This query measures analytic surface radii without requiring the feature-recognition
+extension. It does not itself identify pockets, sharp zero-radius corners, complete
+holes, NURBS curvature, reach or tool clearance. No matches is not proof that a
+part has no problematic corners. Unit tests also confirm that open surface bodies
+and unavailable normals retain unknown inside/outside classification.
+
+Reference: [Autodesk B-Rep geometry and solid-face normals](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/BRepGeometry_UM.htm).
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
