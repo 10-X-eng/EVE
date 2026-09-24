@@ -79,8 +79,11 @@ PreForm validation. A nominal comparison alone is not a printability result.
 
 Plans store the machine ID and a canonical content hash. A changed or missing
 definition does not delete the saved plan or silently replace its limits.
-Checks require the selected revision to exist and match. Changes during a check
-make the report stale; unavailable definitions leave it unverified. Plan reads
+Checks require the selected revision to exist and match. After inspection, every
+machine referenced by the ordered plan is rechecked, including other stages.
+Changes during a check make the report stale; unavailable definitions leave it
+unverified. The measurements are retained without rerunning inspection. Machines
+outside that plan do not affect its report. Plan reads
 also expose `reportBinding.machineStatus`; historical findings require this to
 be `current` as well as matching geometry and plan hashes.
 

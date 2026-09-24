@@ -4,10 +4,13 @@ from types import SimpleNamespace as Obj
 import unittest
 from unittest.mock import patch
 
-from test_fusion_bridge import bridge, Host
+# Load pure DFM modules before the bridge's temporary fake-Autodesk import scope.
+# Otherwise an isolated run can create two machine-module instances and patch
+# a different catalog from the one retained by the bridge.
 from test_dfm import stages
 from steve.dfm import DfmStore
 from steve.tool_protocol import validate_call
+from test_fusion_bridge import bridge, Host
 
 
 class DfmBridgeTests(unittest.TestCase):
@@ -165,6 +168,53 @@ class DfmBridgeTests(unittest.TestCase):
         after = self.call('fusion_dfm_plan')[0]
         self.assertNotEqual(after['reportBinding']['revision'], result['dfm']['revision'])
         self.assertEqual(after['reportBinding']['planHash'], result['dfm']['planHash'])
+
+    def test_other_stage_machine_currency_matches_historical_binding_without_replay(self):
+        import json
+        from pathlib import Path
+        from steve import machines
+        self.tools.dfm.set_enabled(True)
+        definitions = {key: machines.load(key) for key in ('prusa-core-one', 'prusa-mk4s')}
+        selected = {key: {field: value[field] for field in ('id', 'definition_hash')}
+                    for key, value in definitions.items()}
+        execute = bridge.run_python
+        with tempfile.TemporaryDirectory() as folder, patch.object(machines, 'DIRECTORY', Path(folder)):
+            changed_path = Path(folder) / 'prusa-mk4s.json'
+            for index, change in ((0, 'changed'), (1, 'changed'), (0, 'missing'), (1, 'invalid'), (0, 'unreferenced')):
+                with self.subTest(stage=index, change=change):
+                    for key, definition in definitions.items():
+                        value = {k: v for k, v in definition.items() if k != 'definition_hash'}
+                        (Path(folder) / (key + '.json')).write_text(json.dumps(value), encoding='utf-8')
+                    plan = [{'process': 'fdm', 'machine': selected['prusa-core-one']}]
+                    if change != 'unreferenced':
+                        plan.insert(1 - index, {'process': 'fdm', 'machine': selected['prusa-mk4s']})
+                    before = self.call('fusion_dfm_plan', stages=plan)[0]
+                    self.assertTrue(before['ok'])
+                    def change_after_measurement(*args, **kwargs):
+                        result = execute(*args, **kwargs)
+                        if change == 'missing':
+                            changed_path.unlink()
+                        elif change == 'invalid':
+                            changed_path.write_text('{invalid', encoding='utf-8')
+                        else:
+                            value = json.loads(changed_path.read_text(encoding='utf-8'))
+                            value['revision'] = 'fixture-revised'
+                            changed_path.write_text(json.dumps(value), encoding='utf-8')
+                        return result
+                    with patch.object(bridge, 'run_python', side_effect=change_after_measurement) as run:
+                        result = self.call('fusion_dfm_check', stage=index, title='Machine envelope', code=
+                            "def run(context):\n context['dfm'].compare('X', 200, 'machine.nominal_build_x', '<=', 'mm')")[0]
+                        self.assertEqual(run.call_count, 1)
+                    expected = 'current' if change == 'unreferenced' else 'stale' if change == 'changed' else 'unknown'
+                    self.assertTrue(result['ok'])
+                    self.assertEqual(result['dfm']['configurationStatus'], expected)
+                    self.assertEqual(result['dfm']['status'], {'current': 'checked', 'stale': 'stale', 'unknown': 'incomplete'}[expected])
+                    finding = result['dfm']['findings'][0]
+                    self.assertEqual(finding['status'], 'pass' if expected == 'current' else 'unknown')
+                    self.assertEqual((finding['actual'], finding['limit']), (200, 250))
+                    self.assertEqual(result['dfm']['planHash'], before['reportBinding']['planHash'])
+                    self.assertEqual(self.call('fusion_dfm_plan')[0]['reportBinding']['machineStatus'], expected)
+                    self.assertEqual(self.host.executions, 0)
 
     def test_machine_change_during_check_invalidates_report_and_historical_binding(self):
         from steve import machines

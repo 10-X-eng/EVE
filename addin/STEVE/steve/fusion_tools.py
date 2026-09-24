@@ -269,9 +269,8 @@ class FusionTools:
             try:
                 current_plan = self.dfm.plan(key, body, context['design'])
                 configuration_status = 'current' if plan_hash(current_plan) == assessed_plan_hash else 'stale'
-                machine_status = dfm.machine_status()
                 if configuration_status == 'current':
-                    configuration_status = machine_status
+                    configuration_status = machines.plan_status(current_plan)
             except (OSError, RuntimeError, ValueError):
                 # A contended/read-failed store cannot turn old criteria into current evidence.
                 # Preserve the measurements and execution result; do not rerun generated code.
@@ -318,10 +317,8 @@ class FusionTools:
             else:
                 self.dfm.save_plan(key, body, context['design'], arguments['stages'])
             plan = self.dfm.plan(key, body, context['design'])
-        machine_statuses = [machines.status(stage['machine']) for stage in (plan or {}).get('stages', []) if 'machine' in stage]
-        machine_status = 'stale' if 'stale' in machine_statuses else 'unknown' if 'unknown' in machine_statuses else 'current'
         return {'ok': True, 'document_id': self.document_id, 'body': body.name, 'partToken': body.entityToken,
-                'reportBinding': {'revision': revision(body), 'planHash': plan_hash(plan), 'machineStatus': machine_status},
+                'reportBinding': {'revision': revision(body), 'planHash': plan_hash(plan), 'machineStatus': machines.plan_status(plan)},
                 'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',
                 'scope': 'Native body definition. Compare reportBinding with historical reports before reuse; changed or unavailable revision/planHash requires a new check. Occurrence placement, assembly context and build orientation require explicit checks.'}
 
