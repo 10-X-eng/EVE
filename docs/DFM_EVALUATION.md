@@ -355,6 +355,21 @@ python scripts/dfm_model_probe.py --mcp-url <your-loopback-MCP-URL> --pocket-rep
 `--pocket-repair` and `--repair` are mutually exclusive. Local traces include the
 scenario, elapsed time, generated tool calls and independent verification results.
 
+## Current API reference discovery
+
+Installed API help and installed-class search now supply namespace-prefixed web
+reference candidates for core, fusion and cam classes/members. These candidates
+are explicitly unverified until fetched; discovery performs no network I/O on
+Fusion's thread. Missing-page recovery distinguishes obsolete page naming from
+an unavailable installed API and directs the model to class-page links.
+
+A live end-to-end check obtained paths from Fusion's installed API and fetched
+them with STEVE's bounded documentation reader: `ImportManager.importToTarget`,
+`TemporaryBRepManager.createFromFile` and `Tool.toJson`. All three current pages
+loaded and contained their expected API details. Unit tests cover naming, unsafe
+or unsupported paths, the unverified flag, and discovery without method invocation
+or network access. This verifies these references, not every generated candidate.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
