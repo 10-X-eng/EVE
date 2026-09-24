@@ -183,10 +183,10 @@ TOOLS = [
              "required": ["part_id", "material_id"], "additionalProperties": False}}},
          "required": ["document_id", "part_token", "action"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_dfm_plan", "deferLoading": False,
-     "description": "Read or save local manufacturing context for a BRepBody in the pinned Design. Available only when the user enables DFM. Resolve a body token through a query; plans apply to its native part definition, including repeated occurrences. Save the COMPLETE ordered stages using user intent and observed profiles, preserving prior constraints. Omit stages to read. This changes only STEVE's local metadata, never Fusion geometry. Saved-document plans persist locally; unsaved-document plans last this STEVE session. Read steve.dfm via fusion_api_help first.",
+     "description": "Read, save or forget local manufacturing context for a BRepBody in the pinned Design. Available only when the user enables DFM. Resolve a body token through a query; plans apply to its native part definition, including repeated occurrences. Save the COMPLETE ordered stages using user intent and observed profiles, preserving prior constraints. Omit stages to read; use stages=[] only when the user requests forgetting this part's plan. This changes only STEVE's local metadata, never Fusion geometry. Saved-document plans persist locally; unsaved-document plans last this STEVE session. Read steve.dfm via fusion_api_help first.",
      "inputSchema": {"type": "object", "properties": {
          "document_id": {"type": "string"}, "part_token": {"type": "string"},
-         "stages": {"type": "array", "minItems": 1, "maxItems": 8, "items": {
+         "stages": {"type": "array", "description": "Omit to read, supply 1–8 stages to replace the plan, or [] to forget this native part's plan when requested. Repeated instances share the plan; other parts are unchanged.", "minItems": 0, "maxItems": 8, "items": {
              "type": "object", "properties": {
                  "process": {"type": "string", "enum": list(GUIDES)},
                  "material": {"type": "string"}, "notes": {"type": "string"},
@@ -363,7 +363,7 @@ def validate_call(tool, arguments):
             if not isinstance(arguments[key], str) or not arguments[key].strip() or len(arguments[key]) > limit:
                 raise ValueError("Invalid DFM " + key)
         if tool == "fusion_dfm_plan":
-            if "stages" in arguments:
+            if "stages" in arguments and arguments["stages"] != []:
                 validate_stages(arguments["stages"])
             return
         if type(arguments["stage"]) is not int or not 0 <= arguments["stage"] < 8:

@@ -72,6 +72,17 @@ class DfmBridgeTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertEqual(result['dfm']['findings'][0]['status'], 'unknown')
 
+    def test_requested_clear_removes_plan_and_next_check_requires_new_intent(self):
+        self.tools.dfm.set_enabled(True)
+        self.call('fusion_dfm_plan',stages=stages())
+        result=self.call('fusion_dfm_plan',stages=[])[0]
+        self.assertTrue(result['ok'])
+        self.assertIsNone(result['plan'])
+        self.assertIsNone(self.call('fusion_dfm_plan')[0]['plan'])
+        result=self.call('fusion_dfm_check',stage=0,title='Check',code='def run(context):\n return None')[0]
+        self.assertEqual(result['errorCode'],'dfm_plan_required')
+        self.assertEqual(self.host.executions,0)
+
     def test_help_and_schema_reject_unsupported_and_misleading_requests(self):
         validate_call('fusion_api_help', {'path': 'steve.dfm.fdm'})
         self.assertEqual(self.tools.api_help('steve.dfm.fdm')['process'], 'fdm')

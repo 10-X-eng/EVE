@@ -58,7 +58,7 @@ def finite(value):
 def guide(process=None):
     common = {
         'experimental': True,
-        'workflow': 'Inspect the target and resolve a BRepBody token. Read/set its plan with fusion_dfm_plan; use fusion_dfm_check for a selected stage. Derive criteria from user requirements or a documented profile, never invent availability or limits. Preserve functional requirements; recheck after relevant edits.',
+        'workflow': 'Inspect the target and resolve a BRepBody token. Read/set its plan with fusion_dfm_plan; pass stages=[] only when the user asks to forget that part\'s manufacturing plan. Repeated instances share the native part plan. Use fusion_dfm_check for a selected stage. Derive criteria from user requirements or a documented profile, never invent availability or limits. Preserve functional requirements; recheck after relevant edits.',
         'assemblyFrames': 'Plans and dfm.body describe the native part definition; repeated occurrences share that plan. They do not share placement or automatically share a print orientation. For an explicitly chosen assembly build frame, retain the intended BRepBody proxy, obtain its assemblyContext occurrence in the root context (including nested childOccurrences), copy occurrence.transform2 and invert it. Transform build-direction Vector3D objects by that inverse before passing their components to native envelope/overhang helpers. Use Point3D for axis origins so translation is included; Fusion point coordinates are cm, while rotational_surfaces takes an origin in mm. Do not use the retired occurrence.transform. Record the occurrence, chosen axes and measured revision; changing placement requires a new orientation-dependent assessment. Do not silently measure every occurrence with native XYZ or infer a build orientation from assembly placement.',
         'signatures': [
             "context['dfm'].body: selected native BRepBody (component coordinates; account for assembly/build transforms)",
@@ -232,6 +232,22 @@ class DfmStore:
             entries.append({'token': body.entityToken, 'stages': stages})
             self._write(persistent_enabled, plans)
             self._plans = plans
+
+    def clear_plan(self, document_key, body, design):
+        """Forget only this native part's plan, preserving other documents/parts."""
+        with self._lock, self._file_lock():
+            persistent_enabled = self._refresh()
+            key = self._key(document_key)
+            entry = self._entry(key, native(body), design)
+            if entry is None:
+                return False
+            plans = copy.deepcopy(self._plans)
+            plans[key].remove(entry)
+            if not plans[key]:
+                del plans[key]
+            self._write(persistent_enabled, plans)
+            self._plans = plans
+            return True
 
 
 class DfmChecks:

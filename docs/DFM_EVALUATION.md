@@ -145,6 +145,11 @@ local, and another instance's preference change does not toggle an active task.
 Tests cover interleaved saves, preserved preferences, lock contention and retry.
 The exact live repaired-part check also passed through the updated store.
 
+The plan tool also supports an explicit requested clear with `stages=[]`. Store
+and queue tests verify native/proxy identity, preservation of other parts and
+documents, idempotence and missing-plan recovery on the next check. A live Fusion
+temporary plan was saved, cleared and read back as absent with unchanged geometry.
+
 ## Stepped turning fixture
 
 `scripts/fusion_turned_profile_smoke.py` creates a separate full-revolve fixture:

@@ -81,6 +81,28 @@ class DfmTests(unittest.TestCase):
         other.save_plan('doc', self.body, self.design, [{'process':'turning'}])
         self.assertEqual(self.store.plan('doc', self.body, self.design)['stages'], [{'process':'turning'}])
 
+    def test_clear_resolves_native_identity_and_preserves_other_documents(self):
+        self.store.set_enabled(True)
+        self.store.save_plan('first-document',self.body,self.design,stages())
+        self.store.save_plan('second-document',self.body,self.design,[{'process':'turning'}])
+        self.store.save_plan('session:temporary',self.body,self.design,stages())
+        neighbor=Obj(entityToken='neighbor',revisionId='other',name='Other part',nativeObject=None)
+        resolve=self.design.findEntityByToken
+        self.design.findEntityByToken=lambda token: [neighbor] if token=='neighbor' else resolve(token)
+        self.store.save_plan('first-document',neighbor,self.design,[{'process':'resin'}])
+        proxy = Obj(nativeObject=self.body,entityToken='instance-token')
+        self.body.entityToken='new-token'
+        other=DfmStore(self.folder.name)
+        self.assertTrue(other.clear_plan('first-document',proxy,self.design))
+        self.assertIsNone(self.store.plan('first-document',self.body,self.design))
+        self.assertFalse(other.clear_plan('first-document',self.body,self.design))
+        self.assertEqual(other.plan('first-document',neighbor,self.design)['stages'],[{'process':'resin'}])
+        self.assertTrue(other.clear_plan('first-document',neighbor,self.design))
+        self.assertNotIn(self.store._key('first-document'),other._plans)
+        self.assertEqual(self.store.plan('second-document',self.body,self.design)['stages'],[{'process':'turning'}])
+        self.assertIsNotNone(self.store.plan('session:temporary',self.body,self.design))
+        self.assertTrue(DfmStore(self.folder.name).enabled)
+
     def checks(self, stage=None):
         return DfmChecks(self.body, stage or stages()[0])
 
