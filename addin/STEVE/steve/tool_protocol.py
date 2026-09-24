@@ -54,6 +54,12 @@ Validate profiles before extruding. Design lengths use centimeters and angles ra
 use explicit units and expression-aware APIs, and check CAM-specific units separately.
 Verify meaningful outcomes through API queries: dimensions, entities, placement, or
 operation state. Capture the viewport at useful visual checkpoints, not after every
+operation. For changes, record measured checks with context['verification'].check(label,
+actual, expected, tolerance=0.0, units=''). Checks compare bounded scalars, do not modify
+the model, and do not abort on a failed comparison. Read actual measurements from the
+API; never substitute desired values. The returned verification report distinguishes
+execution from checked outcomes and limited feature-health coverage. Report missing or
+failed checks honestly, even when ok is true. Capture images after meaningful changes, not every
 intermediate change. Images supplement API checks; they cannot prove hidden geometry,
 exact dimensions, machining safety, or toolpath correctness. Claim success only when tool
 results and verification support it, with concrete names, counts, or measurements.
@@ -121,6 +127,8 @@ PYTHON_CONTEXT = (
     "Define def run(context); STEVE calls it once on Fusion's main thread with fresh globals. "
     "Context: app, data, ui, document, product, products (by productType), design, root, units, "
     "selection, selectionCount, selectionInvalidCount, targetPinned, dataPanel (pinned scope IDs). "
+    "Modification scripts also receive verification.check(label, actual, expected, tolerance=0.0, units='') "
+    "to record up to 20 measured scalar checks without aborting on a mismatch. "
     "Document/product/selection are the task target; design/root/units may be None. "
     "Import adsk modules as needed. Return JSON-compatible findings, not API objects. "
     "Print is captured, limited to 12,000 characters. Source must have no Markdown fences. "
