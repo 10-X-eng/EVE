@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from .transport import Transport, RuntimeUnavailable, data_home
 from .debug_log import DebugLog
+from .documentation import Documentation
 from .preferences import ProviderChoice
 from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
@@ -160,6 +161,8 @@ class Controller:
         self._lock = threading.RLock()
         self._commands = queue.Queue()
         self._active_tools = {}
+        self.documentation = Documentation()
+        self._documentation_slots = threading.BoundedSemaphore(2)
         self._job_revision = 0
         self._task_context = None
         self._job_contexts = {}
@@ -825,6 +828,26 @@ class Controller:
                     "turnId": requested_turn, "tool": tool, "arguments": arguments,
                     "complete": complete, "cancelled": cancelled}))
                 return
+            if tool == "fusion_fetch_docs" or (tool == "fusion_search_docs" and arguments.get("scope") == "samples"):
+                if not self._documentation_slots.acquire(blocking=False):
+                    raise ToolError("documentation_unavailable", "Two documentation requests are already running. Wait for them to finish.")
+                def read_documentation():
+                    try:
+                        if cancelled():
+                            raise ToolError("cancelled", "Documentation request cancelled.")
+                        result = (self.documentation.fetch(arguments["url"], arguments.get("offset", 0))
+                                  if tool == "fusion_fetch_docs" else
+                                  self.documentation.samples(arguments["query"], arguments.get("offset", 0)))
+                        if cancelled():
+                            raise ToolError("cancelled", "Documentation request cancelled.")
+                    except Exception as exc:
+                        result = tool_failure(exc, code="documentation_unavailable")
+                    finally:
+                        self._documentation_slots.release()
+                    complete(result)
+                self.emit()
+                threading.Thread(target=read_documentation, daemon=True).start()
+                return
             if self.fusion_tools is None:
                 raise ToolError("bridge_unavailable", "The Fusion execution bridge is not available. Restart STEVE inside Fusion.")
             with self._lock:
@@ -832,6 +855,7 @@ class Controller:
                                         "fusion_query_python": "Querying Fusion",
                                         "fusion_capture_viewport": "Looking at the model",
                                         "fusion_api_help": "Reading Fusion API",
+                                        "fusion_search_docs": "Searching installed Fusion documentation",
                                         "fusion_inspect_document": "Inspecting design"}[tool]
             self.emit()
             self.fusion_tools.submit(tool, arguments, complete, cancelled)

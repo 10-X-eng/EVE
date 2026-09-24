@@ -52,3 +52,17 @@ completed Fusion command or replay it. Other products require explicit checks.
 Fixtures cover new/pre-existing warnings, changed tokens, deleted features, partial
 coverage, invalid measurements, and a failed check after a completed command. Native
 feature-health and Undo behavior still need live verification.
+
+## Documentation (#13)
+
+All providers receive installed API class/member discovery, official sample-title
+search, and bounded HTML reference fetching. Sample keywords are filtered locally;
+only public pages are requested online. Fetching uses a dedicated worker, two-request
+concurrency limit, request timeout, response-size limit, and bounded one-hour memory
+cache. URLs and redirects are restricted to Autodesk's Fusion API HTML directory.
+
+Six documentation fixtures cover parsing, limits, caching, discovery, URL restrictions,
+and offline behavior. Controller tests confirm shared tool registration and that Stop
+remains responsive during a documentation request. A live public sample-index search
+returned three Electronics samples and successfully fetched the Board Summary page.
+No authenticated provider inference was used for this check.

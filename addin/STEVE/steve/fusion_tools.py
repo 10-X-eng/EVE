@@ -443,6 +443,28 @@ class FusionTools:
                 **({"guidance": API_GUIDANCE[path]} if path in API_GUIDANCE else {}),
                 "members": [name for name in dir(value) if not name.startswith("_")][:250]}
 
+    def search_docs(self, query, offset=0):
+        words = query.casefold().split()
+        classes = []
+        for namespace in self.namespaces():
+            module = importlib.import_module(namespace)
+            classes.extend((namespace + "." + name, value) for name, value in vars(module).items()
+                           if not name.startswith("_") and inspect.isclass(value))
+        classes.sort(key=lambda entry: entry[0])
+        matches, scanned = [], 0
+        for path, value in classes[offset:offset + 200]:
+            scanned += 1
+            doc = inspect.getdoc(value) or ""
+            members = [name for name in dir(value) if not name.startswith("_")]
+            if all(word in (path + " " + doc + " " + " ".join(members)).casefold() for word in words):
+                matches.append({"path": path, "description": doc[:600],
+                                "matchingMembers": [name for name in members if any(word in name.casefold() for word in words)][:12]})
+                if len(matches) >= 10:
+                    break
+        return {"ok": True, "matches": matches, "scannedClasses": scanned, "totalClasses": len(classes),
+                "nextOffset": offset + scanned if offset + scanned < len(classes) else None,
+                "scope": "Installed class names, docstrings and member names. Use fusion_api_help on a returned path."}
+
     def check_target(self, job):
         if self.closed or job["cancelled"]():
             raise ToolError("cancelled", "Operation cancelled before execution.")
@@ -462,7 +484,7 @@ class FusionTools:
         try:
             if job["cancelled"]():
                 raise ToolError("cancelled", "Operation cancelled before execution.")
-            if self.task and job["tool"] != "fusion_api_help":
+            if self.task and job["tool"] not in ("fusion_api_help", "fusion_search_docs"):
                 if self.document is not None and optional_property(self.document, "isValid") is False:
                     raise ToolError("target_document_closed", "The task's original document was closed.")
                 if self.document is None and self.app.activeDocument is not None:
@@ -481,6 +503,8 @@ class FusionTools:
                 self.finish(job, {"ok": True, **self.inspect_document()})
             elif job["tool"] == "fusion_api_help":
                 self.finish(job, self.api_help(job["arguments"]["path"]))
+            elif job["tool"] == "fusion_search_docs":
+                self.finish(job, self.search_docs(job["arguments"]["query"], job["arguments"].get("offset", 0)))
             elif job["tool"] == "fusion_capture_viewport":
                 self.finish(job, self.capture_viewport(job))
             else:
