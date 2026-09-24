@@ -1,0 +1,43 @@
+{
+  "id": "formlabs-fuse-1-plus-30w",
+  "name": "Formlabs Fuse 1+ 30W (polymer SLS)",
+  "manufacturer": "Formlabs",
+  "revision": "1",
+  "processes": [
+    "powder"
+  ],
+  "verified_on": "2026-09-24",
+  "sources": {
+    "specifications": "https://formlabs.com/3d-printers/fuse-1/tech-specs/",
+    "usable_volume": "https://formlabs.com/support/What-is-the-build-volume-of-the-Form-3L-and-Form-3BL/"
+  },
+  "capabilities": {
+    "nominal_build_x": {
+      "value": 165,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Fuse 1+ 30W chamber extent along build X, not maximum printable part size. Rounded corners and material/settings compensation reduce usable space; verify the job in PreForm."
+    },
+    "nominal_build_y": {
+      "value": 165,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Fuse 1+ 30W chamber extent along build Y, not maximum printable part size. Rounded corners and material/settings compensation reduce usable space; verify the job in PreForm."
+    },
+    "nominal_build_z": {
+      "value": 300,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Fuse 1+ 30W chamber extent along build Z, not maximum printable part size. Rounded corners and material/settings compensation reduce usable space; verify the job in PreForm."
+    }
+  },
+  "unverified": [
+    "This machine is polymer SLS, not metal powder or MJF; confirm the actual material and print settings.",
+    "Formlabs documents 16 mm inside chamber corner radii in PreForm. A square spanning full chamber X and Y is not printable; a box comparison cannot check that boundary.",
+    "Maximum printable dimensions depend on material and print-setting release. Review the usable_volume source and verify the actual job in PreForm.",
+    "No powder escape, fine-feature, wall, clearance, packing, thermal-distortion, depowdering or strength qualification is supplied."
+  ]
+}

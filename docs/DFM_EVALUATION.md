@@ -574,6 +574,27 @@ source/scope, and attempts to replace or invert limits. These validate selected
 nominal capabilities; no physical printer, slicer outcome or complete machine
 capability profile has been qualified.
 
+### Resin and polymer SLS machine definitions
+
+Separate Formlabs Form 4 and Fuse 1+ 30W files add resin and polymer SLS nominal
+envelopes, sourced on 2026-09-24. The catalog records the Fuse chamber's rounded
+corners and material/settings-dependent usable-volume restrictions explicitly;
+it supplies no general powder-process or material qualification. See the source
+links and exact limitations in [MACHINES.md](MACHINES.md).
+
+The existing sourced-envelope script now measures 24 cases across four machines,
+reusing the three plate bodies and original 60/40/8 mm block without new geometry.
+It also measures the 250/20/10 mm plate on edge as 20/10/250 mm: within Fuse's
+nominal XYZ limits, but exceeding Form 4's Z limit by 40 mm. The small block is
+within both nominal boxes; the 218/200/10 mm plate exceeds both in the upright
+frame. All 24 native measurements matched independent expected extents on Fusion
+2705.1.25, and all body revisions remained unchanged. Every report retained an
+explicit unknown print outcome; dimensionally passing cases stayed incomplete.
+
+Catalog tests cover below/equal/above limits, all wrong process-family selections,
+missing wall capabilities and retained process restrictions. No physical print,
+material profile, rounded-chamber fit algorithm or PreForm validation was tested.
+
 ### Paired real-model machine discovery
 
 The opt-in model probe now includes a read-only additive case:
