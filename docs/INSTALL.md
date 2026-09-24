@@ -1,8 +1,8 @@
 # Install STEVE for Autodesk Fusion
 
-STEVE 0.4.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
+STEVE 0.5.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
 
-Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.4.0-windows-x64.zip` or `STEVE-0.4.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.5.0-windows-x64.zip` or `STEVE-0.5.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
 ## Install on Windows
 
@@ -13,7 +13,7 @@ Download the package for your computer from the [STEVE releases page](https://gi
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `Get-FileHash .\STEVE-0.4.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+To verify the download, run `Get-FileHash .\STEVE-0.5.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
 ## Install on macOS
 
@@ -25,11 +25,11 @@ To verify the download, run `Get-FileHash .\STEVE-0.4.0-windows-x64.zip -Algorit
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `shasum -a 256 STEVE-0.4.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+To verify the download, run `shasum -a 256 STEVE-0.5.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
 ## First conversation
 
-STEVE 0.4.0 adds **Claude (experimental)** through your external Claude Code sign-in; see [Claude setup](#claude-subscription-experimental). **Grok / X** remains available in the **AI provider** selector. Select it, choose **Sign in with X / Grok**, and complete xAI authentication. If the browser shows a code for Grok Build after approval, return to Fusion; STEVE completes sign-in automatically without copying it. You can use **Use a device code instead** if the browser callback cannot reach Fusion. Link your X account in Grok account settings if needed; xAI determines your account's access. Switching providers opens that provider's history and saved model choice and is disabled during a task.
+STEVE includes **Claude (experimental)** through your external Claude Code sign-in; see [Claude setup](#claude-subscription-experimental). **Grok / X** remains available in the **AI provider** selector. Select it, choose **Sign in with X / Grok**, and complete xAI authentication. If the browser shows a code for Grok Build after approval, return to Fusion; STEVE completes sign-in automatically without copying it. You can use **Use a device code instead** if the browser callback cannot reach Fusion. Link your X account in Grok account settings if needed; xAI determines your account's access. Switching providers opens that provider's history and saved model choice and is disabled during a task.
 
 Open a design and start with: **“Inspect this document and summarize its components and parameters.”** Then ask for the change you want, including dimensions and units. Save the design before trying generated operations.
 

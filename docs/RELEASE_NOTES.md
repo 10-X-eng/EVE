@@ -1,27 +1,30 @@
-# STEVE 0.4.0 — Claude subscriptions and independent Codex updates
+# STEVE 0.5.0 — Better Fusion inspection and verification
 
-Use your Claude subscription in Autodesk Fusion through the official Claude Code client. Select **Claude (experimental)** alongside ChatGPT, Grok / X, and local Ollama.
+STEVE now has richer document context, explicit verification results, searchable Fusion documentation for every provider, and focused viewport captures.
 
 ## What changed
 
-- **Update Codex independently.** The account menu shows the running Codex version, checks OpenAI's latest stable release, and downloads verified updates without waiting for a STEVE release. Downloads run alongside your current task; click **Restart STEVE** in the account menu to activate the update and reopen your chat without restarting Fusion. The bundled runtime remains available for recovery.
-- **Refresh OpenAI models.** Refresh the ChatGPT model catalog without resetting your conversation. The packaged Codex baseline is now 0.155.1; newer compatible stable versions can be installed independently.
+- **Preserve work while waiting.** Pending tools explain which document or Fusion command they are waiting for. Waits do not expire or cancel Fusion commands. Native-call time no longer consumes the Python loop budget.
+- **Inspect Electronics selection mode.** The verified schematic GROUP state permits inspection and queries without interrupting selection. Editing operations remain gated and return actionable guidance.
+- **Read richer document summaries.** Bounded Design, CAM, and Electronics summaries report useful state, missing capabilities, and incomplete collection coverage. Electronics design editing remains limited by the installed API.
+- **Separate execution from verification.** Measured checks and limited feature-health comparisons distinguish code completion from verified outcomes. Missing evidence and failed checks are reported explicitly.
+- **Find Fusion documentation with any provider.** Search installed API classes and official samples, inspect installed signatures, and fetch Autodesk API reference pages through dedicated tools.
+- **Use consistent Python helpers.** Helpers resolve pinned selections and entity tokens, validate unit expressions, and page through collections without dumping entire documents or libraries.
+- **Capture useful views.** Named views and selected-entity close-ups restore the original camera after capture, including failures. Images supplement API measurements.
 
-- **Use your existing Claude sign-in.** Install Claude Code and run `claude auth login` in a terminal outside Fusion. STEVE detects the account automatically and provides installation and sign-in guidance when needed. Credentials stay with Claude Code.
-- **See model versions and effort choices.** The picker shows resolved names such as Opus 5.5 and Haiku 4.5, preserves context and usage-credit labels, and exposes supported reasoning levels.
-- **Refresh after Claude updates.** The account menu shows the installed Claude Code version. **Check connection** refreshes that version and the model catalog without resetting your chat.
-- **Keep STEVE's tools and conversations.** Claude supports Fusion tool calls, streaming, images, steering, saved history, and native job controls through the existing conversation engine. Signed replay data is isolated by chat.
-- **Handle failures clearly.** Interrupted or incomplete responses do not dispatch unfinished tool batches. Claude errors reach the chat, and cancellation stops the owned process. The adapter prevents additional upstream generations within a single model request.
+This release also includes the previously merged in-app STEVE update flow and the renamed **Jobs** controls. Use `/jobs` to manage ongoing work.
 
-Claude support is experimental. Web search is not connected for this provider; Fusion's installed API documentation remains available. Claude Code is installed separately. Anthropic controls model access, subscription limits, and any usage-credit or extra-usage charges. No API key or separate STEVE account is required.
+## Verification
 
-Live Haiku and Sonnet checks completed tool rounds against a simulated document. Automated checks cover the protocol, images, steering, history, jobs, and cancellation. Native Fusion workflows and macOS Claude usage still need live confirmation; see [verification status](https://github.com/10-X-eng/STEVE/blob/main/docs/VERIFICATION.md).
+Automated checks cover the new behavior with simulated Autodesk hosts, provider/runtime fixtures, and platform package tests. The maintainer reported selection measurement and close-up capture working inside Fusion on Windows. Some native Fusion workflows still need itemized live confirmation, including retesting the schematic GROUP inspection fix. See [verification status](https://github.com/10-X-eng/STEVE/blob/main/docs/VERIFICATION.md) and [reliability validation](https://github.com/10-X-eng/STEVE/blob/main/docs/RELIABILITY_VALIDATION.md).
+
+DFM is planned separately and is not included in this release.
 
 ## Update or install
 
-- **Windows x64:** download **STEVE-0.4.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install STEVE.exe**.
-- **macOS (Apple silicon):** download **STEVE-0.4.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install STEVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
+Existing users can choose **Check for updates**, then **Update STEVE**. Save your work and quit Fusion when prompted so the installer can replace the add-in. Saved chats and preferences are retained. **Download only** is also available.
 
-Existing STEVE users can use **Check for updates** once this release is published. The installer preserves saved chats and preferences. Each ZIP includes the conversation runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer.
+- **Windows x64:** download **STEVE-0.5.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install STEVE.exe**.
+- **macOS (Apple silicon):** download **STEVE-0.5.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install STEVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
 
-These are unsigned previews. Both platform packages must pass automated build and installation verification before publication. Each package's SHA-256 checksum is included as a separate release asset.
+Each ZIP includes the conversation runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer. These are unsigned previews; both platform packages must pass automated build and installation verification before publication. SHA-256 checksums accompany the ZIPs. Codex updates independently of STEVE.
