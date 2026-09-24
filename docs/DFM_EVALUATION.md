@@ -518,6 +518,36 @@ they add no prompt text, tools or manufacturing thresholds. Tool approach, reach
 holder clearance, workholding, NURBS corners and broader feature recognition remain
 unqualified. No customer geometry was changed during fixture setup.
 
+## Provider switch and disabled-tool enforcement
+
+`tests/test_dfm_provider_runtime.py` exercises three complete on/off/on
+conversations through the real local Codex runtime and STEVE's Claude, Grok and
+Ollama transports. Provider inference is scripted through loopback fixtures;
+Claude uses its actual Responses adapter, and Ollama retains its actual
+model/context preparation with fixture metadata. No subscription credentials,
+paid inference, supplier calls or live Fusion are used.
+
+The tests use the actual controller, manufacturing plan store and queued Fusion
+Python runner with a fake Autodesk host. Each enabled conversation saves an FDM
+plan, compares a scripted 0.8 mm sample with an explicit 1.2 mm requirement and
+records unknown manufacturing coverage. While disabled, the scripted provider
+deliberately attempts all four DFM/supplier tools. Every attempt receives
+`dfm_disabled` with `executionStarted=false` and ordinary-tool recovery guidance;
+none reaches the Fusion submission queue or supplier service. Re-enabling reads
+the original plan and checks it in the same chat, with the same plan hash.
+
+Captured outbound provider requests show the latest switch value and pinned
+document each time, with the private task key omitted. The four tool definitions
+remain registered in every phase, so re-enabling needs no chat replacement.
+Reports preserve both the dimensional concern and explicit coverage unknown;
+no mutating Fusion command executes. All three local runtime tests passed.
+
+This establishes delivery, gating and retained-plan behavior for these adapters.
+The sample dimension is scripted, not a CAD measurement; the provider fixtures
+do not establish real-model instruction following or manufacturing quality.
+ChatGPT live model evidence is recorded separately above. Native Fusion and
+independent manufacturing qualification remain separate gates.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
