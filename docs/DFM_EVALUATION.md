@@ -163,6 +163,26 @@ All pre-existing bodies and the checked fixture's revision were unchanged by
 inspection. This extends measured feature coverage; it does not prove a safe
 turning setup, tool fit, imported-geometry coverage or improved generated parts.
 
+## Local additive wall samples
+
+`scripts/fusion_wall_samples_smoke.py` creates a stepped plate with independently
+known **0.8, 1.2 and 2 mm** thick regions. The normal-ray helper measured all three
+correctly. A separate deliberately overlapping body was placed on the thick
+region's ray; a direct native ray query confirmed that the neighbor was hit before
+the target body's exit. The helper correctly ignored it and measured 2 mm.
+
+Supplied synthetic test limits exercise FDM, resin and powder report paths without
+claiming material or supplier rules. The respective 1.2/0.8/1.5 mm test limits
+produced concern/pass/pass, pass/pass/pass and concern/concern/pass at the three
+sample points. The test script explicitly added unknown coverage for unsampled
+regions; the report retained that unknown even when all three samples passed.
+This is a native measurement/report-contract test, not a real-model trial or
+proof that every generated inspection script will include sufficient coverage.
+
+All pre-existing body revisions and both checked fixture bodies were unchanged by
+inspection. Sampled wall thickness is not a global minimum, a validated print
+profile, a strength calculation or slicer certification.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
