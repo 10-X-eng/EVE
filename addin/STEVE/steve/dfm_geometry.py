@@ -58,6 +58,64 @@ class DfmGeometry:
                 'axes': [x,y,z], 'revision': self._revision,
                 'scope': 'Native body envelope in the supplied frame; excludes supports, brim, raft, fixtures, placement offsets and assembly transforms.'}
 
+    def face_distance(self, first_index, second_index):
+        """Native minimum distance between two selected trimmed faces, not a wall scan."""
+        self._check()
+        faces = self.body.faces
+        if any(type(index) is not int or not 0 <= index < faces.count
+               for index in (first_index, second_index)) or first_index == second_index:
+            raise ValueError('Choose two distinct current face indices on this body. Inspect their purpose before measuring a gap or thickness.')
+        first, second = faces.item(first_index), faces.item(second_index)
+        try:
+            # MeasureManager rejects native faces of non-root components. Resolve
+            # one root-context occurrence, then map its measured points back to
+            # the native part. The choice of rigid placement cannot change distance.
+            component = self.body.parentComponent
+            root = component.parentDesign.rootComponent
+            occurrence, placement, inverse = None, None, None
+            if component != root:
+                occurrences = root.allOccurrencesByComponent(component)
+                if not occurrences.count:
+                    raise ValueError('No root-context occurrence is available for the selected part.')
+                occurrence = occurrences.item(0)
+                if not occurrence.isValid:
+                    raise ValueError('The measurement occurrence is unavailable.')
+                placement = occurrence.transform2
+                _, x, y, z = placement.getAsCoordinateSystem()
+                axes = [xyz(axis) for axis in (x, y, z)]
+                if any(abs(dot(a, b)-(1 if i == j else 0)) > 1e-8
+                       for i, a in enumerate(axes) for j, b in enumerate(axes)):
+                    raise ValueError('A rigid occurrence transform is required to measure native face distance.')
+                inverse = placement.copy()
+                if not inverse.invert():
+                    raise ValueError('The occurrence transform could not be inverted.')
+                first = first.createForAssemblyContext(occurrence)
+                second = second.createForAssemblyContext(occurrence)
+                if first is None or second is None:
+                    raise ValueError('Fusion could not resolve the selected faces in assembly context.')
+            measured = self.app.measureManager.measureMinimumDistance(first, second)
+            distance = 10*finite(measured.value)
+            if distance < 0:
+                raise ValueError('Fusion returned a negative minimum distance.')
+            tolerance = 10*finite(self.app.pointTolerance)
+            if tolerance <= 0:
+                raise ValueError('Fusion modeling tolerance is unavailable for boundary interpretation.')
+            start, end = measured.positionOne.copy(), measured.positionTwo.copy()
+            if inverse is not None:
+                if not start.transformBy(inverse) or not end.transformBy(inverse):
+                    raise ValueError('Measurement endpoints could not be mapped to native part coordinates.')
+                if not occurrence.isValid or not placement.isEqualTo(occurrence.transform2):
+                    raise ValueError('The occurrence placement changed during measurement; inspect and retry.')
+            result = {'status': 'measured', 'distance_mm': distance,
+                      'modelingTolerance_mm': tolerance,
+                      'closestPoints_mm': [[10*v for v in xyz(point)] for point in (start, end)]}
+        except (AttributeError, RuntimeError, TypeError, ValueError) as error:
+            result = {'status': 'unknown', 'reason': str(error)[:400],
+                      'recovery': 'Inspect the selected faces and native measurement support. Do not substitute bounding-box or infinite-plane distances for the failed trimmed-face measurement.'}
+        self._check()
+        return {**result, 'faceIndices': [first_index, second_index], 'revision': self._revision,
+                'scope': 'Minimum distance between only these two trimmed faces of the native body; closestPoints_mm is an unordered endpoint pair in native component coordinates, not an ordered mapping to faceIndices. Zero can mean shared boundaries or contact, not a defect. Distances within modelingTolerance_mm of a criterion need an unknown boundary finding, not an asserted pass or violation; modeling tolerance is not a manufacturing allowance or certified measurement uncertainty. This does not determine whether the intervening space is material or air, directional clearance, whole-part minimum wall/gap, fit tolerance, drainage, printability or tool access. Establish feature membership and a sourced process criterion separately.'}
+
     def cylindrical_walls(self, offset=0, limit=10):
         """Full circular bands only: measure walls, never infer complete holes."""
         page(offset, limit)

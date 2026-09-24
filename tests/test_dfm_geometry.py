@@ -11,6 +11,18 @@ def vector(x, y, z):
     return Obj(x=x, y=y, z=z)
 
 
+class Point:
+    def __init__(self, x, y, z):
+        self.x, self.y, self.z = x, y, z
+
+    def copy(self):
+        return Point(self.x, self.y, self.z)
+
+    def transformBy(self, matrix):
+        self.x, self.y, self.z = matrix.point(self.x, self.y, self.z)
+        return True
+
+
 class GeometryTests(unittest.TestCase):
     def setUp(self):
         self.core = Obj(Vector3D=Obj(create=vector),
@@ -18,8 +30,12 @@ class GeometryTests(unittest.TestCase):
                         Cylinder=Obj(cast=lambda geo: geo if getattr(geo, 'kind', '') == 'cylinder' else None),
                         Circle3D=Obj(cast=lambda geo: geo if getattr(geo, 'kind', '') == 'circle' else None))
         self.body = Obj(revisionId='r1', faces=Collection(), isSolid=True)
+        root = Obj()
+        root.parentDesign = Obj(rootComponent=root)
+        self.body.parentComponent = root
         self.cam = Obj()
         self.app = Obj(measureManager=Obj(getOrientedBoundingBox=lambda body, x, y: Obj(length=6, width=4, height=.8, centerPoint=vector(3,2,.4))))
+        self.app.pointTolerance = 1e-6
         self.geo = DfmGeometry(self.body, self.app, self.core, self.cam)
 
     def test_rotational_surface_checks_trimming_and_axis_not_only_cylinder_type(self):
@@ -39,6 +55,89 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual([i['status'] for i in second['items']],['nonrotational','unknown'])
         self.assertIsNone(second['nextOffset'])
         self.assertAlmostEqual(first['modelingTolerance_mm'],1e-5)
+
+    def test_face_distance_uses_actual_faces_and_returns_native_endpoints_in_mm(self):
+        first, second = Obj(name='trimmed first'), Obj(name='trimmed second')
+        self.body.faces = Collection(first, second)
+        received = []
+        def measure(a, b):
+            received.append((a, b))
+            return Obj(value=.04, positionOne=Point(.2, .5, .3), positionTwo=Point(.24, .5, .3))
+        self.app.measureManager.measureMinimumDistance = measure
+        result = self.geo.face_distance(0, 1)
+        self.assertEqual(received, [(first, second)])
+        self.assertEqual(result['status'], 'measured')
+        self.assertAlmostEqual(result['distance_mm'], .4)
+        self.assertEqual(result['closestPoints_mm'], [[2, 5, 3], [2.4, 5, 3]])
+        self.assertEqual(result['faceIndices'], [0, 1])
+        self.assertEqual(result['revision'], 'r1')
+        self.assertAlmostEqual(result['modelingTolerance_mm'], 1e-5)
+        self.assertNotIn('thickness_mm', result)
+        self.app.measureManager.measureMinimumDistance = lambda a, b: Obj(value=0, positionOne=Point(0,0,0), positionTwo=Point(0,0,0))
+        self.assertEqual(self.geo.face_distance(0, 1)['distance_mm'], 0)
+
+    def test_face_distance_failure_does_not_become_zero_or_an_infinite_plane_measurement(self):
+        self.body.faces = Collection(Obj(), Obj())
+        for result in (None, Obj(value=float('nan')), Obj(value=-1), Obj(value=True),
+                       Obj(value=.1, positionOne=None, positionTwo=vector(0,0,0))):
+            self.app.measureManager.measureMinimumDistance = lambda a, b: result
+            measured = self.geo.face_distance(0, 1)
+            self.assertEqual(measured['status'], 'unknown')
+            self.assertNotIn('distance_mm', measured)
+        def unsupported(a, b):
+            raise RuntimeError('Unsupported native faces')
+        self.app.measureManager.measureMinimumDistance = unsupported
+        self.assertIn('Unsupported native faces', self.geo.face_distance(0, 1)['reason'])
+
+    def test_component_face_distance_uses_proxy_and_inverse_rigid_placement(self):
+        root = self.body.parentComponent
+        component = Obj(parentDesign=root.parentDesign)
+        self.body.parentComponent = component
+        inverse = Obj(invert=lambda: True, point=lambda x,y,z: (y+3, 7-x, z-2))
+        placement = Obj(getAsCoordinateSystem=lambda: (Point(7,-3,2), vector(0,1,0), vector(-1,0,0), vector(0,0,1)),
+                        copy=lambda: inverse, isEqualTo=lambda other: other is placement)
+        occurrence = Obj(isValid=True, transform2=placement)
+        root.allOccurrencesByComponent = lambda selected: Collection(occurrence) if selected is component else Collection()
+        proxies = [Obj(name='first proxy'), Obj(name='second proxy')]
+        self.body.faces = Collection(*(Obj(createForAssemblyContext=lambda o, p=p: p if o is occurrence else None) for p in proxies))
+        calls = []
+        def measure(a,b):
+            calls.append((a,b))
+            return Obj(value=.04, positionOne=Point(6.5,-2.8,2.3), positionTwo=Point(6.5,-2.76,2.3))
+        self.app.measureManager.measureMinimumDistance = measure
+        result = self.geo.face_distance(0,1)
+        self.assertEqual(calls, [tuple(proxies)])
+        self.assertEqual(result['status'], 'measured')
+        for actual, expected in zip(result['closestPoints_mm'][0], (2,5,3)):
+            self.assertAlmostEqual(actual, expected)
+        for actual, expected in zip(result['closestPoints_mm'][1], (2.4,5,3)):
+            self.assertAlmostEqual(actual, expected)
+        placement.isEqualTo = lambda other: False
+        self.assertIn('placement changed', self.geo.face_distance(0,1)['reason'])
+        placement.getAsCoordinateSystem = lambda: (Point(0,0,0),vector(2,0,0),vector(0,1,0),vector(0,0,1))
+        self.assertIn('rigid', self.geo.face_distance(0,1)['reason'])
+        self.assertEqual(len(calls), 2)
+        root.allOccurrencesByComponent = lambda selected: Collection()
+        self.assertIn('No root-context occurrence', self.geo.face_distance(0,1)['reason'])
+
+    def test_face_distance_rejects_bad_indices_and_changed_or_cancelled_measurements(self):
+        self.body.faces = Collection(Obj(), Obj())
+        for pair in ((0, 0), (-1, 1), (0, 2), (True, 1), (0, 1.0)):
+            with self.assertRaisesRegex(ValueError, 'two distinct'):
+                self.geo.face_distance(*pair)
+        def change(a, b):
+            self.body.revisionId = 'r2'
+            return Obj(value=.1, positionOne=Point(0,0,0), positionTwo=Point(.1,0,0))
+        self.app.measureManager.measureMinimumDistance = change
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.geo.face_distance(0, 1)
+        self.body.revisionId = 'r1'
+        def cancel(a, b):
+            self.geo.cancelled = lambda: True
+            raise RuntimeError('Native failure after cancellation')
+        self.app.measureManager.measureMinimumDistance = cancel
+        with self.assertRaisesRegex(ValueError, 'cancelled'):
+            self.geo.face_distance(0, 1)
 
     def test_sheet_rule_is_metadata_and_imported_solids_are_not_assumed_foldable(self):
         rule=Obj(name='Fixture',thickness=Obj(value=.2),gap=Obj(value=.02),kFactor=.4)
