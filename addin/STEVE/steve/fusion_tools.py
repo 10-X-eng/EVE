@@ -22,6 +22,7 @@ from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
 from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body
 from .dfm_geometry import DfmGeometry
+from .rmfg_snapshot import export_snapshot
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
 
@@ -187,7 +188,7 @@ class FusionTools:
 
     def check_command(self, tool):
         state = self.command_state()
-        if tool in ("fusion_query_python", "fusion_capture_viewport", "fusion_dfm_plan", "fusion_dfm_check"):
+        if tool in ("fusion_query_python", "fusion_capture_viewport", "fusion_dfm_plan", "fusion_dfm_check", "fusion_rmfg"):
             return state["readAllowed"]
         if state["readAllowed"] and not state["executionAllowed"]:
             raise ToolError("electronics_selection_read_only",
@@ -302,6 +303,19 @@ class FusionTools:
         return {'ok': True, 'body': body.name, 'partToken': body.entityToken,
                 'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',
                 'scope': 'Native body definition. Occurrence placement, assembly context and build orientation require explicit checks.'}
+
+    def rmfg_snapshot(self, arguments):
+        context = self.context()
+        body, key, plan = self.dfm_target(arguments, context)
+        if not plan or not any(stage['process'] == 'sheet_metal' for stage in plan['stages']):
+            raise ToolError('dfm_plan_required', 'RMFG checks require a saved sheet_metal stage for the intended body.')
+        if arguments['action'] == 'prepare':
+            return export_snapshot(body, context['design'], key)
+        binding = arguments['_binding']
+        resolved = context['design'].findEntityByToken(binding['partToken'])
+        if key != binding['documentKey'] or len(resolved) != 1 or native_body(resolved[0]) != body:
+            raise ToolError('dfm_target_unavailable', 'This RMFG job belongs to a different or unavailable part.')
+        return {'ok': True, 'snapshotMatches': body.revisionId == binding['revision']}
 
     def verify(self, job, result):
         if "before" not in job:
@@ -562,6 +576,11 @@ class FusionTools:
             elif job["tool"] == "fusion_dfm_plan":
                 self.check_target(job)
                 self.finish(job, self.dfm_plan(job['arguments']))
+            elif job['tool'] == 'fusion_rmfg':
+                self.check_target(job)
+                if not self.check_command('fusion_rmfg'):
+                    raise ToolError('active_command', 'Finish the active Fusion command before preparing this check.')
+                self.finish(job, self.rmfg_snapshot(job['arguments']))
             else:
                 self.check_target(job)
                 if not self.check_command(job["tool"]):

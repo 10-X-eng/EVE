@@ -51,8 +51,8 @@ and command-wait limitations remain the same as the ordinary query tool.
 No universal manufacturing limits are built in. Actual profiles and requirements
 must supply them. A passing dimensional check does not prove tool access,
 fixture clearance, strength, successful printing, or full manufacturability.
-RMFG integration is planned separately; there is no account connection or upload
-in this first block.
+Optional RMFG sheet-metal checks are described in [RMFG.md](RMFG.md). Native
+checks remain available without a supplier account or geometry upload.
 
 ## Validation
 
@@ -73,8 +73,11 @@ The live cylindrical-wall helper measured 4 mm diameter, 5 mm axial span and
 40 x 60 x 8 mm with swapped build axes. Native hole recognition required an
 inactive Manufacturing Extension on this installation and correctly returned
 unknown. Successful native recognition is currently covered by contract fixtures,
-not a live entitled run. Planar overhangs have analytic unit fixtures; their live
-test and the printer-orientation report comparison are still pending.
+not a live entitled run. Live planar-overhang checks found the blind-hole ceiling
+and the lowest horizontal face, distinguishing the possible bed-contact face.
+The rotated 40 x 60 x 8 mm envelope failed a 62 x 45 x 10 mm printer envelope;
+the 60 x 40 x 8 mm orientation passed those dimensional comparisons. Curved
+overhang coverage remained explicitly unsupported.
 
 This is direct integration evidence, not a model-driven design benchmark or
 macOS live qualification. Broader process fixtures, paired DFM-off/on tasks,

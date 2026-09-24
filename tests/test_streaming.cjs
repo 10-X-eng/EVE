@@ -105,6 +105,15 @@ const runChecks = async () => {
       document.getElementById('job-pause').click(); await frame();
       check(jobCalls.some(c=>c.action==='job' && c.payload.command==='pause'), 'Pause was sent as model text');
       snapshot.busy=false; snapshot.job.status='paused'; send(); await frame();
+      snapshot.dfmEnabled=true; snapshot.rmfgState='connected';
+      snapshot.rmfgUpload={id:'fixture-job',body:'Bracket <script>',bytes:2048};
+      send(); await frame();
+      check(!document.getElementById('rmfg-upload').hidden, 'Upload approval must be visible outside the account menu');
+      check(document.getElementById('rmfg-upload-detail').textContent.includes('Bracket <script>'), 'Upload lost the exact part name');
+      document.getElementById('rmfg-approve').click(); await frame();
+      check(jobCalls.at(-1).action==='rmfgUploadDecision' && jobCalls.at(-1).payload.jobId==='fixture-job' && jobCalls.at(-1).payload.approved===true, 'Upload approval was not bound to its job');
+      snapshot.rmfgUpload=null; send(); await frame();
+      check(document.getElementById('rmfg-upload').hidden, 'Completed approval stayed visible');
       document.getElementById('job-budget').value='70000';
       document.getElementById('job-resume').click(); await frame();
       check(jobCalls.at(-1).payload.command==='resume' && jobCalls.at(-1).payload.tokenBudget===70000, 'Resume lost budget');

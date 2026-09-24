@@ -6,9 +6,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>STEVE · Your engineering partner</title>
   <link rel="stylesheet" href="style.css?v=2">
-  <link rel="stylesheet" href="fusion.css?v=16">
+  <link rel="stylesheet" href="fusion.css?v=17">
   <script src="images.js?v=2" defer></script>
-  <script src="panel.js?v=24" defer></script>
+  <script src="panel.js?v=25" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -48,6 +48,16 @@
       <div class="debug-settings">
         <label class="debug-toggle" for="dfm-enabled"><span>DFM <small>Experimental</small></span><input id="dfm-enabled" type="checkbox" role="switch" aria-describedby="dfm-note"></label>
         <p id="dfm-note">Consider manufacturing while designing and check measured geometry. Tell STEVE how the part will be made. Finish or pause a task before changing this setting.</p>
+        <div id="rmfg-settings" hidden>
+          <strong>RMFG sheet metal · Experimental</strong>
+          <p>Optional supplier checks. Connect your RMFG account here. Each geometry upload asks for your approval; connecting alone uploads nothing. No purchases or orders.</p>
+          <p id="rmfg-status" role="status"></p>
+          <p id="rmfg-code" hidden></p>
+          <button id="rmfg-connect" class="secondary-button">Connect RMFG</button>
+          <button id="rmfg-refresh" class="secondary-button">Check RMFG connection</button>
+          <button id="rmfg-cancel" class="secondary-button" hidden>Cancel sign-in</button>
+          <button id="rmfg-disconnect" class="text-button" hidden>Disconnect RMFG</button>
+        </div>
       </div>
       <div class="debug-settings">
         <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
@@ -107,6 +117,13 @@
       <div id="thinking" class="thinking" role="status" hidden><span></span><span></span><span></span><label>STEVE is working</label></div>
     </main>
     <footer class="composer-area">
+      <section id="rmfg-upload" class="rmfg-upload" aria-label="RMFG upload approval" hidden>
+        <strong>Send this part to RMFG?</strong>
+        <p id="rmfg-upload-detail"></p>
+        <p>Uploads this folded STEP snapshot to RMFG for sheet-metal analysis. No quote, purchase or order.</p>
+        <button id="rmfg-approve" type="button" class="secondary-button">Upload to RMFG</button>
+        <button id="rmfg-decline" type="button" class="text-button">Decline</button>
+      </section>
       <button id="job-strip" class="job-strip" type="button" aria-label="Manage current job" hidden><span aria-hidden="true">◎</span><span id="job-strip-title"></span><span id="job-strip-status"></span></button>
       <div id="task-target" class="task-target" role="status" hidden></div>
       <div id="tool-activity" class="tool-activity" role="status" aria-live="polite" aria-atomic="true" hidden>

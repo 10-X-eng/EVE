@@ -22,7 +22,7 @@ GUIDES = {
     },
     'sheet_metal': {
         'checks': 'Read native thickness and sheet-metal rule, bends and existing flat pattern. Compare supported radii, flange/relief dimensions and hole-to-bend/edge distances with a sourced material/tool profile and explicit distance convention. Respect cutting/forming/machining order.',
-        'unchecked': 'Flat pattern creation is a modification. Bend sequence, springback, tooling collision and imported-solid unfolding require additional validation. RMFG is not connected by this tool.',
+        'unchecked': 'Flat pattern creation is a modification. Bend sequence, springback, tooling collision and imported-solid unfolding require additional validation. Optional RMFG supplier analysis uses rmfg_materials and fusion_rmfg, requires connection and explicit UI approval for each exported snapshot; native checks need no supplier connection.',
     },
     'fdm': {
         'checks': 'Establish FDM/FFF printer, material, orientation, nozzle/extrusion settings and supports. Compare dimensions in the proposed build frame with its envelope; measure supported walls/features/clearances against that profile. Overhang checks depend on build direction.',
