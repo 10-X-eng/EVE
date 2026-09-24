@@ -74,7 +74,7 @@ def guide(process=None):
             "context['dfm'].measurements.enclosed_voids(lump_index=0, offset=0, limit=10): closed native void shells and enclosed volume_mm3 for resin/powder entrapment screening. Inspect every page/lump; absence is NOT proof of drainage, escape-hole sizing, flow, orientation or no suction cups. Do not transfer resin/powder assumptions to FDM or open holes in intentionally sealed parts",
             "context['dfm'].measurements.holes(offset=0, limit=10): native recognized holes/segments or status unknown when API/extension unavailable; honor warnings and segmentsComplete",
             "context['dfm'].measurements.pockets(attack_direction, offset=0, limit=10): native pocket depths for a downward tool direction; may require an extension; no inferred corner radius or tool clearance",
-            "context['dfm'].measurements.planar_overhangs(x_axis, y_axis, offset=0, limit=10): downward planar faces; tilt is 0 degrees for a horizontal underside, 90 for a vertical wall. Lowest horizontal faces are potential bed contact, not automatically unsupported; curved surfaces remain unassessed",
+            "context['dfm'].measurements.planar_overhangs(x_axis, y_axis, offset=0, limit=10): downward planar faces of solid bodies; open surfaces return unknown. Check status before using items. Tilt is 0 degrees for a horizontal underside, 90 for a vertical wall. Lowest horizontal faces are potential bed contact, not automatically unsupported; curved surfaces remain unassessed",
         ],
         'limits': 'Read-only Python, at most 24 findings. Query actual state, not desired dimensions. Measurements and criteria are not independently certified. A checked report covers only its listed checks and geometry revision.',
     }
