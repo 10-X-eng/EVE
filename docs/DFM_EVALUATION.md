@@ -309,6 +309,52 @@ References: [temporary B-Rep file import](https://help.autodesk.com/cloudhelp/EN
 [temporary B-Rep export](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_TemporaryBRepManager_exportToFile.htm),
 [ImportManager command-event limitation](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_ImportManager_importToTarget.htm).
 
+## Paired base-body pocket repair
+
+A third paired model task used two fresh base-body copies of the rounded pocket,
+without source sketch parameters. Both received the same confirmed R3 requirement
+and permission to change only the four R1 corner blends, retaining the 40 × 30 ×
+10 mm outer block, pocket bounds X=10..30 / Y=10..20 mm, floor Z=5 mm and opening
+Z=10 mm. Both used GPT-6-Astra at medium effort with the same 24-call/300-second
+limits and STEVE instructions/tool definitions through the development adapter.
+
+| DFM | Tool calls | Observed elapsed time | Independent geometry outcome |
+| --- | --- | --- | --- |
+| Off | 14 | 71.531 seconds | Passed |
+| On | 15 | 92.907 seconds | Passed |
+
+Both healed the old corner blends and created editable R3 fillets. Independent
+checks read native geometry directly, without using the generating model's check
+report or DFM measurement helpers: all four quarter-cylinder radii, axes, positions,
+areas and depth bounds; outer bounds; flat-floor bounds; topology; and analytic
+remaining volume **11038.628330588459 mm³** matched. All pre-existing fixture
+bodies remained unchanged. This verifier is specific to this analytic shape and
+is not a general equivalence or manufacturing-certification algorithm.
+
+The enabled run saved the sourced radius requirement and checked the edited
+revision, retaining unknown tooling, reach, collision, workholding and manufactured
+accuracy. Its nominal R3 measurements were `3.0000000000000004` mm; the disclosed
+binary64 boundary handling correctly avoided a false concern. Both runs reported
+unchecked manufacturing conditions and neither saved/exported/uploaded a document.
+
+This is another successful design/edit/recheck integration case, **not evidence of
+better generated geometry with DFM enabled**: both repaired the part correctly,
+and the enabled run was slower in this one pair. The development adapter does not
+provide viewport capture; each run requested it once and received an unsupported
+response. The off run also recovered from one missing API-class lookup. Those
+calls are included in the counts; timings are observations, not a performance
+benchmark. A manufacturing-reviewed held-out corpus remains necessary.
+
+Reproduce with the existing disposable rounded-pocket fixture. This command creates
+and edits two additional test components:
+
+```text
+python scripts/dfm_model_probe.py --mcp-url <your-loopback-MCP-URL> --pocket-repair
+```
+
+`--pocket-repair` and `--repair` are mutually exclusive. Local traces include the
+scenario, elapsed time, generated tool calls and independent verification results.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
