@@ -298,7 +298,10 @@ class FusionTools:
         context = self.context()
         body, key, plan = self.dfm_target(arguments, context)
         if 'stages' in arguments:
-            self.dfm.save_plan(key, body, context['design'], arguments['stages'])
+            if arguments['stages'] == []:
+                self.dfm.clear_plan(key, body, context['design'])
+            else:
+                self.dfm.save_plan(key, body, context['design'], arguments['stages'])
             plan = self.dfm.plan(key, body, context['design'])
         return {'ok': True, 'body': body.name, 'partToken': body.entityToken,
                 'plan': plan, 'persistence': 'session' if key.startswith('session:') else 'local',

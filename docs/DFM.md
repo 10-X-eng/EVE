@@ -12,6 +12,10 @@ STEVE can retain ordered process stages for each native body, with material,
 notes and sourced numeric criteria. A part can be turned and then cross-drilled;
 an assembly can contain parts made by different processes. Intent is supplied
 through conversation, without a manufacturing-plan editor.
+Ask STEVE to forget a selected part's manufacturing plan when it is no longer
+applicable. This clears that native part's shared plan, including its repeated
+instances, while retaining other parts and documents. Turning DFM off alone
+retains plans for later use.
 
 Saved-document plans persist locally across STEVE restarts. Unsaved-document
 plans last only this session. Plans do not travel with shared Fusion documents.
@@ -21,7 +25,8 @@ replaced body is not silently substituted.
 
 ## What is implemented
 
-- `fusion_dfm_plan`: read/save bounded per-body context without editing Fusion.
+- `fusion_dfm_plan`: read/save bounded per-body context, or clear a requested
+  part's plan with `stages=[]`, without editing Fusion.
 - `fusion_dfm_check`: run read-only inspection code through STEVE's pinned Fusion
   execution path and return a report from measured comparisons.
 - `fusion_api_help` at `steve.dfm` or `steve.dfm.<process>`: retrieve calling

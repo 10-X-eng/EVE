@@ -113,6 +113,81 @@ model runs requested a final viewport image and received an unsupported-tool res
 The model was able to finish using measured geometry. This development adapter is
 not a security sandbox or a substitute for testing the add-in's normal UI queue.
 
+## Repeated and nested assembly fixtures
+
+A mixed-body component contained a **2 × 1 × 0.125 inch** plate and a separate
+turning body. Two more instances repeated that definition: one translated and
+rotated 90° about Z, and one nested under a rotated parent with a second 90°
+rotation. A temporary process store resolved all three plate proxies to the same
+ordered plan, while preserving the other body's independent turning plan.
+
+The test explicitly mapped an assembly build frame into native body coordinates
+using each root-context occurrence's inverse `transform2`. Against a supplied
+60 × 30 × 5 mm envelope, the original and 180° nested instance measured
+50.8 × 25.4 × 3.175 mm and fit. The 90° instance measured
+25.4 × 50.8 × 3.175 mm and exceeded Y. Independently expected translated bounds
+matched each proxy; all pre-existing body revisions were unchanged.
+
+The reproducible developer fixture is `scripts/fusion_assembly_dfm_smoke.py`.
+This validates plan ownership, inch conversion and explicit frame handling. It
+does not qualify arbitrary mixed-process sequences, assembly collision clearance,
+or automatic print orientation selection. Guidance now gives the tested frame
+conversion steps instead of relying on the model to infer them.
+
+Reference: [Autodesk occurrence transforms](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_Occurrence_transform2.htm)
+and [assembly proxies](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/ComponentsProxies_UM.htm).
+
+A separate two-instance regression reproduced lost saved plans and a reverted
+remembered switch when a stale store overwrote another instance's file. Plan
+reads/writes now refresh persistent data under a nonblocking process lock; writes
+use unique temporary files and atomic replacement. Unsaved-document plans stay
+local, and another instance's preference change does not toggle an active task.
+Tests cover interleaved saves, preserved preferences, lock contention and retry.
+The exact live repaired-part check also passed through the updated store.
+
+The plan tool also supports an explicit requested clear with `stages=[]`. Store
+and queue tests verify native/proxy identity, preservation of other parts and
+documents, idempotence and missing-plan recovery on the next check. A live Fusion
+temporary plan was saved, cleared and read back as absent with unchanged geometry.
+
+## Stepped turning fixture
+
+`scripts/fusion_turned_profile_smoke.py` creates a separate full-revolve fixture:
+outside bands Ø20 × 10 mm, Ø15 × 10 mm, Ø12 × 2 mm (groove floor), and
+Ø15 × 18 mm, with a Ø4 × 40 mm axial through bore. All five native cylindrical
+bands matched independently specified dimensions, including when read in pages
+of two. Its measured volume matched the analytic radial-profile volume
+**7813.140929478 mm³**. All ten faces were compatible with the intended axis;
+an axis offset by 1 mm correctly produced nonrotational evidence.
+
+The same measured maximum outside diameter was checked against explicit fixture
+limits of 19, 20 and 21 mm: concern, pass and pass, respectively. Unspecified
+workholding, stock, approach, reach and groove-tool fit remained unknown in every
+report. These are synthetic supplied limits, not general turning recommendations.
+All pre-existing bodies and the checked fixture's revision were unchanged by
+inspection. This extends measured feature coverage; it does not prove a safe
+turning setup, tool fit, imported-geometry coverage or improved generated parts.
+
+## Local additive wall samples
+
+`scripts/fusion_wall_samples_smoke.py` creates a stepped plate with independently
+known **0.8, 1.2 and 2 mm** thick regions. The normal-ray helper measured all three
+correctly. A separate deliberately overlapping body was placed on the thick
+region's ray; a direct native ray query confirmed that the neighbor was hit before
+the target body's exit. The helper correctly ignored it and measured 2 mm.
+
+Supplied synthetic test limits exercise FDM, resin and powder report paths without
+claiming material or supplier rules. The respective 1.2/0.8/1.5 mm test limits
+produced concern/pass/pass, pass/pass/pass and concern/concern/pass at the three
+sample points. The test script explicitly added unknown coverage for unsampled
+regions; the report retained that unknown even when all three samples passed.
+This is a native measurement/report-contract test, not a real-model trial or
+proof that every generated inspection script will include sufficient coverage.
+
+All pre-existing body revisions and both checked fixture bodies were unchanged by
+inspection. Sampled wall thickness is not a global minimum, a validated print
+profile, a strength calculation or slicer certification.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

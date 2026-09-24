@@ -58,6 +58,51 @@ class DfmTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_stages(invalid)
 
+    def test_two_instances_preserve_each_others_saved_plans_and_switch(self):
+        other = DfmStore(self.folder.name)
+        self.store.set_enabled(True)
+        self.store.save_plan('first-document', self.body, self.design, stages())
+        other.save_plan('second-document', self.body, self.design, [{'process':'turning'}])
+        loaded = DfmStore(self.folder.name)
+        self.assertTrue(loaded.enabled, 'Saving a plan must not overwrite the remembered switch from another instance')
+        self.assertIsNotNone(loaded.plan('first-document', self.body, self.design))
+        self.assertEqual(self.store.plan('second-document', self.body, self.design)['stages'], [{'process':'turning'}])
+        other.set_enabled(False)
+        self.assertIsNotNone(DfmStore(self.folder.name).plan('first-document', self.body, self.design))
+        self.assertTrue(self.store.enabled, 'Remote preferences must not toggle an active task')
+
+    def test_contended_plan_write_fails_without_clobbering_or_waiting(self):
+        other = DfmStore(self.folder.name)
+        self.store.save_plan('doc', self.body, self.design, stages())
+        with self.store._guard.locked():
+            with self.assertRaisesRegex(RuntimeError, 'saving DFM plans'):
+                other.save_plan('doc', self.body, self.design, [{'process':'turning'}])
+        self.assertEqual(other.plan('doc', self.body, self.design)['stages'], stages())
+        other.save_plan('doc', self.body, self.design, [{'process':'turning'}])
+        self.assertEqual(self.store.plan('doc', self.body, self.design)['stages'], [{'process':'turning'}])
+
+    def test_clear_resolves_native_identity_and_preserves_other_documents(self):
+        self.store.set_enabled(True)
+        self.store.save_plan('first-document',self.body,self.design,stages())
+        self.store.save_plan('second-document',self.body,self.design,[{'process':'turning'}])
+        self.store.save_plan('session:temporary',self.body,self.design,stages())
+        neighbor=Obj(entityToken='neighbor',revisionId='other',name='Other part',nativeObject=None)
+        resolve=self.design.findEntityByToken
+        self.design.findEntityByToken=lambda token: [neighbor] if token=='neighbor' else resolve(token)
+        self.store.save_plan('first-document',neighbor,self.design,[{'process':'resin'}])
+        proxy = Obj(nativeObject=self.body,entityToken='instance-token')
+        self.body.entityToken='new-token'
+        other=DfmStore(self.folder.name)
+        self.assertTrue(other.clear_plan('first-document',proxy,self.design))
+        self.assertIsNone(self.store.plan('first-document',self.body,self.design))
+        self.assertFalse(other.clear_plan('first-document',self.body,self.design))
+        self.assertEqual(other.plan('first-document',neighbor,self.design)['stages'],[{'process':'resin'}])
+        self.assertTrue(other.clear_plan('first-document',neighbor,self.design))
+        self.assertNotIn(self.store._key('first-document'),other._plans)
+        self.assertEqual(self.store.plan('second-document',self.body,self.design)['stages'],[{'process':'turning'}])
+        self.assertIsNotNone(self.store.plan('session:temporary',self.body,self.design))
+        self.assertTrue(DfmStore(self.folder.name).enabled)
+
     def checks(self, stage=None):
         return DfmChecks(self.body, stage or stages()[0])
 
