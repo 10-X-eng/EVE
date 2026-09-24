@@ -582,3 +582,27 @@ their respective platforms. A local native STEP export passed without changing
 geometry or uploading it. Actual RMFG browser authorization and a supplier report
 for formed sheet metal are still pending. macOS Fusion behavior itself has not
 been tested by these Windows live runs.
+
+## Machine currency across a complete plan
+
+A regression reproduced a mismatch between fresh reports and historical plan
+bindings: changing/removing the machine definition referenced by another stage
+left the running check's configuration marked current, while a plan read returned
+stale/unknown. Both paths now use the same complete-plan machine currency check.
+Changed definitions invalidate findings as stale; missing/invalid definitions
+leave findings unknown and the report incomplete. Measurements, original limits
+and assessed plan hashes remain intact, and generated code executes only once.
+
+Queue/runner tests change real temporary JSON definitions after measurement,
+covering references before/after the checked stage, missing/invalid definitions
+and an unrelated catalog change that must not invalidate the plan. The bridge
+test imports were also ordered so an isolated test run patches the same catalog
+module used by the runner, removing a dependency on full-suite import order.
+
+On live Fusion 2705.1.25, an unchanged 60 mm fixture measurement remained checked
+with unchanged definitions, became stale when a later stage's definition changed,
+and became incomplete/unknown when that definition disappeared. All three cases
+agreed with their subsequent historical bindings, preserved the original plan
+hash, and executed once. Every body revision remained unchanged; only isolated
+temporary test definitions were modified. This validates report currency rather
+than manufacturing capability or physical machine configuration.
