@@ -12,7 +12,7 @@ Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your
 
 For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
 
-> **Preview 0.4.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.5.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What STEVE can do
 
@@ -22,14 +22,16 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 - **Query your actual design.** Inspect geometry, measure entities, examine parameters, and verify changes. A dedicated query tool makes reading the document the default when you ask a question.
 - **Work with CAM context.** Inspect setups, assigned machines, document tools, and accessible local or cloud tool libraries before choosing how to approach an operation.
 - **Find and assemble existing designs.** Search projects and folders accessible through your Autodesk session, identify matching files, and insert selected designs into assemblies through Fusion's API.
-- **Read the right documentation.** Discover classes, methods, and signatures from your installed Fusion API, with live web search available for public documentation and examples.
+- **Read the right documentation.** Search installed API classes and official samples, inspect exact signatures, and fetch Autodesk API references through tools available to every provider.
+- **Inspect each Fusion product.** Bounded summaries expose Design structure and feature health, CAM setup and operation state, and the Electronics information available through the installed API.
+- **Check measured outcomes.** STEVE can report measured checks and feature-health changes separately from whether its Python completed. Missing coverage and failed checks remain visible.
 
 ### Show STEVE what you mean
 
 - **Selection context, automatically.** Select a face, body, sketch, or component and ask about “this.” Each request includes a snapshot of the selection and Data Panel scope.
 - **Paste reference images.** Use **Ctrl+V** (Windows) or **⌘V** (macOS) in the message box, or **Attach images**, to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
 - **Images during a task.** Send an image with text, on its own, or as a correction while STEVE is already working. Up to four PNG, JPEG, or WebP images can accompany each message.
-- **Visual verification.** STEVE can capture the model viewport and inspect the image alongside API results to check what it has made.
+- **Visual verification.** STEVE can capture named views and close-ups of a selected entity, then restore your camera. Images complement measurements and other API checks.
 - **Revisit earlier pictures.** STEVE can list and reopen saved attachments and viewport captures from the same chat. Images indexed by this version remain available when that chat is reopened; older captures are identified as historical rather than current model state.
 
 ### Stay in control of the conversation
@@ -97,7 +99,7 @@ Choose **Ollama (local)** to use a model running on your computer, with no sign-
 
 Get the complete Windows package from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `STEVE-0.4.0-windows-x64.zip` package:
+With an `STEVE-0.5.0-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -108,7 +110,7 @@ With an `STEVE-0.4.0-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `STEVE-0.4.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `STEVE-0.5.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
 2. Save your work and quit Fusion.

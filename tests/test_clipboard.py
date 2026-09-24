@@ -67,9 +67,13 @@ class ClipboardTests(unittest.TestCase):
                 else:
                     fixture += "$png = New-Object System.IO.MemoryStream; $fixture.Save($png, [System.Drawing.Imaging.ImageFormat]::Png); $png.Position = 0; $data.SetData('PNG', $png)"
                 script = clipboard.WINDOWS_READER.replace("$data = [System.Windows.Forms.Clipboard]::GetDataObject()", fixture)
-                with patch.object(clipboard, "WINDOWS_READER", script):
+                with patch.object(clipboard, "WINDOWS_READER", script), \
+                        patch.object(clipboard.subprocess, "run", wraps=subprocess.run) as runner:
                     result = clipboard.read_clipboard_image()
                 self.assertTrue(result["url"].startswith("data:image/png;base64,"))
+                runner.assert_called_once()
+                self.assertEqual(runner.call_args.kwargs["timeout"], 30)
+                self.assertEqual(runner.call_args.kwargs["creationflags"], subprocess.CREATE_NO_WINDOW)
 
 
 if __name__ == "__main__":
