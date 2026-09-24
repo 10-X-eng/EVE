@@ -52,13 +52,28 @@ into minimum wall thickness, or nominal print volume into successful printing.
 Unknown capabilities must remain absent and documented, not assigned guessed
 defaults. Definitions are data; loading them executes no plugin code or requests.
 
-This initial catalog includes separately sourced nominal build envelopes for
-[Original Prusa MK4S](https://www.prusa3d.com/product/original-prusa-mk4s-kit/) and
-the [original Prusa CORE One](https://blog.prusa3d.com/introducing-prusa-core-one-fully-enclosed-corexy-3d-printer-with-active-temperature-control_105477/).
-Their XYZ envelopes are 250/210/220 and 250/220/270 mm respectively. They do not
-define material/nozzle-specific wall, overhang, support, strength or clearance
-rules. No CNC, sheet-metal, resin or powder machine is bundled yet; the loader
-supports those processes without inventing a machine profile for them.
+The catalog includes these separately sourced nominal XYZ envelopes:
+
+| Definition | Process | Nominal XYZ (mm) | Manufacturer reference |
+| --- | --- | --- | --- |
+| `prusa-mk4s` | FDM | 250 / 210 / 220 | [Original Prusa MK4S](https://www.prusa3d.com/product/original-prusa-mk4s-kit/) |
+| `prusa-core-one` | FDM | 250 / 220 / 270 | [Original CORE One](https://blog.prusa3d.com/introducing-prusa-core-one-fully-enclosed-corexy-3d-printer-with-active-temperature-control_105477/) |
+| `formlabs-form-4` | Resin | 200 / 125 / 210 | [Form 4 build volume](https://formlabs.com/support/What-is-the-build-volume-of-the-Form-3L-and-Form-3BL/) |
+| `formlabs-fuse-1-plus-30w` | Polymer SLS | 165 / 165 / 300 | [Fuse 1+ 30W specifications](https://formlabs.com/3d-printers/fuse-1/tech-specs/) |
+
+These files do not define material-specific wall, support, strength or clearance
+rules. No CNC or sheet-metal machine is bundled yet. Resin and powder definitions
+cannot be selected for FDM (or vice versa); the powder entry specifically covers
+polymer SLS, not MJF or metal processes. Technology/material compatibility still
+requires confirmation; the broad `powder` stage category alone does not prove it.
+
+The Fuse entry describes chamber dimensions, not guaranteed printable dimensions.
+Formlabs documents material/settings-dependent compensation and 16 mm inside
+corner radii: a full-width square cannot fit even though its XYZ box equals the
+nominal dimensions. Review the [usable-volume restrictions](https://formlabs.com/support/What-is-the-build-volume-of-the-Form-3L-and-Form-3BL/)
+and verify the actual job in PreForm. Those restrictions stay in the definition's
+unverified coverage; STEVE does not implement rounded-chamber containment or
+PreForm validation. A nominal comparison alone is not a printability result.
 
 ## Updates and historical reports
 

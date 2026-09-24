@@ -1,0 +1,41 @@
+{
+  "id": "formlabs-form-4",
+  "name": "Formlabs Form 4",
+  "manufacturer": "Formlabs",
+  "revision": "1",
+  "processes": [
+    "resin"
+  ],
+  "verified_on": "2026-09-24",
+  "sources": {
+    "specifications": "https://formlabs.com/support/What-is-the-build-volume-of-the-Form-3L-and-Form-3BL/"
+  },
+  "capabilities": {
+    "nominal_build_x": {
+      "value": 200,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Form 4 part extent along build X; excludes supports, raft, placement and setup allowances. Not a printability result."
+    },
+    "nominal_build_y": {
+      "value": 125,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Form 4 part extent along build Y; excludes supports, raft, placement and setup allowances. Not a printability result."
+    },
+    "nominal_build_z": {
+      "value": 210,
+      "units": "mm",
+      "relation": "<=",
+      "source": "specifications",
+      "scope": "Nominal Form 4 part extent along build Z; excludes supports, raft, placement and setup allowances. Not a printability result."
+    }
+  },
+  "unverified": [
+    "Confirm the installed Form 4, resin, build platform, orientation and print settings; this is not a Form 4L definition.",
+    "No resin-specific wall, clearance, support, drainage, suction-cup, cure or strength limits are defined.",
+    "Usable placement and the complete supported job require PreForm verification; no physical print is qualified."
+  ]
+}

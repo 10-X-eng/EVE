@@ -124,5 +124,35 @@ class MachineTests(unittest.TestCase):
             machines.load('prusa-mk4s')
 
 
+class BundledAdditiveMachineTests(unittest.TestCase):
+    def test_resin_and_polymer_sls_limits_keep_process_and_scope(self):
+        body = Obj(entityToken='fixture', nativeObject=None, revisionId='r1', name='Fixture')
+        for machine_id, process, limits in (
+                ('formlabs-form-4', 'resin', (200, 125, 210)),
+                ('formlabs-fuse-1-plus-30w', 'powder', (165, 165, 300))):
+            with self.subTest(machine=machine_id):
+                definition = machines.help(machine_id)
+                stage = {'process': process, 'machine': definition['selection']}
+                self.assertEqual(definition['processes'], [process])
+                self.assertEqual(tuple(definition['capabilities']['nominal_build_' + a]['value'] for a in 'xyz'), limits)
+                for other in machines.PROCESSES - {process}:
+                    with self.assertRaises(machines.MachineDefinitionError):
+                        DfmChecks(body, {**stage, 'process': other})
+                for offset, expected in ((-1, 'pass'), (0, 'pass'), (1, 'concern')):
+                    checks = DfmChecks(body, stage)
+                    for axis, limit in zip('xyz', limits):
+                        checks.compare(axis, limit + offset, 'machine.nominal_build_' + axis, '<=', 'mm')
+                    checks.compare('Unsupported wall', 1, 'machine.minimum_wall', '>=', 'mm')
+                    report = checks.report(True)
+                    self.assertEqual([f['status'] for f in report['findings']], [expected] * 3 + ['unknown'])
+                    self.assertEqual(report['status'], 'concerns' if offset > 0 else 'incomplete')
+                    self.assertEqual(report['machineUnchecked'], definition['unverified'])
+                    self.assertTrue(all('Nominal' in f['capabilityScope'] for f in report['findings'][:3]))
+                if process == 'powder':
+                    restrictions = ' '.join(definition['unverified'])
+                    for text in ('polymer SLS', 'not metal', '16 mm', 'not printable', 'material', 'PreForm'):
+                        self.assertIn(text, restrictions)
+
+
 if __name__ == '__main__':
     unittest.main()

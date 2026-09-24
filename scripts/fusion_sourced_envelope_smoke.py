@@ -15,7 +15,12 @@ import adsk.fusion
 
 
 COMPONENT = 'DFM sourced FDM envelope fixture'
-MACHINE_IDS = ('prusa-mk4s', 'prusa-core-one')
+MACHINE_PROFILES = {
+    'prusa-mk4s': ('fdm', (250, 210, 220)),
+    'prusa-core-one': ('fdm', (250, 220, 270)),
+    'formlabs-form-4': ('resin', (200, 125, 210)),
+    'formlabs-fuse-1-plus-30w': ('powder', (165, 165, 300)),
+}
 PARTS = (
     ('DFM orientation plate', (218, 200, 10)),
     ('DFM envelope boundary', (250, 20, 10)),
@@ -58,29 +63,33 @@ def measure(design):
         tools.document, tools.document_id, tools.closed = app.activeDocument, 'sourced-envelope-probe', False
         tools.dfm = bridge.DfmStore(folder)
         tools.dfm.set_enabled(True)
-        for machine_id in MACHINE_IDS:
+        bodies = [(next(b for b in component.bRepBodies if b.name == name), expected) for name, expected in PARTS]
+        bodies.append((design.rootComponent.bRepBodies.item(0), (60, 40, 8)))
+        for machine_id, (process, expected_nominal) in MACHINE_PROFILES.items():
             selected = machines.help(machine_id)
             nominal = tuple(selected['capabilities']['nominal_build_' + axis]['value'] for axis in 'xyz')
-            expected_nominal = (250,210,220) if machine_id == MACHINE_IDS[0] else (250,220,270)
             assert nominal == expected_nominal, 'Review fixture expectations after definition changes'
-            for name, expected in PARTS:
-                body = next(b for b in component.bRepBodies if b.name == name)
+            for body, expected in bodies:
+                name = body.name
                 volume = expected[0] * expected[1] * expected[2]
-                assert body.isSolid and body.faces.count == 6
-                assert abs(body.volume*1000 - volume) < .00001
+                assert body.isSolid
+                if name != 'DFM fixture block':
+                    assert body.faces.count == 6 and abs(body.volume*1000 - volume) < .00001
                 args = {'document_id': tools.document_id, 'part_token': body.entityToken}
-                tools.dfm_plan({**args, 'stages': [{'process': 'fdm', 'machine': selected['selection'],
+                tools.dfm_plan({**args, 'stages': [{'process': process, 'machine': selected['selection'],
                     'notes': 'Benchmark machine choice; no actual installed machine, material, slicer or print qualification.'}]})
                 frames = [('upright', [1,0,0], [0,1,0], expected)]
                 if name == PARTS[0][0]:
                     frames.append(('quarter_turn', [0,1,0], [-1,0,0], (expected[1], expected[0], expected[2])))
+                if name == PARTS[1][0]:
+                    frames.append(('on_edge', [0,1,0], [0,0,1], (expected[1], expected[2], expected[0])))
                 for orientation, x, y, dimensions in frames:
                     code = '''def run(context):
         d = context['dfm']
         measured = d.measurements.envelope(X_AXIS, Y_AXIS)
         for axis, actual in zip(('machine.nominal_build_x', 'machine.nominal_build_y', 'machine.nominal_build_z'), measured['dimensions_mm']):
             d.compare(axis, actual, axis, '<=', 'mm', 'Selected nominal printer envelope in explicit native build frame; part only')
-        d.unknown('Print outcome', 'No slicer verification, support/brim/raft allowance, placement, material, adhesion or strength qualification')
+        d.unknown('Print outcome', 'Nominal box only. No usable-boundary, material compensation, slicer, support, placement, adhesion or strength qualification')
         return measured
     '''.replace('X_AXIS', repr(x)).replace('Y_AXIS', repr(y))
                     checked = tools.run_script({'tool': 'fusion_dfm_check', 'arguments': {**args, 'stage': 0,
@@ -92,7 +101,7 @@ def measure(design):
                     statuses = [f['status'] for f in checked['dfm']['findings']]
                     assert statuses == expected_statuses, (name, orientation, statuses)
                     assert checked['dfm']['status'] == ('concerns' if 'concern' in statuses else 'incomplete')
-                    results.append({'machine': selected['selection'], 'body': name, 'orientation': orientation, 'dimensions_mm': actual,
+                    results.append({'machine': selected['selection'], 'process': process, 'body': name, 'orientation': orientation, 'dimensions_mm': actual,
                                     'volume_mm3': body.volume*1000, 'statuses': statuses,
                                     'reportStatus': checked['dfm']['status']})
     assert all(b.isValid and b.revisionId == rev for b,rev in protected), 'Inspection changed geometry'
