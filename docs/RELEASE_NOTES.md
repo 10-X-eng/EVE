@@ -1,31 +1,30 @@
-# STEVE 0.5.0 — Better Fusion inspection and verification
+# STEVE 0.6.0 — Experimental DFM and machine definitions
 
-STEVE now has richer document context, explicit verification results, searchable Fusion documentation for every provider, and focused viewport captures.
+Turn **DFM** on in STEVE's menu and describe how each part will be made. STEVE can retain ordered manufacturing stages, inspect actual Fusion geometry and report measured concerns, unsupported checks and unknowns. DFM starts off and can be disabled between tasks without losing plans.
 
-## What changed
+## What's new
 
-- **Preserve work while waiting.** Pending tools explain which document or Fusion command they are waiting for. Waits do not expire or cancel Fusion commands. Native-call time no longer consumes the Python loop budget.
-- **Inspect Electronics selection mode.** The verified schematic GROUP state permits inspection and queries without interrupting selection. Editing operations remain gated and return actionable guidance.
-- **Read richer document summaries.** Bounded Design, CAM, and Electronics summaries report useful state, missing capabilities, and incomplete collection coverage. Electronics design editing remains limited by the installed API.
-- **Separate execution from verification.** Measured checks and limited feature-health comparisons distinguish code completion from verified outcomes. Missing evidence and failed checks are reported explicitly.
-- **Find Fusion documentation with any provider.** Search installed API classes and official samples, inspect installed signatures, and fetch Autodesk API reference pages through dedicated tools.
-- **Use consistent Python helpers.** Helpers resolve pinned selections and entity tokens, validate unit expressions, and page through collections without dumping entire documents or libraries.
-- **Capture useful views.** Named views and selected-entity close-ups restore the original camera after capture, including failures. Images supplement API measurements.
-- **Allow slower Windows image-paste startup.** The background clipboard helper now has a bounded 30-second deadline to accommodate slower PowerShell/.NET startup; it does not block Fusion's UI thread.
+- **Process-aware checks:** milling/drilling, turning, sheet metal, FDM, resin and powder guidance, loaded when needed. Native helpers inspect supported radii, cylinder bands, selected face distances, sampled walls, build envelopes, planar overhangs, sealed cavities and existing sheet-metal bend lines.
+- **One definition file per machine:** sourced capabilities are selected per process stage and bound by a content hash. The initial MK4S and original CORE One definitions cover nominal build envelopes. Missing capabilities remain unknown; changed definitions invalidate old checks instead of silently changing their limits.
+- **Reports tied to current evidence:** geometry, ordered plans and selected machine definitions are checked for changes. Reports distinguish measured concerns, unknown coverage and evidence-backed exclusions; successful Python execution alone is not a manufacturing pass.
+- **Optional RMFG sheet-metal workflow:** connect a supplier account and explicitly approve each selected-part STEP upload. Jobs retain snapshot identity and retry receipts; no orders, payments or automatic risk acceptance. Live supplier authorization/report qualification is still pending.
+- **Clearer tools and documentation:** concise calling contracts, Python context loaded on demand, improved installed-API helper compatibility and current Autodesk reference candidates.
 
-This release also includes the previously merged in-app STEVE update flow and the renamed **Jobs** controls. Use `/jobs` to manage ongoing work.
+## Validation and scope
 
-## Verification
+Live Windows Fusion fixtures exercised native and SAT-imported geometry, selected distances and assembly frames, counterbores/intersecting holes/open pockets, bent sheet and additive envelope/wall/cavity checks. The same rotated plate correctly exceeded the selected MK4S envelope while fitting the selected CORE One envelope. Inspection preserved body revisions; setup was confined to disposable fixtures.
 
-Automated checks cover the new behavior with simulated Autodesk hosts, provider/runtime fixtures, and platform package tests. The maintainer reported selection measurement and close-up capture working inside Fusion on Windows. Some native Fusion workflows still need itemized live confirmation, including retesting the schematic GROUP inspection fix. See [verification status](https://github.com/10-X-eng/STEVE/blob/main/docs/VERIFICATION.md) and [reliability validation](https://github.com/10-X-eng/STEVE/blob/main/docs/RELIABILITY_VALIDATION.md).
+The merged main checkout passed 381 Python tests (11 skipped), panel/image checks and a real browser streaming check. Scripted provider integration exercised DFM on/off/on through the actual Codex runtime with Claude, Grok and Ollama adapters. Windows and macOS release packages must also pass CI build, runtime and fixture-install verification before publication.
 
-DFM is planned separately and is not included in this release.
+**DFM remains experimental.** These are scoped measurements and comparisons, not a certified manufacturing rule library or a guarantee of machining/printing success. Slicer outcomes, physical process qualification, complete machine profiles, live macOS DFM and an authorized RMFG supplier report remain unverified. Recorded paired model tasks succeeded with DFM both off and on; they do not establish better generated geometry yet.
+
+See [DFM scope](https://github.com/10-X-eng/STEVE/blob/main/docs/DFM.md), [machine definitions](https://github.com/10-X-eng/STEVE/blob/main/docs/MACHINES.md), and [validation status](https://github.com/10-X-eng/STEVE/blob/main/docs/DFM_READINESS.md).
 
 ## Update or install
 
-Existing users can choose **Check for updates**, then **Update STEVE**. Save your work and quit Fusion when prompted so the installer can replace the add-in. Saved chats and preferences are retained. **Download only** is also available.
+Existing users can choose **Check for updates**, then **Update STEVE**. Save your work and quit Fusion when prompted. Chats and preferences are retained. Start a **new chat** after updating to load the revised tool definitions; existing chats keep their registered definitions.
 
-- **Windows x64:** download **STEVE-0.5.0-windows-x64.zip**, extract the whole ZIP, close Fusion, then run **Install STEVE.exe**.
-- **macOS (Apple silicon):** download **STEVE-0.5.0-macos-arm64.zip**, extract it, quit Fusion, then run **Install STEVE.command** through Terminal (type `bash `, drag the file in, press Return) or allow it under System Settings > Privacy & Security.
+- **Windows x64:** download **STEVE-0.6.0-windows-x64.zip**, extract the complete ZIP, close Fusion and run **Install STEVE.exe**.
+- **macOS (Apple silicon):** download **STEVE-0.6.0-macos-arm64.zip**, extract it, quit Fusion and run **Install STEVE.command** through Terminal (`bash ` followed by dragging the file into the window).
 
-Each ZIP includes the conversation runtime, installer, and installation guide. GitHub's **Source code** downloads do not include the runtime or installer. These are unsigned previews; both platform packages must pass automated build and installation verification before publication. SHA-256 checksums accompany the ZIPs. Codex updates independently of STEVE.
+Both ZIPs include the runtime, installer and installation guide, with accompanying SHA-256 checksums. GitHub's Source code archives omit the runtime and installer. These are unsigned previews. Codex updates independently of STEVE.

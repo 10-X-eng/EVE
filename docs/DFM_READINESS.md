@@ -1,8 +1,9 @@
 # DFM implementation and qualification status
 
-The development stack is experimental. The process issues remain open; passing
+The DFM preview is experimental. The process issues remain open; passing
 unit tests, package CI or individual geometry fixtures does not qualify a
-manufacturing process. No release or merge is part of this stack.
+manufacturing process. PRs #31–#47 were merged in dependency order for the 0.6.0
+preview; their implemented scope and remaining qualification are listed below.
 
 ## Shared workflow
 
@@ -56,18 +57,18 @@ are in [RMFG.md](RMFG.md).
 - Synthetic dimensional limits exercise comparisons without inventing a universal
   manufacturing rule. They are not validated printer, resin, powder or shop profiles.
 
-## Review order
+## Implementation history
 
-The draft PRs form one ordered stack: foundation (#31), optional supplier path
+The merged PRs formed one ordered stack: foundation (#31), optional supplier path
 (#32), native process geometry (#33), shared state/assemblies (#34), partial radii
 (#35), build orientation (#36), report currency (#37), imported solids (#38),
 paired pocket repair (#39), reference discovery (#40), applicability/readiness
 (#41), existing-pattern bend inspection (#42), selected face distances (#43),
 the tool-contract/on-demand-context review (#44), milling topology fixtures (#45),
-provider toggle integration tests (#46), and machine definitions.
-Later branches include
-their predecessors. Review each PR against its declared base; do not merge later
-branches out of order or interpret a green package build as process qualification.
+provider toggle integration tests (#46), and machine definitions (#47).
+The combined main checkout matched the tested final branch and passed 381 Python
+tests (11 skipped), panel/image checks, a real-browser streaming check and the
+145-file portability audit. Package CI is distinct from process qualification.
 
 The local source add-in contains this stack under `addin/STEVE`. Loading the source
 add-in and starting a new conversation exposes the new tool definitions. This is
