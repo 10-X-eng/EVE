@@ -40,6 +40,8 @@ replaced body is not silently substituted.
 - Native measurement helpers provide oriented envelopes, complete cylindrical
   wall bands, and downward planar face angles. The build axes are explicit;
   assembly transforms and support/brim/raft envelopes are not implicitly included.
+  Open surface bodies return unknown for print-overhang classification because
+  their normals do not establish the outside of printable solid material.
   Partial/intersected cylindrical faces and curved overhangs are reported as
   unsupported. A cylindrical band's axial span is not a complete-hole depth.
 - A separate cylindrical-surface query measures analytic radii on partial faces,

@@ -232,6 +232,29 @@ units still require investigation rather than guessed conversions.
 
 Reference: [Autodesk CAM parameters and tool JSON](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CAMParameters_UM.htm).
 
+## Build orientation and unsupported surface bodies
+
+`scripts/fusion_build_orientation_smoke.py` inspects the existing blind-hole block
+without changing it. Independently expected underside slopes matched in four
+frames: upright (two 0-degree faces), upside down (one), sideways (one), and
+30 degrees about X (30/30/60 degrees). Each axis-aligned placement had one lowest
+horizontal bed-contact candidate; the tilted frame had none. Pagination at one
+result per page preserved the curved hole wall as unsupported in every frame.
+
+Synthetic minimum-slope profiles of 29/30/31 degrees exercised below, equal and
+above-boundary comparisons. The first two passed the three planar comparisons;
+31 degrees raised two concerns. The unmeasured curved wall and printing outcome
+remained unknown. These limits are test inputs, not recommended printer settings,
+and the test does not calculate bridge spans, supports, adhesion or slicer output.
+
+An adjacent bug allowed the same classifier to use open-surface normals even
+though they do not establish the outside of printable solid material. It now
+returns unknown before classifying such a body. Unit tests cover this guard,
+revision invalidation and unavailable normals across pages.
+`scripts/fusion_surface_dfm_smoke.py` also verified the guard in live Fusion by
+copying one planar face into a separate disposable surface component. Inspection
+did not change that surface; both scripts verified all pre-existing body revisions.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

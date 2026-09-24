@@ -303,8 +303,15 @@ class DfmGeometry:
                 'scope': 'Paged surface-and-trim evidence about an explicitly chosen turning axis. Review every page; this is not a whole-part lathe approval. No chucking, tool approach, groove-tool fit, slenderness, deflection or stock allowance is assessed. Modeling tolerances are numerical kernel tolerances, not manufacturing limits.'}
 
     def planar_overhangs(self, x_axis, y_axis, offset=0, limit=10):
-        """Downward planar faces only; slope is measured from the build plane."""
+        """Downward planar faces of a solid only; slope is measured from the build plane."""
         page(offset, limit)
+        self._check()
+        if not self.body.isSolid:
+            return {'status': 'unknown', 'items': [], 'unsupported': [],
+                    'scannedFaces': 0, 'totalFaces': self.body.faces.count,
+                    'nextOffset': None, 'revision': self._revision,
+                    'reason': 'A solid body is required: an open surface normal does not establish the outside of printable material.',
+                    'recovery': 'Inspect the intended solid body or clarify surface/thickening intent. Do not infer no overhangs or modify the surface to make inspection succeed.'}
         frame = self.envelope(x_axis, y_axis)
         x, y, up = frame['axes']
         box = self.app.measureManager.getOrientedBoundingBox(self.body,

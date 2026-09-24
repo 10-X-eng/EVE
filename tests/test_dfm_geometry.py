@@ -229,6 +229,37 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(result['items'][0]['depth_mm'], 5)
         self.assertIn('No minimum corner radius', result['scope'])
 
+    def test_overhang_query_does_not_classify_open_surface_normals(self):
+        self.body.isSolid = False
+        self.body.faces = Collection(Obj())  # No normal should be read.
+        self.app.measureManager.getOrientedBoundingBox = lambda *args: self.fail('No envelope needed for an unsupported surface')
+        result = self.geo.planar_overhangs([1,0,0], [0,1,0])
+        self.assertEqual(result['status'], 'unknown')
+        self.assertEqual(result['items'], [])
+        self.assertIsNone(result['nextOffset'])
+        self.assertEqual(result['scannedFaces'], 0)
+        self.assertIn('solid body', result['reason'])
+        self.assertIn('Do not infer no overhangs', result['recovery'])
+        self.body.revisionId = 'r2'
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.geo.planar_overhangs([1,0,0], [0,1,0])
+
+    def test_overhang_normal_failure_is_unknown_and_paging_continues(self):
+        self.body.faces = Collection(
+            Obj(geometry=Obj(kind='plane'), pointOnFace=vector(0,0,0),
+                evaluator=Obj(getNormalAtPoint=lambda p: (False, None))),
+            Obj(geometry=Obj(kind='plane'), pointOnFace=vector(0,0,.5),
+                evaluator=Obj(getNormalAtPoint=lambda p: (True, vector(0,0,-1))),
+                area=1, entityToken='ceiling'))
+        first = self.geo.planar_overhangs([1,0,0], [0,1,0], limit=1)
+        self.assertEqual(first['items'], [])
+        self.assertEqual(first['unsupported'][0]['reason'], 'Face normal unavailable.')
+        self.assertEqual(first['nextOffset'], 1)
+        second = self.geo.planar_overhangs([1,0,0], [0,1,0], offset=first['nextOffset'], limit=1)
+        self.assertEqual(second['items'][0]['faceToken'], 'ceiling')
+        self.assertFalse(second['items'][0]['lowestHorizontalFace'])
+        self.assertIsNone(second['nextOffset'])
+
 
 if __name__ == '__main__':
     unittest.main()
