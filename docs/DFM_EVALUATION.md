@@ -188,6 +188,50 @@ All pre-existing body revisions and both checked fixture bodies were unchanged b
 inspection. Sampled wall thickness is not a global minimum, a validated print
 profile, a strength calculation or slicer certification.
 
+## Partial cylindrical pocket corners
+
+`scripts/fusion_pocket_radius_smoke.py` creates a 40 × 30 × 10 mm block with a
+20 × 10 × 5 mm rounded pocket and independently specified R1 corners. The new
+`cylindrical_surfaces` helper measured all four partial cylindrical radii as
+1 mm, classified them as internal using solid-face normals, and returned the
+expected vertical axes through paged queries. Independent quarter-cylinder areas,
+axial bounds and analytic remaining volume matched. The original full-band query
+still rejected all four partial faces, so this does not weaken its recognition.
+
+The test identified the intended pocket faces from the fixture and compared their
+radii with supplied cutter radii of 0.5, 1 and 3 mm: all four dimensional comparisons
+passed for the first two tools and raised concerns for the 3 mm radius. Every
+report retained unknown machining-strategy/clearance coverage, including at equal
+radius. Those are synthetic fixture tool inputs, not general recommendations.
+All pre-existing bodies and the inspected fixture revision were preserved.
+
+This query measures analytic surface radii without requiring the feature-recognition
+extension. It does not itself identify pockets, sharp zero-radius corners, complete
+holes, NURBS curvature, reach or tool clearance. No matches is not proof that a
+part has no problematic corners. Unit tests also confirm that open surface bodies
+and unavailable normals retain unknown inside/outside classification.
+
+Reference: [Autodesk B-Rep geometry and solid-face normals](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/BRepGeometry_UM.htm).
+
+## Library-derived cutter criterion
+
+A read-only local Fusion test retrieved one selected flat end mill from an existing
+tool library. Its JSON declared `inches`: `geometry.DC` of 0.5 and `LCF` of 1
+converted to a 12.7 mm diameter and 25.4 mm flute length. A temporary DFM plan
+retained the library/item provenance, source field and unit, and used the derived
+6.35 mm cutter radius against the four independently identified R1 pocket corners.
+All four comparisons raised concerns. Setup safety remained unknown; flute length
+was not treated as safe reach. All existing body revisions were unchanged, and no
+tool, setup or user DFM plan was changed.
+
+This checks the measurement/report path with a real library entry; it is not a
+model tool-selection trial or evidence that the cutter is physically available.
+CAM help now distinguishes numeric parameter units (cm/degrees), expression
+units, and a tool JSON's own declared units. Unsupported tool types and missing
+units still require investigation rather than guessed conversions.
+
+Reference: [Autodesk CAM parameters and tool JSON](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CAMParameters_UM.htm).
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

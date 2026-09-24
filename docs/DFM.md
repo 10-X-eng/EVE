@@ -42,6 +42,12 @@ replaced body is not silently substituted.
   assembly transforms and support/brim/raft envelopes are not implicitly included.
   Partial/intersected cylindrical faces and curved overhangs are reported as
   unsupported. A cylindrical band's axial span is not a complete-hole depth.
+- A separate cylindrical-surface query measures analytic radii on partial faces,
+  including rounded pocket corners. Pocket membership and approach must be
+  established before comparing a radius with a cutter. Sharp corners and
+  non-cylindrical surfaces remain unassessed; radius equality alone does not
+  establish a suitable toolpath. Open surface bodies do not receive an inferred
+  inside/outside classification.
 - Native hole and pocket recognition adapters report missing APIs or extension
   access as unknown. Paging bounds results, not the duration of native Fusion
   calculations. No automatic cancellation of native recognition is attempted.

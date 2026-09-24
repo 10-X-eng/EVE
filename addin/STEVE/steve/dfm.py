@@ -17,7 +17,7 @@ from .secure_store import SecureStore
 
 GUIDES = {
     'milling': {
-        'checks': 'Measure supported holes/pockets. Compare minimum internal corner radius with the chosen cutter radius; compare axial depth with confirmed cutting reach. Inspect installed adsk.cam recognition APIs and extension availability first. A cylindrical face alone is not a complete hole.',
+        'checks': 'Measure supported holes/pockets. Compare minimum internal corner radius with the chosen cutter radius; compare axial depth with confirmed cutting reach. Read adsk.cam.Tool help for library-derived dimensions and units; a library entry does not establish physical availability, and flute length alone is not safe reach. Inspect installed adsk.cam recognition APIs and extension availability first. A cylindrical face alone is not a complete hole.',
         'unchecked': 'Holder/fixture collision, workholding, chatter, rigidity, full tool approach, and unseen/intersecting features require separate evidence.',
     },
     'turning': {
@@ -67,6 +67,7 @@ def guide(process=None):
             "context['dfm'].unknown(label, reason): explicit missing/unsupported coverage",
             "context['dfm'].measurements.envelope(x_axis, y_axis): explicit perpendicular directions in native body coordinates; returns oriented dimensions_mm and excluded geometry",
             "context['dfm'].measurements.cylindrical_walls(offset=0, limit=10): full cylindrical bands with diameter_mm, axial_span_mm, side, faceToken; NOT complete-hole recognition; page by returned nextOffset",
+            "context['dfm'].measurements.cylindrical_surfaces(offset=0, limit=10): radius_mm and solid-face internal/external side for analytic cylindrical faces, including partial rounded corners. No trimming or pocket recognition. First establish pocket membership and the applicable tool axis/approach; do not confuse bores with corners or infer a safe strategy from radius equality. Page by nextOffset. Sharp edges and non-cylindrical surfaces are unassessed; no matches does not prove no tight corners",
             "context['dfm'].measurements.rotational_surfaces(axis_origin_mm, axis_direction, offset=0, limit=10): analytic surface and circular-trim compatibility about a chosen turning axis; compatible/nonrotational/unknown per face. Read every page; no lathe/process approval inferred",
             "context['dfm'].measurements.sheet_metal(): native folded-body flag, configured sheet-metal rule thickness/gap/kFactor and existing component flat-pattern presence. Rule settings are NOT a physical thickness measurement; imported solids stay unknown",
             "context['dfm'].measurements.normal_thickness(face_index): ray-measured material thickness at ONE interior face sample, in mm; requires a solid and a confirmed inward material origin/outward exit on the SAME body. Not a global minimum or whole-part wall check; record unsampled/thin-region coverage as unknown",
