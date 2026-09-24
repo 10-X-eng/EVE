@@ -10,7 +10,7 @@ class FusionHelpers:
         self._selection = tuple(captured_selection)
 
     def selected(self, index=0, expected_type=None):
-        """Resolve the original captured selection index; never substitute a later selection."""
+        """Resolve the captured selection. expected_type accepts an SDK class, classType() string or dotted adsk class path."""
         if type(index) is not int or not 0 <= index < len(self._selection):
             raise ToolError("entity_unavailable", "That index was not in the captured selection.")
         return self._checked(self._selection[index], expected_type)
@@ -19,12 +19,22 @@ class FusionHelpers:
     def _checked(entity, expected_type):
         if entity is None or getattr(entity, "isValid", True) is False:
             raise ToolError("entity_unavailable", "The original entity is no longer valid. Inspect the pinned document.")
-        if expected_type is not None and entity.objectType != expected_type:
-            raise ToolError("entity_unavailable", "The resolved entity does not match the requested objectType.")
+        if expected_type is not None:
+            if isinstance(expected_type, type) and callable(getattr(expected_type, 'classType', None)):
+                expected_type = expected_type.classType()
+            if not isinstance(expected_type, str) or not 1 <= len(expected_type) <= 250:
+                raise ValueError('expected_type must be an installed SDK class, its classType() string, or a dotted adsk class path.')
+            if expected_type.startswith('adsk.'):
+                if any(not part.isidentifier() or part.startswith('_') for part in expected_type.split('.')):
+                    raise ValueError('Use a public dotted adsk class path.')
+                expected_type = expected_type.replace('.', '::')
+            if entity.objectType != expected_type:
+                raise ToolError('entity_type_mismatch',
+                    'The resolved entity has objectType ' + entity.objectType + ', but ' + expected_type + ' was requested.')
         return entity
 
     def entity(self, token, expected_type=None):
-        """Resolve exactly one entity in the pinned Design; ambiguous/deleted tokens raise an error."""
+        """Resolve exactly one pinned entity. expected_type accepts an SDK class, classType() string or dotted adsk path."""
         design = self._context.get("design")
         if design is None:
             raise ToolError("entity_unavailable", "Token resolution needs the pinned Design product.")

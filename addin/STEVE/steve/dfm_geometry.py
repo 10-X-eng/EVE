@@ -5,7 +5,7 @@ calculation; paging bounds returned data, not time spent inside that calculation
 """
 import math
 
-from .dfm import finite, revision
+from .dfm import finite, revision, native
 
 
 def xyz(value):
@@ -32,8 +32,9 @@ def page(offset, limit):
 
 
 class DfmGeometry:
-    def __init__(self, body, app, core, cam, cancelled=lambda: False):
+    def __init__(self, body, app, core, cam, cancelled=lambda: False, fusion=None):
         self.body, self.app, self.core, self.cam = body, app, core, cam
+        self.fusion = fusion
         self._revision = revision(body)
         self.cancelled = cancelled
 
@@ -83,6 +84,190 @@ class DfmGeometry:
                 'nextOffset': offset + scanned if offset + scanned < faces.count else None,
                 'revision': self._revision,
                 'scope': 'Full cylindrical wall bands, not complete holes. Axial span is not necessarily drilling depth, tool reach or access. No pocket/counterbore classification.'}
+
+    def sheet_metal(self):
+        """Read rule metadata without flattening or converting the body."""
+        self._check()
+        try:
+            folded = self.body.isSheetMetal
+            component = self.body.parentComponent
+            rule = component.activeSheetMetalRule
+            pattern = component.flatPattern
+            result = {'status': 'measured' if folded and rule is not None else 'unknown',
+                      'isSheetMetal': bool(folded), 'componentFlatPatternPresent': pattern is not None}
+            if folded and rule is not None:
+                result['rule'] = {'name': str(rule.name)[:200],
+                    'thickness_mm': 10*finite(rule.thickness.value),
+                    'gap_mm': 10*finite(rule.gap.value), 'kFactor': finite(rule.kFactor)}
+            else:
+                result['reason'] = 'The body is not a native folded sheet-metal part with an active rule. No thickness or bend capability was inferred.'
+        except (AttributeError, RuntimeError) as error:
+            result = {'status': 'unknown', 'reason': str(error)[:400],
+                      'recovery': 'Inspect the installed sheet-metal API. Do not convert or flatten the model to make an inspection succeed.'}
+        self._check()
+        return {**result, 'revision': self._revision,
+                'scope': 'Configured component rule, not measured wall thickness or supplier capability. Existing component flat-pattern presence does not prove its currency, bend sequence or tooling clearance. No geometry was created.'}
+
+    def normal_thickness(self, face_index):
+        """One inward normal ray at Fusion's interior face sample, not a global minimum."""
+        self._check()
+        if type(face_index) is not int or not 0 <= face_index < self.body.faces.count:
+            raise ValueError('Use a current face index from this body.')
+        if self.fusion is None:
+            raise ValueError('The Fusion ray-query API is unavailable in this measurement context.')
+        face = self.body.faces.item(face_index)
+        def unknown(reason):
+            self._check()
+            return {'status': 'unknown', 'faceIndex': face_index, 'reason': reason, 'revision': self._revision}
+        if not self.body.isSolid:
+            return unknown('A solid body is required to distinguish material from empty space.')
+        point = face.pointOnFace
+        ok, normal = face.evaluator.getNormalAtPoint(point)
+        if not ok:
+            return unknown('The start face normal is unavailable.')
+        direction = [-v for v in unit(xyz(normal))]
+        tolerance = finite(self.app.pointTolerance)
+        if tolerance <= 0:
+            return unknown('Fusion modeling tolerance is unavailable.')
+        # Move past the boundary's numerical uncertainty, then explicitly check
+        # material containment. This offset is not a minimum printable wall rule.
+        origin = self.core.Point3D.create(*(v+10*tolerance*d for v,d in zip(xyz(point),direction)))
+        if self.body.pointContainment(origin) != self.fusion.PointContainment.PointInsidePointContainment:
+            return unknown('The inward ray origin is not confirmed inside solid material. Thin, ambiguous or invalid local geometry is unassessed.')
+        hits = self.core.ObjectCollection.create()
+        entities = self.body.parentComponent.findBRepUsingRay(origin, self.core.Vector3D.create(*direction),
+            self.fusion.BRepEntityTypes.BRepFaceEntityType, tolerance, False, hits)
+        self._check()
+        if entities.count != hits.count or entities.count > 200:
+            return unknown('Ray intersections are inconsistent or exceed the 200-hit traversal limit.')
+        for index in range(entities.count):
+            self._check()
+            target = self.fusion.BRepFace.cast(entities.item(index))
+            if target is None or native(target.body) != self.body:
+                continue
+            hit = hits.item(index)
+            delta = [h-p for h,p in zip(xyz(hit),xyz(point))]
+            distance = dot(delta,direction)
+            radial = math.hypot(*(v-distance*d for v,d in zip(delta,direction)))
+            ok, exit_normal = target.evaluator.getNormalAtPoint(hit)
+            self._check()
+            if (distance <= 10*tolerance or radial > tolerance or not ok
+                    or dot(unit(xyz(exit_normal)), direction) <= math.sin(finite(self.app.vectorAngleTolerance))):
+                return unknown('The nearest same-body intersection is near a boundary, off the ray or not a confirmed outward crossing.')
+            return {'status':'measured', 'faceIndex':face_index, 'faceToken':face.entityToken,
+                'exitFaceToken':target.entityToken, 'samplePoint_mm':[10*v for v in xyz(point)],
+                'exitPoint_mm':[10*v for v in xyz(hit)], 'direction':direction,
+                'thickness_mm':10*distance, 'modelingTolerance_mm':10*tolerance, 'revision':self._revision,
+                'scope':'Material distance along one inward normal at one interior face point. Not the minimum wall thickness, opposite-face spacing everywhere, feature diameter, or proof of printability. Thin regions elsewhere, drainage, trapped volumes and strength remain unassessed.'}
+        return unknown('No outward crossing of this same body was found. Do not use another component as the opposite wall.')
+
+    def enclosed_voids(self, lump_index=0, offset=0, limit=10):
+        """Use native shell topology to identify sealed cavities, without inferring drainage."""
+        page(offset,limit)
+        self._check()
+        lumps = self.body.lumps
+        if type(lump_index) is not int or not 0 <= lump_index < lumps.count:
+            raise ValueError('Use an existing lump index; inspect this body before checking voids.')
+        lump = lumps.item(lump_index)
+        if not self.body.isSolid or not lump.isClosed:
+            return {'status':'unknown', 'reason':'Closed solid topology is required to classify sealed voids.', 'revision':self._revision}
+        shells = lump.shells
+        result = []
+        for index in range(offset, min(shells.count, offset+limit)):
+            self._check()
+            shell = shells.item(index)
+            closed = bool(shell.isClosed)
+            void = bool(shell.isVoid)
+            # BRepShell.entityToken can raise InternalValidationError on a valid
+            # newly evaluated shell. Revision-bound indices suffice for this query.
+            entry = {'shellIndex':index, 'isClosed':closed,
+                     'isVoid':void, 'sealedVoid':closed and void}
+            if entry['sealedVoid']:
+                try:
+                    entry['enclosedVolume_mm3'] = 1000*abs(finite(shell.volume))
+                    entry['volumeStatus'] = 'measured'
+                except (AttributeError, RuntimeError) as error:
+                    entry.update(volumeStatus='unknown', volumeReason=str(error)[:400],
+                                 recovery='The sealed void is detected, but Fusion did not provide its volume. Do not substitute zero or alter geometry to obtain it.')
+            result.append(entry)
+        self._check()
+        return {'status':'measured', 'lumpIndex':lump_index, 'totalLumps':lumps.count,
+                'items':result, 'totalShells':shells.count,
+                'nextOffset':offset+limit if offset+limit<shells.count else None,
+                'revision':self._revision,
+                'scope':'Native closed void shells in this solid lump. Inspect all pages and lumps. Sealed voids can retain resin or powder; absence does not prove drain/escape-hole size, orientation, flow, wash access or lack of printing suction cups. FDM and deliberately sealed parts need different process decisions.'}
+
+    def rotational_surfaces(self, axis_origin_mm, axis_direction, offset=0, limit=10):
+        """Classify analytic surfaces AND their circular trimming about a chosen axis."""
+        page(offset, limit)
+        if not isinstance(axis_origin_mm, (list, tuple)) or len(axis_origin_mm) != 3:
+            raise ValueError('Supply the turning-axis origin in millimeters, in native body coordinates.')
+        origin = [finite(v)/10 for v in axis_origin_mm]
+        axis = unit(axis_direction)
+        self._check()
+        distance_tolerance = finite(self.app.pointTolerance)
+        angle_tolerance = finite(self.app.vectorAngleTolerance)
+        if distance_tolerance <= 0 or angle_tolerance <= 0:
+            raise ValueError('Fusion modeling tolerances are unavailable. Do not invent a manufacturing tolerance.')
+
+        def on_axis(point):
+            delta = [v-o for v,o in zip(xyz(point), origin)]
+            projection = dot(delta, axis)
+            return math.hypot(*(v-projection*a for v,a in zip(delta,axis))) <= distance_tolerance
+
+        def parallel(direction):
+            v = unit(xyz(direction))
+            cross = [v[1]*axis[2]-v[2]*axis[1], v[2]*axis[0]-v[0]*axis[2], v[0]*axis[1]-v[1]*axis[0]]
+            return math.atan2(math.hypot(*cross), abs(dot(v,axis))) <= angle_tolerance
+
+        result = []
+        faces = self.body.faces
+        for index in range(offset, min(faces.count, offset+limit)):
+            self._check()
+            face = faces.item(index)
+            surface = face.geometry
+            kind, analytic, aligned = None, None, False
+            for name in ('Plane','Cylinder','Cone','Torus','Sphere'):
+                cast = getattr(self.core, name, None)
+                analytic = cast.cast(surface) if cast else None
+                if analytic is not None:
+                    kind = name
+                    break
+            entry = {'faceIndex': index, 'faceToken': face.entityToken, 'surface': kind or 'unsupported', 'status': 'unknown'}
+            if kind == 'Plane':
+                aligned = parallel(analytic.normal)
+            elif kind == 'Sphere':
+                aligned = on_axis(analytic.origin)
+            elif kind:
+                aligned = parallel(analytic.axis) and on_axis(analytic.origin)
+            if kind and not aligned:
+                entry.update(status='nonrotational', reason='This analytic surface is not rotationally invariant about the supplied axis. A secondary operation or different axis may be needed.')
+            elif kind:
+                # A coaxial underlying cylinder alone is insufficient: flats,
+                # windows and partial sweeps can trim it into a non-rotational face.
+                if face.edges.count > 64:
+                    entry['reason'] = 'Face trimming exceeds this bounded check (64 edges).'
+                else:
+                    circular = True
+                    for edge_index in range(face.edges.count):
+                        circle = self.core.Circle3D.cast(face.edges.item(edge_index).geometry)
+                        if circle is None or not on_axis(circle.center) or not parallel(circle.normal):
+                            circular = False
+                            break
+                    if circular and (face.edges.count or kind in ('Sphere','Torus')):
+                        entry.update(status='compatible', reason='Analytic surface and every boundary circle are coaxial with the supplied axis.')
+                    else:
+                        entry['reason'] = 'Trimming is not verified as full coaxial circles; split, intersected or partial surfaces remain unassessed.'
+            else:
+                entry['reason'] = 'This surface representation is unsupported; do not treat an unrecognized surface as a turning failure.'
+            result.append(entry)
+        self._check()
+        return {'status': 'measured', 'items': result, 'totalFaces': faces.count,
+                'nextOffset': offset+limit if offset+limit < faces.count else None,
+                'axisOrigin_mm': list(axis_origin_mm), 'axisDirection': axis,
+                'modelingTolerance_mm': 10*distance_tolerance, 'modelingAngleTolerance_rad': angle_tolerance,
+                'revision': self._revision,
+                'scope': 'Paged surface-and-trim evidence about an explicitly chosen turning axis. Review every page; this is not a whole-part lathe approval. No chucking, tool approach, groove-tool fit, slenderness, deflection or stock allowance is assessed. Modeling tolerances are numerical kernel tolerances, not manufacturing limits.'}
 
     def planar_overhangs(self, x_axis, y_axis, offset=0, limit=10):
         """Downward planar faces only; slope is measured from the build plane."""

@@ -22,6 +22,94 @@ class GeometryTests(unittest.TestCase):
         self.app = Obj(measureManager=Obj(getOrientedBoundingBox=lambda body, x, y: Obj(length=6, width=4, height=.8, centerPoint=vector(3,2,.4))))
         self.geo = DfmGeometry(self.body, self.app, self.core, self.cam)
 
+    def test_rotational_surface_checks_trimming_and_axis_not_only_cylinder_type(self):
+        self.app.pointTolerance=1e-6
+        self.app.vectorAngleTolerance=1e-6
+        circle=Obj(kind='circle',center=vector(0,0,0),normal=vector(0,0,1))
+        surface=Obj(kind='cylinder',origin=vector(0,0,0),axis=vector(0,0,-1))
+        valid=Obj(geometry=surface,edges=Collection(Obj(geometry=circle)),entityToken='valid')
+        trimmed=Obj(geometry=surface,edges=Collection(Obj(geometry=Obj(kind='arc'))),entityToken='trimmed')
+        off_axis=Obj(geometry=Obj(kind='cylinder',origin=vector(1,0,0),axis=vector(0,0,1)),entityToken='offset')
+        nurbs=Obj(geometry=Obj(kind='nurbs'),entityToken='unsupported')
+        self.body.faces=Collection(valid,trimmed,off_axis,nurbs)
+        first=self.geo.rotational_surfaces([0,0,0],[0,0,1],limit=2)
+        self.assertEqual([i['status'] for i in first['items']],['compatible','unknown'])
+        self.assertEqual(first['nextOffset'],2)
+        second=self.geo.rotational_surfaces([0,0,0],[0,0,1],offset=first['nextOffset'])
+        self.assertEqual([i['status'] for i in second['items']],['nonrotational','unknown'])
+        self.assertIsNone(second['nextOffset'])
+        self.assertAlmostEqual(first['modelingTolerance_mm'],1e-5)
+
+    def test_sheet_rule_is_metadata_and_imported_solids_are_not_assumed_foldable(self):
+        rule=Obj(name='Fixture',thickness=Obj(value=.2),gap=Obj(value=.02),kFactor=.4)
+        self.body.parentComponent=Obj(activeSheetMetalRule=rule,flatPattern=None)
+        self.body.isSheetMetal=True
+        result=self.geo.sheet_metal()
+        self.assertEqual(result['rule']['thickness_mm'],2)
+        self.assertEqual(result['rule']['gap_mm'],.2)
+        self.assertFalse(result['componentFlatPatternPresent'])
+        self.body.isSheetMetal=False
+        result=self.geo.sheet_metal()
+        self.assertEqual(result['status'],'unknown')
+        self.assertNotIn('rule',result)
+
+    def test_normal_thickness_measures_material_and_never_substitutes_a_neighbor(self):
+        self.app.pointTolerance=1e-6
+        self.app.vectorAngleTolerance=1e-10
+        self.core.Point3D=Obj(create=vector)
+        self.core.ObjectCollection=Obj(create=Collection)
+        self.geo.fusion=Obj(PointContainment=Obj(PointInsidePointContainment=1),
+            BRepEntityTypes=Obj(BRepFaceEntityType=2), BRepFace=Obj(cast=lambda value:value))
+        self.body.isSolid=True
+        self.body.pointContainment=lambda point:1
+        start=Obj(pointOnFace=vector(0,0,.2),entityToken='start',
+                  evaluator=Obj(getNormalAtPoint=lambda point:(True,vector(0,0,1))))
+        end=Obj(body=self.body,entityToken='exit',evaluator=Obj(getNormalAtPoint=lambda point:(True,vector(0,0,-1))))
+        self.body.faces=Collection(start,end)
+        def ray(origin,direction,kind,tolerance,visible,hits):
+            self.assertFalse(visible)
+            self.assertLess(origin.z,.2)
+            hits.values.append(vector(0,0,0))
+            return Collection(end)
+        self.body.parentComponent=Obj(findBRepUsingRay=ray)
+        result=self.geo.normal_thickness(0)
+        self.assertEqual(result['thickness_mm'],2)
+        self.assertEqual(result['samplePoint_mm'],[0,0,2])
+        end.body=Obj(nativeObject=None)
+        self.assertEqual(self.geo.normal_thickness(0)['status'],'unknown')
+        self.body.pointContainment=lambda point:0
+        self.assertIn('not confirmed inside',self.geo.normal_thickness(0)['reason'])
+
+    def test_void_shell_paging_distinguishes_sealed_space_and_open_geometry(self):
+        self.body.isSolid=True
+        outer=Obj(isClosed=True,isVoid=False,entityToken='outer')
+        inner=Obj(isClosed=True,isVoid=True,entityToken='inner',volume=-.125)
+        lump=Obj(isClosed=True,shells=Collection(outer,inner))
+        self.body.lumps=Collection(lump)
+        first=self.geo.enclosed_voids(limit=1)
+        self.assertFalse(first['items'][0]['sealedVoid'])
+        self.assertEqual(first['nextOffset'],1)
+        second=self.geo.enclosed_voids(offset=first['nextOffset'])
+        self.assertTrue(second['items'][0]['sealedVoid'])
+        self.assertEqual(second['items'][0]['enclosedVolume_mm3'],125)
+        self.assertIsNone(second['nextOffset'])
+        self.body.isSolid=False
+        self.assertEqual(self.geo.enclosed_voids()['status'],'unknown')
+
+    def test_failed_shell_volume_preserves_detected_void_without_claiming_zero(self):
+        class Shell:
+            isClosed=True
+            isVoid=True
+            @property
+            def volume(self):
+                raise RuntimeError('InternalValidationError')
+        self.body.isSolid=True
+        self.body.lumps=Collection(Obj(isClosed=True,shells=Collection(Shell())))
+        result=self.geo.enclosed_voids()['items'][0]
+        self.assertTrue(result['sealedVoid'])
+        self.assertEqual(result['volumeStatus'],'unknown')
+        self.assertNotIn('enclosedVolume_mm3',result)
+
     def wall(self, radius=.2, length=.5, inward=True):
         edges = [Obj(geometry=Obj(kind='circle', center=vector(0, 0, z), radius=radius)) for z in (0, length)]
         return Obj(geometry=Obj(kind='cylinder', radius=radius, axis=vector(0,0,1), origin=vector(0,0,0)),

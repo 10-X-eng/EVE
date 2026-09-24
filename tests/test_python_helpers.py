@@ -6,6 +6,22 @@ from steve.tool_protocol import validate_call
 
 
 class HelperTests(unittest.TestCase):
+    def test_expected_type_accepts_sdk_class_and_public_python_path(self):
+        class Body:
+            @staticmethod
+            def classType():
+                return 'adsk::fusion::BRepBody'
+        body=Obj(isValid=True,objectType=Body.classType())
+        helper=FusionHelpers({'design':Obj(findEntityByToken=lambda token:[body])},[body])
+        for kind in (Body,Body.classType(),'adsk.fusion.BRepBody'):
+            self.assertIs(helper.selected(0,kind),body)
+            self.assertIs(helper.entity('token',kind),body)
+        with self.assertRaisesRegex(RuntimeError,'adsk::fusion::BRepFace') as failed:
+            helper.selected(0,'adsk.fusion.BRepFace')
+        self.assertEqual(failed.exception.code,'entity_type_mismatch')
+        with self.assertRaises(ValueError):
+            helper.selected(0,object())
+
     def test_invalid_selection_keeps_original_indices(self):
         original = Obj(isValid=False)
         second = Obj(isValid=True, objectType='Edge')

@@ -59,7 +59,7 @@ def run(_context):
         assert result['result']['length_mm'] == 60, result
         assert [f['status'] for f in result['dfm']['findings']] == ['concern', 'pass', 'unknown'], result
         assert before == body.revisionId, 'Read-only DFM changed the body'
-        geometry = bridge.DfmGeometry(body, app, adsk.core, bridge.adsk.cam)
+        geometry = bridge.DfmGeometry(body, app, adsk.core, bridge.adsk.cam, fusion=adsk.fusion)
         walls = geometry.cylindrical_walls()
         assert len(walls['items']) == 1, walls
         assert abs(walls['items'][0]['diameter_mm'] - 4) < 1e-6, walls
@@ -91,11 +91,15 @@ def run(_context):
             assert outcome['ok'], outcome
             orientation_results.append(outcome['dfm']['status'])
         assert orientation_results == ['concerns', 'checked'], orientation_results
+        floor = next(face for face in overhangs['items'] if not face['lowestHorizontalFace'])
+        thickness = geometry.normal_thickness(floor['faceIndex'])
+        assert thickness['status'] == 'measured' and abs(thickness['thickness_mm'] - 3) < 1e-6, thickness
         assert before == body.revisionId, 'Measurements changed the body'
         print(json.dumps({'fusionVersion': app.version, 'unchanged': True,
                           'test': 'Actual STEVE run_script and DFM plan on real Fusion geometry',
                           'walls': walls, 'envelope': envelope, 'rotatedEnvelope': rotated,
                           'planarOverhangs': overhangs, 'printerOrientationResults': orientation_results,
+                          'blindHoleFloorThickness': thickness,
                           'holes': geometry.holes(), 'result': result}, ensure_ascii=False))
 
 
