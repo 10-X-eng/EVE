@@ -380,6 +380,41 @@ and evidence preservation. This validates the reporting contract, not the truth
 of a model-written applicability judgment; unsupported measurements and missing
 settings must still be reported as unknown.
 
+## Existing native flat-pattern bend inspection
+
+A disposable bent strip was created in the named test document: 2 mm wall,
+R3 inside/R5 outside quarter bend, 25/30 mm straight legs and 20 mm width.
+Its native volume was **2451.327412287183 mm³**, matching the independently
+calculated cross-section volume. Analytic surface radii read 3 and 5 mm; inward
+normal samples on both curved faces measured 2.0000000000000013 mm material.
+
+Separate development setup converted this fixture to native sheet metal and
+explicitly created its flat pattern. Conversion used an installed preview API
+only in the local setup; no preview API is distributed in STEVE or the committed
+fixture script. Before setup, sheet-metal/bend inspection correctly returned
+unknown. The measurement query itself never converts or flattens anything.
+
+On Fusion 2705.1.25, the existing flat pattern returned **two bend lines for one
+physical bend**, on opposite sheet surfaces. Both reported 90 degrees and 20 mm
+line length. `sheet_bends(limit=1)` followed by its `nextOffset` read both lines
+without duplication or changes to any body revision. The native Python return
+tuple and centimeter/radian conversions were exercised. The helper checks folded
+body ownership, returns per-line failures as unknown and does not present line
+count as a count of physical bends. Unit tests also cover missing/foreign patterns,
+non-sheet bodies, missing wire geometry, invalid direction values and stale bodies.
+
+`scripts/fusion_formed_sheet_smoke.py` creates only the guarded solid fixture.
+Its `measure(component)` entry can recheck that fixture read-only before or after
+explicit native sheet-metal setup. It refuses duplicate creation. The first
+creation request exceeded the development HTTP observation timeout but completed
+in Fusion; a read-only state check established this before further work, so it
+was neither duplicated nor cancelled. All other fixture bodies remained unchanged
+during setup; read-only inspection preserved every body revision.
+
+This fixture validates measurement plumbing for one bend. It does not qualify
+multi-bend parts, physical bend identification, relief, flange clearances,
+springback, tooling/sequence, pattern currency or supplier acceptance.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native

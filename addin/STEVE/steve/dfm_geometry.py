@@ -108,6 +108,51 @@ class DfmGeometry:
         return {**result, 'revision': self._revision,
                 'scope': 'Configured component rule, not measured wall thickness or supplier capability. Existing component flat-pattern presence does not prove its currency, bend sequence or tooling clearance. No geometry was created.'}
 
+    def sheet_bends(self, offset=0, limit=10):
+        """Read bend-line angles from this body's existing flat pattern; never create one."""
+        page(offset, limit)
+        self._check()
+        def unknown(reason):
+            self._check()
+            return {'status': 'unknown', 'reason': reason, 'revision': self._revision,
+                    'recovery': 'Inspect the existing native sheet-metal part and its flat pattern. Do not convert or flatten geometry just to make an inspection succeed.'}
+        try:
+            if not self.body.isSheetMetal:
+                return unknown('The body is not a native sheet-metal body.')
+            pattern = self.body.parentComponent.flatPattern
+            if pattern is None:
+                return unknown('No existing flat pattern is available for bend-line inspection.')
+            if pattern.foldedBody is None or native(pattern.foldedBody) != native(self.body):
+                return unknown('The component flat pattern belongs to a different or unavailable folded body.')
+            wire = pattern.bendLinesBody
+            if wire is None:
+                return unknown('The flat pattern did not provide a bend-line body.')
+            edges = wire.edges
+            total = edges.count
+        except (AttributeError, RuntimeError) as error:
+            return unknown(str(error)[:400])
+        result = []
+        for index in range(offset, min(total, offset + limit)):
+            self._check()
+            try:
+                edge = edges.item(index)
+                ok, up, angle = pattern.getBendInfo(edge)
+                if not ok:
+                    result.append({'lineIndex': index, 'status': 'unknown', 'reason': 'Fusion could not return this bend line information.'})
+                    continue
+                if type(up) is not bool:
+                    raise ValueError('Fusion did not return a Boolean bend direction.')
+                result.append({'lineIndex': index, 'status': 'measured',
+                               'angle_deg': math.degrees(finite(angle)), 'isBendUp': up,
+                               'lineLength_mm': 10*finite(edge.length)})
+            except (AttributeError, RuntimeError, TypeError, ValueError) as error:
+                result.append({'lineIndex': index, 'status': 'unknown', 'reason': str(error)[:400]})
+        self._check()
+        return {'status': 'measured', 'items': result, 'totalLines': total,
+                'nextOffset': offset + limit if offset + limit < total else None,
+                'revision': self._revision,
+                'scope': 'Existing flat-pattern bend lines only. Indices refer to this query, not durable bend identities. Angle is converted from radians; isBendUp is relative to the native line direction. Lines are not guaranteed unique physical bends. No bend radius, tooling, relief, sequencing, springback or flat-pattern currency certification.'}
+
     def cylindrical_surfaces(self, offset=0, limit=10):
         """Analytic radii, including partial pocket-corner faces; no feature recognition."""
         page(offset, limit)
