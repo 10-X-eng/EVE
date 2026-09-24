@@ -112,15 +112,21 @@ to run outside the explicitly named disposable test document or to duplicate
 their existing fixtures. They are developer checks, not add-in entry points.
 
 This is direct integration evidence, not broad manufacturing qualification or
-macOS live qualification. One paired DFM-off/on real-model inspection passed;
-both runs found the same known defect, with the enabled run adding structured,
-sourced reporting. Design-quality improvement, additional providers and embedded
+macOS live qualification. Paired DFM-off/on real-model inspection and authorized
+repair trials passed; both modes found and repaired the known defect, with the
+enabled mode adding structured, sourced reporting. A native floating-point
+boundary false concern was fixed and its exact generated check replayed.
+Comparisons preserve raw values and disclose any allowance of up to eight
+binary64 rounding steps; this is not a manufacturing tolerance.
+Design-quality improvement, additional providers and embedded
 panel workflows remain to be evaluated. See [DFM_EVALUATION.md](DFM_EVALUATION.md).
 
-An opt-in inspection benchmark is available as `scripts/dfm_model_probe.py`.
+An opt-in inspection/repair benchmark is available as `scripts/dfm_model_probe.py`.
 It uses STEVE's existing ChatGPT connection and an explicitly supplied loopback
 development MCP endpoint, creates ephemeral model conversations, and compares
-the same task with DFM off/on. Its adapter allows only inspection and local
-plan metadata, checks the named fixture/revision, and supplies no editing or
-upload capability. This development script is not a product MCP dependency.
+the same task with DFM off/on. By default its adapter allows only inspection and
+local plan metadata. Explicit `--repair` creates two disposable child fixtures,
+allows command edits, and independently verifies the resulting geometry and
+preserved fixture revisions. Neither mode supplies upload capability.
+This development script is not a product MCP dependency.
 See the recorded validation results before treating it as a quality benchmark.

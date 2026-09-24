@@ -1,5 +1,6 @@
 """DFM evidence contracts, persistence and revision ownership (no CAD host)."""
 from pathlib import Path
+import math
 import sys
 import tempfile
 from types import SimpleNamespace as Obj
@@ -83,6 +84,33 @@ class DfmTests(unittest.TestCase):
         checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
         self.assertEqual(checks.report(True)['findings'][0]['status'], 'unknown')
         self.assertEqual(checks.report(True)['findings'][0]['conditionalResult'], 'pass')
+
+    def test_native_roundoff_is_disclosed_without_a_manufacturing_tolerance(self):
+        stage = stages()[0]
+        stage['criteria']['cutter_radius']['value'] = 4
+        checks = self.checks(stage)
+        measured = 4.0000000000000036  # Observed unchanged nominal 4 mm Fusion hole.
+        checks.compare('Diameter', measured, 'cutter_radius', '==', 'mm')
+        finding = checks.report(True)['findings'][0]
+        self.assertEqual(finding['status'], 'pass')
+        self.assertEqual(finding['actual'], measured)
+        self.assertEqual(finding['limit'], 4)
+        self.assertEqual(finding['numericalComparison']['maxUlps'], 8)
+        checks.compare('Upper bound', measured, 'cutter_radius', '<=', 'mm')
+        checks.compare('Lower bound', 4-4*math.ulp(4), 'cutter_radius', '>=', 'mm')
+        self.assertTrue(all(f['status'] == 'pass' for f in checks.report(True)['findings']))
+        for relation, value in [('==',4+16*math.ulp(4)), ('<=',4.000001), ('>=',3.999999)]:
+            check = self.checks(stage)
+            check.compare('Real difference', value, 'cutter_radius', relation, 'mm')
+            self.assertEqual(check.report(True)['findings'][0]['status'], 'concern')
+        stage['criteria']['cutter_radius']['value'] = 0
+        check = self.checks(stage)
+        check.compare('No absolute epsilon around zero', 1e-16, 'cutter_radius', '==', 'mm')
+        self.assertEqual(check.report(True)['findings'][0]['status'], 'concern')
+        stage['criteria']['cutter_radius'].update(value=4, basis='assumption')
+        check = self.checks(stage)
+        check.compare('Unconfirmed criterion', measured, 'cutter_radius', '==', 'mm')
+        self.assertEqual(check.report(True)['findings'][0]['status'], 'unknown')
 
     def test_empty_failed_and_stale_reports_do_not_pass(self):
         checks = self.checks()

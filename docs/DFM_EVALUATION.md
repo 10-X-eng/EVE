@@ -53,7 +53,7 @@ changes. The adapter ran actual Fusion queries with read-only enforcement.
 This single pair demonstrates tool selection and end-to-end measured reporting.
 It **does not demonstrate higher design quality or lower latency**: both models
 answered correctly, and the enabled workflow used more calls. Design/edit/recheck
-tasks, multiple seeds, other providers, and additional process fixtures remain
+tasks across multiple seeds, other providers, and additional process fixtures remain
 necessary to measure an improvement in design outcomes.
 
 The off run passed `adsk.fusion.BRepBody` as a class to the selection helper,
@@ -74,6 +74,44 @@ python scripts/dfm_model_probe.py --mcp-url <your-loopback-MCP-URL>
 It writes local traces under `.cache`, creates no permanent chat, and never
 copies credentials. The development adapter is not installed as a STEVE dependency.
 Protocol reference: [Codex app-server](https://learn.chatgpt.com/docs/app-server).
+
+## Paired authorized repair
+
+A second pair used the same model/effort and two fresh child components in the
+disposable document. Both started with the 60 × 40 × 8 mm block and bottom-entry
+Ø4 × 5 mm blind hole. The instruction allowed only top growth to the smallest
+whole-millimeter height meeting the 4 mm ceiling requirement, while preserving
+the footprint, bottom plane, hole dimensions and center.
+
+Both runs changed the existing height to **9 mm** and remeasured a **4 mm** ceiling.
+An independent verifier checked the final bounds, cylindrical surface, hole
+depth/position, solid volume and preservation of every pre-existing fixture body.
+Both passed. The DFM-on run retained a manufacturing plan and produced a
+revision-bound check of the repaired geometry. The off run also repaired the part
+correctly, so this pair proves the repair/recheck path, not superior design quality.
+
+The enabled check exposed a false concern: Fusion returned
+`4.0000000000000036 mm` for the unchanged nominal 4 mm hole. Comparison now accepts
+a boundary difference of at most eight binary64 representable steps (ULPs), keeps
+both raw values, and discloses the numerical window whenever it changes an outcome.
+This is arithmetic roundoff handling, **not a manufacturing tolerance**. Larger
+differences remain concerns; assumed criteria and unmeasured coverage remain
+unknown. Replaying the exact generated check in Fusion passed all nine measured
+dimensions and retained the explicit unknown tooling/workholding coverage.
+
+Run this opt-in, mutating development trial only with the named disposable document
+active and idle:
+
+```text
+python scripts/dfm_model_probe.py --mcp-url <your-loopback-MCP-URL> --repair --output .cache/dfm-repair-probe.json
+```
+
+The two trial components remain available for inspection. Other fixture revisions
+are checked after each call. The adapter permits command edits but excludes
+document switching, exports, supplier/network tools and viewport capture; both
+model runs requested a final viewport image and received an unsupported-tool result.
+The model was able to finish using measured geometry. This development adapter is
+not a security sandbox or a substitute for testing the add-in's normal UI queue.
 
 ## RMFG and platform status
 

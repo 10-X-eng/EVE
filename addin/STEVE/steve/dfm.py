@@ -239,9 +239,22 @@ class DfmChecks:
             raise ValueError('Measurement units must match criterion units; convert through Fusion units helpers first.')
         expected = limit['value']
         passed = actual <= expected if relation == '<=' else actual >= expected if relation == '>=' else actual == expected
+        # A handful of binary64 rounding steps can accumulate in native geometry
+        # and cm-to-mm conversion. This is NOT a shop tolerance or kernel distance
+        # tolerance: preserve raw values and disclose any adjusted boundary result.
+        numerical = None
+        if not passed and (type(actual) is float or type(expected) is float):
+            window = 8 * max(math.ulp(actual), math.ulp(expected))
+            if abs(actual - expected) <= window:
+                passed = True
+                numerical = {'method': 'binary64 boundary comparison', 'maxUlps': 8,
+                             'absoluteWindow': window, 'units': units,
+                             'scope': 'Floating-point rounding only; not a manufacturing tolerance or measurement uncertainty allowance.'}
         result = {'label': label, 'actual': actual, 'criterion': criterion, 'relation': relation,
                   'limit': expected, 'units': units, 'source': limit['source'], 'basis': limit['basis'],
                   'status': 'pass' if passed else 'concern', 'evidence': evidence}
+        if numerical is not None:
+            result['numericalComparison'] = numerical
         if limit['basis'] in ('assumption', 'guideline'):
             result['conditionalResult'] = result['status']
             result['status'] = 'unknown'
