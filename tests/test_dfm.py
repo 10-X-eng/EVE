@@ -173,6 +173,33 @@ class DfmTests(unittest.TestCase):
         checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
         self.assertEqual(checks.report(True)['status'], 'incomplete')
 
+    def test_public_stage_copy_cannot_relabel_measured_criteria(self):
+        original = stages()[0]
+        checks = self.checks(original)
+        before = checks.report(True)['configurationHash']
+        original['process'] = 'turning'
+        exposed = checks.stage
+        exposed['process'] = 'fdm'
+        exposed['criteria']['cutter_radius']['value'] = 100
+        checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
+        report = checks.report(True)
+        self.assertEqual(report['process'], 'milling')
+        self.assertEqual(report['configurationHash'], before)
+        self.assertEqual(report['findings'][0]['limit'], 3)
+        self.assertEqual(report['findings'][0]['status'], 'pass')
+
+    def test_changed_or_unreadable_configuration_preserves_unverified_evidence(self):
+        checks = self.checks()
+        checks.compare('Radius', 4, 'cutter_radius', '>=', 'mm')
+        for configuration, expected in [('stale', 'stale'), ('unknown', 'incomplete')]:
+            report = checks.report(True, configuration)
+            self.assertEqual(report['status'], expected)
+            self.assertEqual(report['configurationStatus'], configuration)
+            self.assertEqual(report['findings'][0]['status'], 'unknown')
+            self.assertEqual(report['findings'][0]['actual'], 4)
+            self.assertEqual(report['findings'][0]['limit'], 3)
+        self.assertEqual(checks.report(True)['findings'][0]['status'], 'pass')
+
     def test_report_is_bounded_and_cannot_omit_overflow_silently(self):
         checks = self.checks()
         for i in range(24):

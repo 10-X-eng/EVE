@@ -59,6 +59,7 @@ def guide(process=None):
     common = {
         'experimental': True,
         'workflow': 'Inspect the target and resolve a BRepBody token. Read/set its plan with fusion_dfm_plan; pass stages=[] only when the user asks to forget that part\'s manufacturing plan. Repeated instances share the native part plan. Use fusion_dfm_check for a selected stage. Derive criteria from user requirements or a documented profile, never invent availability or limits. Preserve functional requirements; recheck after relevant edits.',
+        'historicalReports': 'Reports are snapshots, not live certifications. Before reusing one, read fusion_dfm_plan for the same document and resolved native body. Its reportBinding.revision and planHash must both be available and match the report revision and planHash. The hash covers all ordered stages, including material, notes and criteria. Changed/removed plans, edited geometry or unavailable bindings require a new check. A matching binding alone does not validate external machine/tool settings, occurrence placement, build orientation or the correctness/completeness of the prior inspection.',
         'assemblyFrames': 'Plans and dfm.body describe the native part definition; repeated occurrences share that plan. They do not share placement or automatically share a print orientation. For an explicitly chosen assembly build frame, retain the intended BRepBody proxy, obtain its assemblyContext occurrence in the root context (including nested childOccurrences), copy occurrence.transform2 and invert it. Transform build-direction Vector3D objects by that inverse before passing their components to native envelope/overhang helpers. Use Point3D for axis origins so translation is included; Fusion point coordinates are cm, while rotational_surfaces takes an origin in mm. Do not use the retired occurrence.transform. Record the occurrence, chosen axes and measured revision; changing placement requires a new orientation-dependent assessment. Do not silently measure every occurrence with native XYZ or infer a build orientation from assembly placement.',
         'signatures': [
             "context['dfm'].body: selected native BRepBody (component coordinates; account for assembly/build transforms)",
@@ -251,13 +252,25 @@ class DfmStore:
             return True
 
 
+def plan_hash(plan):
+    """Bind evidence to all ordered stages, independently of rotating entity tokens."""
+    if plan is None:
+        return None
+    return hashlib.sha256(json.dumps(plan['stages'], sort_keys=True).encode('utf-8')).hexdigest()
+
+
 class DfmChecks:
     def __init__(self, body, stage):
         self.body = native(body)
-        self.stage = validate_stages([stage])[0]
-        self._criteria = copy.deepcopy(self.stage.get('criteria', {}))
+        self._stage = validate_stages([stage])[0]
+        self._criteria = copy.deepcopy(self._stage.get('criteria', {}))
         self._revision = revision(self.body)
         self._findings = []
+
+    @property
+    def stage(self):
+        """The assessed stage snapshot; editing the returned value cannot change evidence."""
+        return copy.deepcopy(self._stage)
 
     def _add(self, value):
         if len(self._findings) >= 24:
@@ -307,20 +320,25 @@ class DfmChecks:
             result['reason'] = 'Confirm applicability of this criterion before treating the conditional result as verified.'
         self._add(result)
 
-    def report(self, execution_ok):
+    def report(self, execution_ok, configuration_status='current'):
+        if configuration_status not in ('current', 'stale', 'unknown'):
+            raise ValueError('Use current, stale or unknown configuration status.')
         current = revision(self.body)
-        stale = bool(self._revision and current != self._revision)
+        stale = bool(self._revision and current != self._revision) or configuration_status == 'stale'
         findings = copy.deepcopy(self._findings)
-        verified = bool(execution_ok and self._revision and current == self._revision)
+        verified = bool(execution_ok and self._revision and current == self._revision and configuration_status == 'current')
         if not verified:
             for finding in findings:
                 finding['status'] = 'unknown'
-                finding['reason'] = 'Execution or geometry revision was not verified; remeasure before relying on this result.'
+                finding['reason'] = ('The manufacturing plan changed or could not be revalidated; read the current plan and recheck.'
+                    if configuration_status != 'current' else
+                    'Execution or geometry revision was not verified; remeasure before relying on this result.')
         status = ('stale' if stale else 'incomplete' if not verified or not findings else
                   'concerns' if any(f['status'] == 'concern' for f in findings) else
                   'incomplete' if any(f['status'] == 'unknown' for f in findings) else 'checked')
-        return {'status': status, 'process': self.stage['process'], 'body': str(self.body.name)[:200],
+        return {'status': status, 'process': self._stage['process'], 'body': str(self.body.name)[:200],
                 'bodyToken': self.body.entityToken, 'revision': self._revision,
-                'configurationHash': hashlib.sha256(json.dumps(self.stage, sort_keys=True).encode('utf-8')).hexdigest(),
+                'configurationHash': hashlib.sha256(json.dumps(self._stage, sort_keys=True).encode('utf-8')).hexdigest(),
+                'configurationStatus': configuration_status,
                 'findings': findings, 'coverage': 'Only the listed measurements for this body and revision. Generated inspection code is not independently certified.',
-                'unchecked': GUIDES[self.stage['process']]['unchecked']}
+                'unchecked': GUIDES[self._stage['process']]['unchecked']}
