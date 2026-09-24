@@ -18,6 +18,7 @@ from .python_runner import run_python, bounded_result
 from .document_summary import design_summary, cam_summary, electronics_summary
 from .verification import Checks, snapshot, report
 from .python_helpers import FusionHelpers, helper_help
+from .viewport import temporary_camera
 from .cam_guard import protect_cam_values
 from .tool_protocol import API_GUIDANCE, ToolError, tool_failure
 from .transport import data_home
@@ -377,16 +378,19 @@ class FusionTools:
         self.capture_folder.mkdir(parents=True, exist_ok=True)
         path = self.capture_folder / (str(uuid4()) + ".png")
         try:
-            viewport.refresh()
-            if not viewport.saveAsImageFile(str(path), width, height):
-                raise ToolError("viewport_capture_failed", "Fusion could not render the viewport image.")
-            if path.stat().st_size > 8 * 1024 * 1024:
-                raise ToolError("viewport_capture_failed", "The viewport image exceeded the capture size limit.")
-            data = path.read_bytes()
-            if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-                raise ToolError("viewport_capture_failed", "Fusion did not return a valid PNG image.")
-            return {"ok": True, "document_id": self.document_id, "width": width, "height": height,
-                    "imageUrl": "data:image/png;base64," + base64.b64encode(data).decode("ascii")}
+            with temporary_camera(viewport, self.context(), job["arguments"], adsk.core, job["cancelled"]):
+                viewport.refresh()
+                if not viewport.saveAsImageFile(str(path), width, height):
+                    raise ToolError("viewport_capture_failed", "Fusion could not render the viewport image.")
+                if path.stat().st_size > 8 * 1024 * 1024:
+                    raise ToolError("viewport_capture_failed", "The viewport image exceeded the capture size limit.")
+                data = path.read_bytes()
+                if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+                    raise ToolError("viewport_capture_failed", "Fusion did not return a valid PNG image.")
+                return {"ok": True, "document_id": self.document_id, "width": width, "height": height,
+                        "view": job["arguments"].get("view", "current"),
+                        "framing": "target" if any(key in job["arguments"] for key in ("selection_index", "entity_token")) else "model",
+                        "imageUrl": "data:image/png;base64," + base64.b64encode(data).decode("ascii")}
         finally:
             path.unlink(missing_ok=True)
 

@@ -66,3 +66,20 @@ and offline behavior. Controller tests confirm shared tool registration and that
 remains responsive during a documentation request. A live public sample-index search
 returned three Electronics samples and successfully fetched the Board Summary page.
 No authenticated provider inference was used for this check.
+
+## Viewport verification (#15)
+
+Capture accepts named ViewCube orientations and either an original selection index
+or a pinned Design entity token. Close-ups support bodies, faces, edges, and occurrences;
+native child-component geometry requires an assembly-context proxy. Named views and
+framing are limited to Design/CAM; other products retain current-view capture.
+
+Each call returns one image, at most 1280 pixels on its longest edge and 8 MB, with a
+view/framing label preserved in the chat image catalog. Temporary camera changes use
+nonanimated transitions and restore the original camera in a finally block, including
+capture failure and cancellation. A restoration error is surfaced explicitly.
+
+Fixtures verify camera restoration, narrow-viewport framing, unsupported products,
+stale selection rejection, and the bridge's labeled image return. Native framing,
+ViewCube orientation, assembly proxy coordinates, and image usefulness remain live
+Fusion checks; no live CAD geometry has been modified during this development pass.

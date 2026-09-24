@@ -1135,7 +1135,7 @@ class Controller:
             if payload["cancelled"]():
                 raise ToolError("inactive_request", "The image request's turn is no longer active.")
             saved = payload.get("savedImage")
-            label = SAVED_IMAGE_PREFIX + "\n" + json.dumps(saved, ensure_ascii=False) if saved else VIEWPORT_PREFIX
+            label = SAVED_IMAGE_PREFIX + "\n" + json.dumps(saved, ensure_ascii=False) if saved else VIEWPORT_PREFIX + "\n" + json.dumps({key: payload["result"][key] for key in ("view", "framing") if key in payload["result"]})
             payload["client"].request("turn/steer", {"threadId": payload["threadId"],
                 "expectedTurnId": payload["turnId"], "input": [
                     {"type": "text", "text": label, "text_elements": []},
@@ -1145,12 +1145,13 @@ class Controller:
             result.update(tool_failure(exc, code="chat_image_delivery_failed" if payload.get("savedImage") else "image_delivery_failed"))
         if result.get("imageDelivered") and not payload.get("savedImage"):
             try:
-                images = validate_images([{"url": payload["imageUrl"], "name": "Viewport capture"}],
+                capture_name = "Viewport: " + payload["result"].get("view", "current") + " (" + payload["result"].get("framing", "model") + ")"
+                images = validate_images([{"url": payload["imageUrl"], "name": capture_name}],
                                          max_bytes=MAX_STORED_IMAGE_BYTES)
                 with self._lock:
                     document = copy.deepcopy(self.state.get("taskDocument"))
                 recorded = self._record_chat_images(payload["threadId"], payload["turnId"], images,
-                    source="viewport", message="Viewport captured for visual verification", document=document)
+                    source="viewport", message=capture_name + " for visual verification", document=document)
                 if recorded:
                     result["imageId"] = recorded[0]["imageId"]
                 else:
