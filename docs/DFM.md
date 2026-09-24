@@ -66,6 +66,12 @@ replaced body is not silently substituted.
 - Native sheet-metal inspection reads the folded-body flag, active rule and
   existing flat-pattern presence. Configured thickness is not a measurement;
   an imported solid is not assumed foldable.
+- Existing flat-pattern bend lines provide native angles and line lengths in
+  bounded pages. The pattern must belong to the selected body; missing data stays
+  unknown. Lines are not unique physical bends: the live bent-strip fixture has
+  one bend and two lines, one on each sheet surface. This query never creates a
+  flat pattern or converts a part, and does not certify pattern currency, bend
+  radius, relief, sequence or tooling clearance.
 - A normal-ray helper measures material at one interior face sample, requiring
   a confirmed solid interior and an exit on the same body. It does not find the
   global minimum wall thickness or qualify unsampled regions.

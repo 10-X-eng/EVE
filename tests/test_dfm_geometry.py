@@ -53,6 +53,41 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(result['status'],'unknown')
         self.assertNotIn('rule',result)
 
+    def test_existing_bend_lines_use_native_angles_and_preserve_failed_pages(self):
+        first, second = Obj(length=2), Obj(length=3)
+        pattern = Obj(foldedBody=Obj(nativeObject=self.body), bendLinesBody=Obj(edges=Collection(first, second)),
+                      getBendInfo=lambda edge: (True, True, math.pi/2) if edge is first else (False, None, None))
+        self.body.isSheetMetal = True
+        self.body.parentComponent = Obj(flatPattern=pattern)
+        page1 = self.geo.sheet_bends(limit=1)
+        self.assertEqual(page1['items'][0]['angle_deg'], 90)
+        self.assertEqual(page1['items'][0]['lineLength_mm'], 20)
+        self.assertTrue(page1['items'][0]['isBendUp'])
+        self.assertEqual(page1['nextOffset'], 1)
+        page2 = self.geo.sheet_bends(offset=page1['nextOffset'], limit=1)
+        self.assertEqual(page2['items'][0]['status'], 'unknown')
+        self.assertIsNone(page2['nextOffset'])
+        self.assertEqual(page2['totalLines'], 2)
+        pattern.getBendInfo = lambda edge: (True, None, math.pi/2)
+        self.assertEqual(self.geo.sheet_bends()['items'][0]['status'], 'unknown')
+
+    def test_missing_foreign_or_non_sheet_patterns_are_not_created_or_assumed_valid(self):
+        self.body.isSheetMetal = False
+        self.assertEqual(self.geo.sheet_bends()['status'], 'unknown')
+        self.body.isSheetMetal = True
+        self.body.parentComponent = Obj(flatPattern=None)
+        self.assertIn('No existing flat pattern', self.geo.sheet_bends()['reason'])
+        pattern = Obj(foldedBody=Obj(nativeObject=None), bendLinesBody=None)
+        self.body.parentComponent.flatPattern = pattern
+        self.assertIn('different', self.geo.sheet_bends()['reason'])
+        pattern.foldedBody = self.body
+        self.assertEqual(self.geo.sheet_bends()['status'], 'unknown')
+        pattern.bendLinesBody = Obj(edges=Collection())
+        self.assertEqual(self.geo.sheet_bends()['totalLines'], 0)
+        self.body.revisionId = 'r2'
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.geo.sheet_bends()
+
     def test_normal_thickness_measures_material_and_never_substitutes_a_neighbor(self):
         self.app.pointTolerance=1e-6
         self.app.vectorAngleTolerance=1e-10
