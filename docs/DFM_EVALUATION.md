@@ -574,6 +574,45 @@ source/scope, and attempts to replace or invert limits. These validate selected
 nominal capabilities; no physical printer, slicer outcome or complete machine
 capability profile has been qualified.
 
+### Paired real-model machine discovery
+
+The opt-in model probe now includes a read-only additive case:
+
+```sh
+python scripts/dfm_model_probe.py --mcp-url <your-loopback-MCP-URL> --fdm-envelope --output .cache/dfm-machine-probe.json
+```
+
+It requires the existing `DFM orientation plate` in the sourced-envelope fixture,
+the dedicated development document and an idle selection command. It creates no
+geometry. The identical prompt in each mode explicitly selects MK4S and original
+CORE One and three native build frames, without supplying measured dimensions or
+machine limits. The model must discover installed definitions and measure the body.
+The output contains the prompt's tool trace and answer; independent native bounds,
+volume and all protected body revisions are checked after each conversation.
+The verifier checks geometry preservation, not correctness of natural-language
+answers; conclusions below were reviewed against the measurements and sources.
+
+On Fusion 2705.1.25, GPT-6-Astra/medium completed both modes with no failed tool
+calls. DFM off used 9 calls in 35.047 seconds; DFM on used 14 in 59.531 seconds.
+Both correctly reported 218/200/10 mm in the original frame and 200/218/10 mm at
+a quarter turn: MK4S fits upright and exceeds Y by 8 mm after rotation; original
+CORE One fits the rotated part with 2 mm nominal Y margin. Both identified the
+installed source references and explicitly excluded printability certification.
+Independent volume was 436,000 mm³, and every body revision remained unchanged.
+
+The enabled run discovered exact machine hashes, saved a temporary plan and
+recorded sourced comparisons for all three cases. Its initial measurement-only
+check had no findings and correctly returned `incomplete`; it then performed the
+comparisons. The final reports were `checked`, `concerns`, `checked`, scoped to
+listed envelope measurements and retaining machine/process unchecked coverage.
+`checked` is not a whole-part manufacturing pass. The model recorded comparison
+alternatives as separately annotated plan stages; this run does not establish
+automatic selection of a final manufacturing route or alternative-plan semantics.
+
+This is the first paired additive machine-discovery case. Both modes reached the
+same correct dimensional conclusions, so it demonstrates integration rather than
+improved design quality or speed. No physical printing or slicer validation ran.
+
 ## RMFG and platform status
 
 Windows and macOS CI built and verified the foundation and RMFG packages. Native
