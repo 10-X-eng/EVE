@@ -11,6 +11,7 @@ STEVE now has richer document context, explicit verification results, searchable
 - **Find Fusion documentation with any provider.** Search installed API classes and official samples, inspect installed signatures, and fetch Autodesk API reference pages through dedicated tools.
 - **Use consistent Python helpers.** Helpers resolve pinned selections and entity tokens, validate unit expressions, and page through collections without dumping entire documents or libraries.
 - **Capture useful views.** Named views and selected-entity close-ups restore the original camera after capture, including failures. Images supplement API measurements.
+- **Allow slower Windows image-paste startup.** The background clipboard helper now has a bounded 30-second deadline to accommodate slower PowerShell/.NET startup; it does not block Fusion's UI thread.
 
 This release also includes the previously merged in-app STEVE update flow and the renamed **Jobs** controls. Use `/jobs` to manage ongoing work.
 

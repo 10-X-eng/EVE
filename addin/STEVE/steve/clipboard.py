@@ -74,12 +74,16 @@ def read_clipboard_image():
         command = [executable, "-NoProfile", "-NonInteractive", "-STA", "-EncodedCommand",
                    base64.b64encode(WINDOWS_READER.encode("utf-16-le")).decode("ascii")]
         options = {"creationflags": subprocess.CREATE_NO_WINDOW}
+        # Cold PowerShell/.NET startup can exceed ten seconds on busy Windows
+        # machines. This helper runs on a worker, never Fusion's UI thread.
+        timeout = 30
     elif sys.platform == "darwin":
         executable = shutil.which("osascript")
         if not executable:
             raise RuntimeError("macOS clipboard support requires osascript.")
         command = [executable, "-l", "JavaScript", "-e", MACOS_READER]
         options = {}
+        timeout = 10
     else:
         raise RuntimeError("Image paste is supported on Windows and macOS.")
     with tempfile.TemporaryDirectory(prefix="steve-clipboard-") as scratch:
@@ -87,7 +91,7 @@ def read_clipboard_image():
         env = {**os.environ, "STEVE_CLIPBOARD_IMAGE": str(path)}
         try:
             result = subprocess.run(command, env=env, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL, timeout=10, **options)
+                                    stderr=subprocess.DEVNULL, timeout=timeout, **options)
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("Clipboard image read timed out. Copy the screenshot again and retry paste.") from exc
         if result.returncode:
