@@ -218,6 +218,28 @@ class ControllerTests(unittest.TestCase):
     def test_startup_validates_saved_account_without_opening_browser(self):
         self.assertTrue(self.controller.snapshot()["accountChecked"])
         self.assertEqual(self.controller.snapshot()["account"]["email"], "test@example.com")
+
+    def test_documentation_worker_does_not_block_stop_or_require_fusion_bridge(self):
+        from steve.documentation import BASE
+        entered, release = threading.Event(), threading.Event()
+        def fetch(*args):
+            entered.set()
+            release.wait(2)
+            return {"ok": True, "text": "reference"}
+        self.controller.dispatch("send", {"text": "Find documentation"})
+        eventually(lambda: self.controller.turn_id is not None)
+        with patch.object(self.controller.documentation, "fetch", side_effect=fetch):
+            try:
+                self.client.on_request("docs", "item/tool/call", {"threadId": "thread-1", "turnId": "turn-1",
+                    "tool": "fusion_fetch_docs", "arguments": {"url": BASE + "SampleList.htm"}})
+                self.assertTrue(entered.wait(1))
+                self.controller.dispatch("stop")
+                eventually(lambda: any(method == "turn/interrupt" for method, _ in self.client.calls))
+            finally:
+                release.set()
+            eventually(lambda: any(row[0] == "docs" for row in self.client.replies))
+        result = next(row[1] for row in self.client.replies if row[0] == "docs")
+        self.assertFalse(result["success"])
         self.assertIn(("account/read", {"refreshToken": True}), self.client.calls)
         self.assertFalse(self.urls)
 
@@ -854,7 +876,7 @@ class ControllerTests(unittest.TestCase):
     def test_new_and_resumed_chats_receive_current_tools_and_prompt(self):
         params = thread_start_params(ROOT)
         self.assertEqual({tool["name"] for tool in params["dynamicTools"]},
-                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image"})
+                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image", "fusion_search_docs", "fusion_fetch_docs"})
         self.assertNotIn("No tools are available", params["baseInstructions"])
         self.client.history = [{"id": "saved-thread", "preview": "Old chat"}]
         self.controller.dispatch("history")
