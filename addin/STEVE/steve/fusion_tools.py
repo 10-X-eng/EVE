@@ -248,7 +248,7 @@ class FusionTools:
             if not plan or index >= len(plan['stages']):
                 raise ToolError('dfm_plan_required', 'No saved manufacturing plan at that stage index.')
             dfm = DfmChecks(body, plan['stages'][index])
-            dfm.measurements = DfmGeometry(body, self.app, adsk.core, adsk.cam, job['cancelled'])
+            dfm.measurements = DfmGeometry(body, self.app, adsk.core, adsk.cam, job['cancelled'], fusion=adsk.fusion)
             context['dfm'] = dfm
         if job["tool"] == "fusion_execute_python":
             job["before"] = snapshot(context["design"])

@@ -62,6 +62,10 @@ def guide(process=None):
             "context['dfm'].unknown(label, reason): explicit missing/unsupported coverage",
             "context['dfm'].measurements.envelope(x_axis, y_axis): explicit perpendicular directions in native body coordinates; returns oriented dimensions_mm and excluded geometry",
             "context['dfm'].measurements.cylindrical_walls(offset=0, limit=10): full cylindrical bands with diameter_mm, axial_span_mm, side, faceToken; NOT complete-hole recognition; page by returned nextOffset",
+            "context['dfm'].measurements.rotational_surfaces(axis_origin_mm, axis_direction, offset=0, limit=10): analytic surface and circular-trim compatibility about a chosen turning axis; compatible/nonrotational/unknown per face. Read every page; no lathe/process approval inferred",
+            "context['dfm'].measurements.sheet_metal(): native folded-body flag, configured sheet-metal rule thickness/gap/kFactor and existing component flat-pattern presence. Rule settings are NOT a physical thickness measurement; imported solids stay unknown",
+            "context['dfm'].measurements.normal_thickness(face_index): ray-measured material thickness at ONE interior face sample, in mm; requires a solid and a confirmed inward material origin/outward exit on the SAME body. Not a global minimum or whole-part wall check; record unsampled/thin-region coverage as unknown",
+            "context['dfm'].measurements.enclosed_voids(lump_index=0, offset=0, limit=10): closed native void shells and enclosed volume_mm3 for resin/powder entrapment screening. Inspect every page/lump; absence is NOT proof of drainage, escape-hole sizing, flow, orientation or no suction cups. Do not transfer resin/powder assumptions to FDM or open holes in intentionally sealed parts",
             "context['dfm'].measurements.holes(offset=0, limit=10): native recognized holes/segments or status unknown when API/extension unavailable; honor warnings and segmentsComplete",
             "context['dfm'].measurements.pockets(attack_direction, offset=0, limit=10): native pocket depths for a downward tool direction; may require an extension; no inferred corner radius or tool clearance",
             "context['dfm'].measurements.planar_overhangs(x_axis, y_axis, offset=0, limit=10): downward planar faces; tilt is 0 degrees for a horizontal underside, 90 for a vertical wall. Lowest horizontal faces are potential bed contact, not automatically unsupported; curved surfaces remain unassessed",
@@ -235,9 +239,22 @@ class DfmChecks:
             raise ValueError('Measurement units must match criterion units; convert through Fusion units helpers first.')
         expected = limit['value']
         passed = actual <= expected if relation == '<=' else actual >= expected if relation == '>=' else actual == expected
+        # A handful of binary64 rounding steps can accumulate in native geometry
+        # and cm-to-mm conversion. This is NOT a shop tolerance or kernel distance
+        # tolerance: preserve raw values and disclose any adjusted boundary result.
+        numerical = None
+        if not passed and (type(actual) is float or type(expected) is float):
+            window = 8 * max(math.ulp(actual), math.ulp(expected))
+            if abs(actual - expected) <= window:
+                passed = True
+                numerical = {'method': 'binary64 boundary comparison', 'maxUlps': 8,
+                             'absoluteWindow': window, 'units': units,
+                             'scope': 'Floating-point rounding only; not a manufacturing tolerance or measurement uncertainty allowance.'}
         result = {'label': label, 'actual': actual, 'criterion': criterion, 'relation': relation,
                   'limit': expected, 'units': units, 'source': limit['source'], 'basis': limit['basis'],
                   'status': 'pass' if passed else 'concern', 'evidence': evidence}
+        if numerical is not None:
+            result['numericalComparison'] = numerical
         if limit['basis'] in ('assumption', 'guideline'):
             result['conditionalResult'] = result['status']
             result['status'] = 'unknown'

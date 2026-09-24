@@ -40,6 +40,19 @@ replaced body is not silently substituted.
 - Native hole and pocket recognition adapters report missing APIs or extension
   access as unknown. Paging bounds results, not the duration of native Fusion
   calculations. No automatic cancellation of native recognition is attempted.
+- Turning-axis checks classify analytic surfaces **and their trimming** as
+  compatible, nonrotational or unknown. Read every face page. A compatible page
+  does not prove a lathe setup, tool fit, stock allowance or workholding.
+- Native sheet-metal inspection reads the folded-body flag, active rule and
+  existing flat-pattern presence. Configured thickness is not a measurement;
+  an imported solid is not assumed foldable.
+- A normal-ray helper measures material at one interior face sample, requiring
+  a confirmed solid interior and an exit on the same body. It does not find the
+  global minimum wall thickness or qualify unsampled regions.
+- Native closed-void shells provide resin/powder entrapment evidence. Missing
+  shell volume remains unknown, never zero. An open cavity still needs process
+  checks for escape-hole size, orientation, flow and washing. This criterion
+  must not be transferred blindly to FDM or intentionally sealed designs.
 
 Process guidance currently covers milling/drilling, turning, sheet metal, FDM,
 resin and powder printing. Guidance is not a qualified algorithm library for all
@@ -77,8 +90,43 @@ not a live entitled run. Live planar-overhang checks found the blind-hole ceilin
 and the lowest horizontal face, distinguishing the possible bed-contact face.
 The rotated 40 x 60 x 8 mm envelope failed a 62 x 45 x 10 mm printer envelope;
 the 60 x 40 x 8 mm orientation passed those dimensional comparisons. Curved
-overhang coverage remained explicitly unsupported.
+overhang coverage remained explicitly unsupported. A normal ray through the
+blind-hole ceiling measured the independently known 3 mm remaining material.
 
-This is direct integration evidence, not a model-driven design benchmark or
-macOS live qualification. Broader process fixtures, paired DFM-off/on tasks,
-provider behavior and embedded-panel interaction remain to be validated.
+`scripts/fusion_process_smoke.py` creates an additional disposable cylinder in
+the named test document. All three faces of the 20 mm diameter, 40 mm long
+cylinder were compatible with its axis. After a transverse cut, the checker
+identified nonrotational surfaces and unsupported trimming; the old measurement
+object rejected the changed revision. The original block remained unchanged.
+
+`scripts/fusion_additive_smoke.py` creates a sealed cylindrical cavity inside a
+separate cube, then opens it. Native shell topology detected the sealed void;
+independent material-volume subtraction confirmed 50.265482 mm³ removed. A ray
+measured its 3 mm ceiling. After opening it, no sealed void remained. This does
+not establish practical resin drainage or powder removal. Fusion's inner-shell
+token and volume getters raised internal validation errors on this fixture;
+STEVE retains the valid topology finding and explicitly marks volume unknown.
+
+The latter two scripts modify **only their new fixture components** and refuse
+to run outside the explicitly named disposable test document or to duplicate
+their existing fixtures. They are developer checks, not add-in entry points.
+
+This is direct integration evidence, not broad manufacturing qualification or
+macOS live qualification. Paired DFM-off/on real-model inspection and authorized
+repair trials passed; both modes found and repaired the known defect, with the
+enabled mode adding structured, sourced reporting. A native floating-point
+boundary false concern was fixed and its exact generated check replayed.
+Comparisons preserve raw values and disclose any allowance of up to eight
+binary64 rounding steps; this is not a manufacturing tolerance.
+Design-quality improvement, additional providers and embedded
+panel workflows remain to be evaluated. See [DFM_EVALUATION.md](DFM_EVALUATION.md).
+
+An opt-in inspection/repair benchmark is available as `scripts/dfm_model_probe.py`.
+It uses STEVE's existing ChatGPT connection and an explicitly supplied loopback
+development MCP endpoint, creates ephemeral model conversations, and compares
+the same task with DFM off/on. By default its adapter allows only inspection and
+local plan metadata. Explicit `--repair` creates two disposable child fixtures,
+allows command edits, and independently verifies the resulting geometry and
+preserved fixture revisions. Neither mode supplies upload capability.
+This development script is not a product MCP dependency.
+See the recorded validation results before treating it as a quality benchmark.

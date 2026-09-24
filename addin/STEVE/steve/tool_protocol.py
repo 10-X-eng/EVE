@@ -104,6 +104,20 @@ is blocked for native stability. Do not evade runtime guards or retry blocked ac
 
 # Detailed recipes are returned by API help only for the relevant workflow.
 API_GUIDANCE = {
+    'adsk.fusion.BRepShell': """For sealed-cavity queries, inspect isClosed and isVoid on every relevant lump/shell.
+A valid freshly evaluated shell's entityToken or volume may raise InternalValidationError in Fusion.
+Identify such findings by body token, body revision and lump/shell indices instead; do not
+modify the model or repeat the same failing getter merely to obtain a token or volume.
+Keep a detected sealed void even if its volume is unknown; never substitute zero. No voids found
+does not prove resin drainage, powder escape-hole sizing, or favorable print orientation.""",
+    'adsk.fusion.Sketch': """Sketch geometry uses sketch coordinates. For a known point in the component's model coordinates,
+use sketch.modelToSketchSpace before creating a curve on an oriented or offset sketch plane.
+Check the resulting sketch point's worldGeometry when placement is consequential; guessing
+the axis mapping can create a valid feature in the wrong place.""",
+    'adsk.fusion.ExtrudeFeatureInput': """For cuts in a design with multiple bodies/components, set participantBodies to the intended
+current BRepBody objects explicitly. Verify the feature's health and the current component
+bodies after the operation; the existence of a returned feature alone does not prove the
+intended target changed. Use modelToSketchSpace when locating profiles on oriented planes.""",
     'adsk.cam.CAMManager': """Query existing machines and tools before choosing them; do not invent availability.
 Use adsk.cam.CAMManager.get().libraryManager for libraries and the pinned document's
 CAM product for setups and document tools. Start with library names/URLs and counts;
@@ -261,6 +275,7 @@ def tool_failure(exc, code=None, execution_started=False):
     recovery = {
         "camera_restore_failed": "The capture changed the view but Fusion rejected camera restoration. Tell the user and stop camera operations; do not retry capture or modify geometry to compensate.",
         "entity_unavailable": "The pinned entity is stale, missing, ambiguous, or has the wrong type. Inspect the original document and resolve the intended target before changes. Do not use a later UI selection or arbitrarily choose the first match.",
+        "entity_type_mismatch": "The original entity resolved, but its type differs from the request. Read fusion_api_help steve.helpers and the reported installed class. expected_type accepts an SDK class, its classType() string or dotted adsk path. Correct the type only if it matches the intended operation; do not replace the original selection or simply drop the check to force an incompatible operation.",
         "documentation_unavailable": "The documentation read failed, not a Fusion operation. Use installed fusion_api_help or another official sample link. Check connectivity for network errors; do not interpret a missing page as an unavailable API or retry in a loop.",
         "invalid_python": "Correct the Python syntax at the reported line, keep work inside def run(context), and submit the corrected code without Markdown fences.",
         "invalid_arguments": "Correct the named argument using this tool's input schema. Python tools require document_id, title, and code defining run(context); get document_id from fusion_inspect_document.",
