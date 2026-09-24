@@ -67,6 +67,17 @@ class PythonExecutionTests(unittest.TestCase):
         self.assertIn("time budget", result["error"])
         self.assertIs(sys.gettrace(), previous)
 
+    def test_native_wait_does_not_consume_python_loop_budget(self):
+        previous = sys.getprofile()
+        result = run_python("import time\ndef run(context):\n time.sleep(0.06)\n return 'completed'", {}, budget_seconds=0.03)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["result"], "completed")
+        self.assertIs(sys.getprofile(), previous)
+
+    def test_python_loop_after_native_wait_still_expires(self):
+        result = run_python("import time\ndef run(context):\n time.sleep(0.03)\n while True:\n  pass", {}, budget_seconds=0.02)
+        self.assertEqual(result["errorCode"], "python_time_budget")
+
     def test_print_output_is_bounded_and_return_value_must_be_json(self):
         result = run_python("def run(context):\n print('x' * 20000)\n return object()", {})
         self.assertFalse(result["ok"])

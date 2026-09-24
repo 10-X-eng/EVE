@@ -86,6 +86,8 @@ def run_python(source, context, cancelled=lambda: False, budget_seconds=15, diag
     remaining = 12000
     output_truncated = False
     started = time.monotonic()
+    native_started = None
+    native_seconds = 0.0
     execution_started = False
     formatting_result = False
     traced_lines = set()
@@ -98,11 +100,21 @@ def run_python(source, context, cancelled=lambda: False, budget_seconds=15, diag
             output.append(text[:remaining])
         remaining = max(0, remaining - len(text))
 
+    def profile(frame, event, arg):
+        # Native calls cannot be interrupted. Their duration must not consume
+        # the Python-loop budget and cause a rollback after legitimate work.
+        nonlocal native_started, native_seconds
+        if event == "c_call":
+            native_started = time.monotonic()
+        elif event in ("c_return", "c_exception") and native_started is not None:
+            native_seconds += time.monotonic() - native_started
+            native_started = None
+
     def trace(frame, event, arg):
         if frame.f_code.co_filename == FILENAME:
             if cancelled():
                 raise ScriptStopped("Operation cancelled.")
-            if time.monotonic() - started > budget_seconds:
+            if time.monotonic() - started - native_seconds > budget_seconds:
                 raise ScriptStopped("Python execution exceeded its time budget. Use a smaller operation.", "python_time_budget")
             if diagnostic and event == "line" and frame.f_lineno not in traced_lines:
                 traced_lines.add(frame.f_lineno)
@@ -110,6 +122,7 @@ def run_python(source, context, cancelled=lambda: False, budget_seconds=15, diag
         return trace
 
     previous_trace = sys.gettrace()
+    previous_profile = sys.getprofile()
     try:
         tree = ast.parse(source, filename=FILENAME)
         for node in ast.walk(tree):
@@ -126,6 +139,7 @@ def run_python(source, context, cancelled=lambda: False, budget_seconds=15, diag
             raise ScriptStopped("Operation cancelled before execution.")
         namespace = {"__name__": "__steve_script__", "__builtins__": {**vars(builtins), "print": capture}}
         sys.settrace(trace)
+        sys.setprofile(profile)
         execution_started = True
         exec(compile(tree, FILENAME, "exec"), namespace)
         value = namespace["run"](context)
@@ -143,3 +157,4 @@ def run_python(source, context, cancelled=lambda: False, budget_seconds=15, diag
                 "output": "".join(output), "outputTruncated": output_truncated, "trace": frames}
     finally:
         sys.settrace(previous_trace)
+        sys.setprofile(previous_profile)
