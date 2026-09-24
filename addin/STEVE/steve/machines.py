@@ -114,6 +114,15 @@ def status(reference):
     return 'current' if current['definition_hash'] == reference['definition_hash'] else 'stale'
 
 
+def plan_status(plan):
+    """Currency of every referenced definition in an already validated plan."""
+    references = {(stage['machine']['id'], stage['machine']['definition_hash'])
+                  for stage in (plan or {}).get('stages', []) if 'machine' in stage}
+    states = {status({'id': machine_id, 'definition_hash': digest})
+              for machine_id, digest in sorted(references)}
+    return 'stale' if 'stale' in states else 'unknown' if 'unknown' in states else 'current'
+
+
 def help(machine_id=None):
     if machine_id is not None:
         definition = load(machine_id)
