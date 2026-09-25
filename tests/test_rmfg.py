@@ -45,12 +45,12 @@ class RMFGTests(unittest.TestCase):
     def connected(self):
         self.store.write({'state':'connected','tokens':{**self.token(),'expires_at':self.now+100}})
 
-    def test_device_flow_requests_only_dfm_scopes_and_respects_poll_interval(self):
+    def test_device_flow_requests_dfm_and_checkout_without_payments_and_respects_poll_interval(self):
         self.responses.append({'device_code':'private-code','user_code':'PUBLIC-CODE',
             'verification_uri_complete':'https://www.rmfg.com/connect?code=PUBLIC-CODE',
             'interval':5,'expires_in':600})
         attempt = self.auth.begin()
-        self.assertEqual(self.calls[0][2]['scope'], 'designs dfm')
+        self.assertEqual(self.calls[0][2]['scope'], 'designs dfm quotes carts')
         self.assertEqual(self.auth.poll(attempt), 'pending')
         self.assertEqual(len(self.calls), 1)
         self.now += 5
@@ -129,6 +129,28 @@ class RMFGTests(unittest.TestCase):
         for payload in ({**self.token(),'scope':'designs'}, {**self.token(),'expires_in':float('nan')}):
             with self.assertRaises(RMFGError):
                 self.auth.validate_tokens(payload)
+
+    def test_old_dfm_connection_remains_usable_and_checkout_requires_new_scopes(self):
+        self.connected()
+        self.assertEqual(self.auth.access_token(), 'fixture-access')
+        self.assertFalse(self.auth.checkout_available())
+        with self.assertRaisesRegex(RMFGError, 'enable quotes and checkout'):
+            self.auth.access_token({'quotes', 'carts'})
+        self.store.value['tokens']['scope'] = 'designs dfm quotes carts'
+        self.assertTrue(self.auth.checkout_available())
+        self.assertEqual(self.auth.access_token({'quotes', 'carts'}), 'fixture-access')
+
+    def test_checkout_transport_uses_exact_items_and_keys_without_payment(self):
+        client = RMFGClient(lambda: 'fixture', self.transport)
+        items = [{'design_id': 'design-1', 'quantity': 3, 'configuration': {'parts': [{'part_id': 'p', 'material_id': 'm'}]}}]
+        self.responses.extend([{'id': 'q'}, {'id': 'q'}, {'id': 'c'}, {'id': 'c'}])
+        client.create_quote(items, 'quote-key')
+        client.quote('q')
+        client.create_cart(items, 'cart-key')
+        client.cart('c')
+        self.assertEqual([call[1] for call in self.calls], ['/v1/quotes', '/v1/quotes/q', '/v1/carts', '/v1/carts/c'])
+        self.assertEqual(self.calls[0][2], self.calls[2][2])
+        self.assertEqual(self.calls[2][-1], 'cart-key')
 
     def test_dfm_request_cannot_accept_risks_or_order_parts(self):
         client = RMFGClient(lambda:'token', self.transport)

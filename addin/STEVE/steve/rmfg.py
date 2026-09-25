@@ -1,4 +1,4 @@
-"""RMFG device OAuth and DFM-only REST transport. Call from workers, not Fusion UI."""
+"""RMFG device OAuth, DFM and hosted checkout. Call from workers, not Fusion UI."""
 from dataclasses import dataclass, field
 import hashlib
 import json
@@ -12,7 +12,8 @@ from uuid import uuid4
 
 ORIGIN = 'https://api.rmfg.com'
 CLIENT_ID = 'rmfg-agent'
-SCOPES = 'designs dfm'
+SCOPES = 'designs dfm quotes carts'
+DFM_SCOPES = {'designs', 'dfm'}
 MAX_STEP_BYTES = 50*1024*1024
 
 
@@ -116,7 +117,7 @@ class RMFGAuth:
     def validate_tokens(self, value):
         lifetime = value.get('expires_in')
         if (str(value.get('token_type','')).lower()!='bearer' or not isinstance(value.get('scope'),str)
-                or not set(SCOPES.split()) <= set(value['scope'].split())
+                or not DFM_SCOPES <= set(value['scope'].split())
                 or type(lifetime) not in (int,float) or not math.isfinite(lifetime) or not 0<lifetime<=900):
             raise RMFGError('RMFG connection needs designs and DFM permissions and a valid expiry. Reconnect.')
         return {'access_token':secret(value.get('access_token')), 'refresh_token':secret(value.get('refresh_token')),
@@ -177,7 +178,7 @@ class RMFGAuth:
                 raise RMFGError('Connect RMFG in STEVE before using supplier jobs.')
             return identifier(record['connection'])
 
-    def access_token(self):
+    def access_token(self, required_scopes=DFM_SCOPES):
         with self.store.locked():
             record = self.store.read() or {}
             if record.get('state')!='connected':
@@ -185,8 +186,10 @@ class RMFGAuth:
             tokens = record.get('tokens',{})
             expiry = tokens.get('expires_at')
             if (type(expiry) not in (int,float) or not math.isfinite(expiry)
-                    or not set(SCOPES.split()) <= set(str(tokens.get('scope','')).split())):
+                    or not DFM_SCOPES <= set(str(tokens.get('scope','')).split())):
                 raise RMFGError('The RMFG connection is invalid. Reconnect.')
+            if not set(required_scopes) <= set(tokens.get('scope', '').split()):
+                raise RMFGError('Reconnect RMFG in Accounts & providers to enable quotes and checkout. Your existing DFM connection still works.')
             if self.clock()+30<expiry:
                 return secret(tokens.get('access_token'))
             refresh = secret(tokens.get('refresh_token'))
@@ -197,7 +200,14 @@ class RMFGAuth:
                 self.store.write({'state':'connected','connection':record.get('connection'),'tokens':replacement})
             except Exception:
                 raise RMFGError('RMFG refresh could not be confirmed. Reconnect instead of retrying the old credential.') from None
+            if not set(required_scopes) <= set(replacement['scope'].split()):
+                raise RMFGError('Reconnect RMFG in Accounts & providers to enable quotes and checkout.')
             return replacement['access_token']
+
+    def checkout_available(self):
+        with self.store.locked():
+            record = self.store.read() or {}
+            return record.get('state') == 'connected' and {'quotes', 'carts'} <= set(record.get('tokens', {}).get('scope', '').split())
 
     def disconnect(self):
         with self.store.locked():
@@ -245,3 +255,17 @@ class RMFGClient:
 
     def dfm(self, dfm_id):
         return self.transport('GET','/v1/dfm/'+identifier(dfm_id),token=self.access_token())
+
+    def create_quote(self, items, operation_key):
+        return self.transport('POST', '/v1/quotes', {'items': items},
+                              token=self.access_token(), key=identifier(operation_key))
+
+    def quote(self, quote_id):
+        return self.transport('GET', '/v1/quotes/'+identifier(quote_id), token=self.access_token())
+
+    def create_cart(self, items, operation_key):
+        return self.transport('POST', '/v1/carts', {'items': items},
+                              token=self.access_token(), key=identifier(operation_key))
+
+    def cart(self, cart_id):
+        return self.transport('GET', '/v1/carts/'+identifier(cart_id), token=self.access_token())

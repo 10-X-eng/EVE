@@ -220,17 +220,46 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(self.controller.snapshot()["account"]["email"], "test@example.com")
 
     def test_dfm_switch_publishes_context_and_does_not_change_mid_turn(self):
+        eventually(lambda: not self.controller.state['rmfgBusy'])
         self.assertFalse(self.controller.snapshot()['dfmEnabled'])
         self.controller.dispatch('dfm', {'enabled': True})
         eventually(lambda: self.snapshots[-1]['dfmEnabled'])
+        self.controller._update_state({'rmfgState': 'connected'})
         self.controller.dispatch('send', {'text': 'Design a printable bracket'})
         eventually(lambda: self.controller.turn_id is not None)
         sent = next(p for method, p in self.client.calls if method == 'turn/start')
         context = next(p['text'] for p in sent['input'] if p.get('text', '').startswith(CONTEXT_PREFIX))
         self.assertTrue(json.loads(context[len(CONTEXT_PREFIX):])['dfmEnabled'])
+        self.assertEqual(json.loads(context[len(CONTEXT_PREFIX):])['rmfgConnection'], 'connected')
         with self.assertRaisesRegex(ValueError, 'Finish or pause'):
             self.controller.dispatch('dfm', {'enabled': False})
         self.assertTrue(self.controller.dfm.enabled)
+
+    def test_checkout_button_uses_owned_receipt_and_browser_not_model_url(self):
+        self.controller.thread_id = 'thread-1'
+        self.controller._update_state({'rmfgCheckout': {'id': 'checkout-1', 'threadId': 'thread-1'}})
+        with patch.object(self.controller.rmfg_service.checkout, 'open_url', return_value='https://www.rmfg.com/checkout/fixture') as opened:
+            with self.assertRaises(ValueError):
+                self.controller.dispatch('rmfgOpenCheckout', {'checkoutId': 'foreign-id'})
+            self.controller.dispatch('rmfgOpenCheckout', {'checkoutId': 'checkout-1'})
+            eventually(lambda: bool(self.urls))
+            self.assertEqual(self.urls[-1], 'https://www.rmfg.com/checkout/fixture')
+            opened.assert_called_once_with('checkout-1')
+            self.controller.thread_id = 'thread-2'
+            with self.assertRaises(ValueError):
+                self.controller.dispatch('rmfgOpenCheckout', {'checkoutId': 'checkout-1'})
+
+    def test_checkout_tool_publishes_button_for_current_chat_without_a_link(self):
+        self.controller.dispatch('dfm', {'enabled': True})
+        eventually(lambda: self.controller.dfm.enabled)
+        self.controller.dispatch('send', {'text': 'Get a checkout for this bracket'})
+        eventually(lambda: self.controller.turn_id is not None)
+        result = {'ok': True, 'checkoutId': 'checkout-fixture', 'checkoutAvailable': True}
+        with patch.object(self.controller.rmfg_service, 'submit', side_effect=lambda tool,args,done,cancelled: done(result)):
+            self.client.on_request('checkout-call', 'item/tool/call', {'threadId': 'thread-1', 'turnId': 'turn-1',
+                'tool': 'rmfg_checkout', 'arguments': {'document_id': 'doc', 'action': 'create', 'checkout_id': 'checkout-fixture'}})
+        self.assertEqual(self.controller.snapshot()['rmfgCheckout'], {'id': 'checkout-fixture', 'threadId': 'thread-1'})
+        self.assertNotIn('cart_url', json.dumps(self.client.replies[-1]))
 
     def test_documentation_worker_does_not_block_stop_or_require_fusion_bridge(self):
         from steve.documentation import BASE
@@ -889,7 +918,7 @@ class ControllerTests(unittest.TestCase):
     def test_new_and_resumed_chats_receive_current_tools_and_prompt(self):
         params = thread_start_params(ROOT)
         self.assertEqual({tool["name"] for tool in params["dynamicTools"]},
-                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image", "fusion_search_docs", "fusion_fetch_docs", "fusion_dfm_plan", "fusion_dfm_check", "rmfg_materials", "fusion_rmfg"})
+                         {"fusion_inspect_document", "fusion_query_python", "fusion_execute_python", "fusion_api_help", "fusion_capture_viewport", "list_chat_images", "view_chat_image", "fusion_search_docs", "fusion_fetch_docs", "fusion_dfm_plan", "fusion_dfm_check", "rmfg_materials", "fusion_rmfg", "rmfg_checkout"})
         self.assertNotIn("No tools are available", params["baseInstructions"])
         self.client.history = [{"id": "saved-thread", "preview": "Old chat"}]
         self.controller.dispatch("history")

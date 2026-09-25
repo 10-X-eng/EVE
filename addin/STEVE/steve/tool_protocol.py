@@ -197,16 +197,26 @@ PYTHON_CALL = (
 
 
 TOOLS = [
+    {"type": "function", "name": "rmfg_checkout", "deferLoading": False,
+     "description": "Quote checked sheet-metal parts and create an RMFG website checkout when requested. Requires DFM on and RMFG connected. quote takes saved fusion_rmfg job IDs and quantities, using their checked materials; retries use checkout_id. status reads paged findings; do not busy-poll. create requires a ready matching quote and unchanged parts, then shows an Open checkout button. Changed parts need new snapshots and a new quote. The customer reviews delivery and pays on RMFG; this tool cannot pay or accept manufacturing risks.",
+     "inputSchema": {"type": "object", "properties": {
+         "document_id": {"type": "string"}, "action": {"type": "string", "enum": ["quote", "status", "create"]},
+         "checkout_id": {"type": "string", "description": "Returned checkoutId; required for status/create and quote retries."},
+         "items": {"type": "array", "minItems": 1, "maxItems": 20, "description": "New quote only; each saved job once. Quantity is completed copies of that design.",
+             "items": {"type": "object", "properties": {"job_id": {"type": "string"}, "quantity": {"type": "integer", "minimum": 1, "maximum": 1000000}},
+                       "required": ["job_id", "quantity"], "additionalProperties": False}},
+         "offset": {"type": "integer", "minimum": 0, "maximum": 100000, "default": 0, "description": "status only; continue with nextOffset."}},
+         "required": ["document_id", "action"], "additionalProperties": False}},
     {"type": "function", "name": "rmfg_materials", "deferLoading": False,
      "description": "Read RMFG's sheet-metal material catalog. Requires DFM enabled and RMFG connected in STEVE. Returns materials[].id for fusion_rmfg checks; no geometry upload.",
      "inputSchema": {"type": "object", "properties": {"cursor": {"type": "string", "description": "Omit for the first page; use next_cursor while has_more is true."}}, "additionalProperties": False}},
     {"type": "function", "name": "fusion_rmfg", "deferLoading": False,
-     "description": "Request RMFG supplier DFM for a pinned BRepBody. Requires DFM enabled, RMFG connected and a saved sheet_metal plan. prepare exports a folded STEP of a single-solid leaf component, then waits for the user's Upload to RMFG approval. status reads analysis/report pages; do not busy-poll. check starts DFM after designState is ready. retry_upload repeats an interrupted approved upload using its original bytes/key. Results describe the exported snapshot; snapshotMatchesAtStart does not prove currency after processing. Unsupported scope requires review, not assembly uploads or restructuring. No orders or payments.",
+     "description": "Request RMFG supplier DFM for a pinned BRepBody. Requires DFM enabled, RMFG connected and a saved sheet_metal plan. prepare exports and automatically uploads a folded STEP of a single-solid leaf component. status reads analysis/report pages; do not busy-poll. check starts DFM after designState is ready. retry_upload repeats an interrupted upload using its original bytes/key. Results describe the exported snapshot; snapshotMatchesAtStart does not prove currency after processing. Unsupported scope requires review, not assembly uploads or restructuring. No orders or payments.",
      "inputSchema": {"type": "object", "properties": {
          "document_id": {"type": "string"}, "part_token": {"type": "string"},
          "action": {"type": "string", "enum": ["prepare", "status", "check", "retry_upload"]},
          "job_id": {"type": "string", "description": "Non-prepare actions only; required. Use the returned jobId."}, "offset": {"type": "integer", "minimum": 0, "maximum": 100000, "default": 0, "description": "status only; continue with nextOffset."},
-         "parts": {"type": "array", "description": "check only, required: every analyzed parts[].id exactly once as part_id, paired with a user-chosen material_id from rmfg_materials.", "minItems": 1, "maxItems": 20, "items": {"type": "object", "properties": {
+         "parts": {"type": "array", "description": "check only, required: every analyzed parts[].id exactly once as part_id, paired with a material_id from rmfg_materials matching the established material/thickness requirements.", "minItems": 1, "maxItems": 20, "items": {"type": "object", "properties": {
              "part_id": {"type": "string"}, "material_id": {"type": "string"}},
              "required": ["part_id", "material_id"], "additionalProperties": False}}},
          "required": ["document_id", "part_token", "action"], "additionalProperties": False}},
@@ -338,7 +348,7 @@ def tool_failure(exc, code=None, execution_started=False):
         "dfm_disabled": "DFM is off. Do not retry DFM tools or change the setting yourself; the user can enable DFM in STEVE's menu. Continue the requested work using the ordinary Fusion tools.",
         "machine_definition_unavailable": "Read fusion_api_help steve.machines or steve.machines.<id>. Confirm the intended machine/process and review changed capabilities before updating the plan's machine reference. Missing capabilities stay unknown. Do not silently substitute a machine or use stale limits.",
         "rmfg_export_scope": "No geometry was uploaded. The installed STEP exporter exports a whole component. Use a single-solid component with no children/meshes, or report that the current part scope is unsupported. Do not export the parent assembly, hide neighbors, restructure the design, or copy it into a new document without an explicit user request.",
-        "rmfg_unavailable": "Follow the specific RMFG error. Connect or approve only through STEVE's user interface. Preserve the returned job ID for retries; do not repeat uploads as new jobs. For stale geometry, request a new snapshot and approval. Supplier processing is not a Fusion failure; do not modify geometry just to retry.",
+        "rmfg_unavailable": "Follow the specific RMFG error. Connect through STEVE's account menu. Preserve the returned job ID for retries; do not repeat uploads as new jobs. For stale geometry, prepare a new snapshot. Supplier processing is not a Fusion failure; do not modify geometry just to retry.",
         "dfm_plan_required": "Read the body's plan with fusion_dfm_plan. Resolve manufacturing intent and consequential missing inputs, save its stages, then check an existing stage index. Do not invent limits.",
         "dfm_target_unavailable": "Inspect the pinned Design and obtain a current BRepBody token. Do not substitute another body for a deleted or ambiguous target. DFM currently checks one native body definition per call.",
     }.get(code)
@@ -355,6 +365,34 @@ def validate_call(tool, arguments):
         raise ValueError("Unknown Fusion tool.")
     if not isinstance(arguments, dict):
         raise ValueError("Tool arguments must be an object.")
+    if tool == 'rmfg_checkout':
+        from .rmfg import identifier
+        action = arguments.get('action')
+        optional = {'quote': {'items', 'checkout_id'}, 'status': {'checkout_id', 'offset'}, 'create': {'checkout_id'}}
+        if (action not in optional or not {'document_id', 'action'} <= set(arguments)
+                or set(arguments) - {'document_id', 'action'} - optional[action]):
+            raise ValueError('Use quote with items or checkout_id; status/create require checkout_id.')
+        if not isinstance(arguments['document_id'], str) or not 0 < len(arguments['document_id']) <= 100:
+            raise ValueError('Use the pinned document_id.')
+        if ('items' in arguments) == ('checkout_id' in arguments):
+            raise ValueError('Provide either items for a new quote or the returned checkout_id.')
+        if 'checkout_id' in arguments:
+            identifier(arguments['checkout_id'])
+        if 'items' in arguments:
+            items = arguments['items']
+            if not isinstance(items, list) or not 1 <= len(items) <= 20:
+                raise ValueError('Quote 1 to 20 saved jobs.')
+            seen = set()
+            for item in items:
+                if not isinstance(item, dict) or set(item) != {'job_id', 'quantity'}:
+                    raise ValueError('Each item needs job_id and quantity only.')
+                identifier(item['job_id'])
+                if item['job_id'] in seen or type(item['quantity']) is not int or not 1 <= item['quantity'] <= 1000000:
+                    raise ValueError('Include each job once with an integer quantity from 1 to 1000000.')
+                seen.add(item['job_id'])
+        if type(arguments.get('offset', 0)) is not int or not 0 <= arguments.get('offset', 0) <= 100000:
+            raise ValueError('Use a bounded nonnegative findings offset.')
+        return
     if tool == 'rmfg_materials':
         if set(arguments) - {'cursor'} or ('cursor' in arguments and (not isinstance(arguments['cursor'], str) or not 0 < len(arguments['cursor']) <= 1000)):
             raise ValueError('Use the returned catalog cursor or omit it for the first page.')

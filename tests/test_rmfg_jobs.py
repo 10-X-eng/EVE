@@ -1,4 +1,4 @@
-"""Supplier lifecycle and upload consent; no account or network required."""
+"""Automatic supplier lifecycle and bounded exports; no account or network required."""
 import copy
 import json
 from pathlib import Path
@@ -48,23 +48,19 @@ class RMFGJobTests(unittest.TestCase):
 
     def ready(self):
         job = self.jobs.prepare(self.snapshot)
-        self.jobs.decide(job['id'],True)
         self.jobs.upload(job['id'])
         return job
 
-    def test_upload_requires_exact_snapshot_approval_and_deny_removes_local_copy(self):
+    def test_prepared_snapshot_uploads_without_a_user_decision(self):
         job = self.jobs.prepare(self.snapshot)
-        with self.assertRaises(RMFGError):
-            self.jobs.upload(job['id'])
+        self.assertEqual(job['state'], 'prepared')
         self.assertFalse(self.client.calls)
-        self.jobs.decide(job['id'],False)
-        self.assertFalse((self.jobs.folder/(job['id']+'.step')).exists())
-        with self.assertRaises(RMFGError):
-            self.jobs.upload(job['id'])
+        result = self.jobs.upload(job['id'])
+        self.assertEqual(result['designState'], 'ready')
+        self.assertEqual(self.client.calls, [(self.snapshot['step'], job['uploadKey'])])
 
     def test_interrupted_upload_survives_restart_and_reuses_exact_body_and_key(self):
         job = self.jobs.prepare(self.snapshot)
-        self.jobs.decide(job['id'],True)
         self.client.fail=True
         with self.assertRaises(RMFGError):
             self.jobs.upload(job['id'])
@@ -76,9 +72,8 @@ class RMFGJobTests(unittest.TestCase):
         self.assertEqual(self.client.calls[0], self.client.calls[1])
         self.assertEqual(result['snapshot']['binding']['revision'],'r1')
 
-    def test_modified_approved_bytes_and_different_connection_are_rejected(self):
+    def test_modified_snapshot_bytes_and_different_connection_are_rejected(self):
         job=self.jobs.prepare(self.snapshot)
-        self.jobs.decide(job['id'],True)
         (self.jobs.folder/(job['id']+'.step')).write_bytes(b'different')
         with self.assertRaises(RMFGError):
             self.jobs.upload(job['id'])
@@ -128,15 +123,10 @@ class RMFGJobTests(unittest.TestCase):
         with self.assertRaises(ToolError):
             export_snapshot(body,design,'doc')
 
-    def test_service_never_uploads_until_ui_approves_and_ignores_other_job(self):
+    def test_service_automatically_uploads_after_export_and_publishes_progress(self):
         published=[]
-        shown=threading.Event()
-        def publish(state):
-            published.append(state)
-            if state.get('rmfgUpload'):
-                shown.set()
         bridge=Obj(submit=lambda tool,args,done,cancelled:done({'ok':True,**self.snapshot}))
-        service=RMFGService(self.temp.name,self.auth,publish,bridge)
+        service=RMFGService(self.temp.name,self.auth,published.append,bridge)
         self.addCleanup(service.close)
         service.jobs=self.jobs
         done=threading.Event()
@@ -144,16 +134,43 @@ class RMFGJobTests(unittest.TestCase):
         def complete(result):
             results.append(result); done.set()
         service.submit('fusion_rmfg',{'action':'prepare'},complete,lambda:False)
-        self.assertTrue(shown.wait(3))
-        self.assertFalse(self.client.calls)
-        service.decide('another-job',True)
-        self.assertFalse(self.client.calls)
-        job_id=next(s['rmfgUpload']['id'] for s in published if s.get('rmfgUpload'))
-        service.decide(job_id,True)
         self.assertTrue(done.wait(3))
         self.assertTrue(results[0]['ok'],results)
         self.assertEqual(len(self.client.calls),1)
-        self.assertIsNone(published[-1]['rmfgUpload'])
+        self.assertEqual(published, [{'status': 'Uploading part to RMFG'}])
+
+    def test_cancel_after_export_or_before_upload_prevents_submission(self):
+        for cancel_at in ('export', 'upload'):
+            with self.subTest(cancel_at=cancel_at):
+                cancelled = threading.Event()
+                def export(tool, args, done, is_cancelled):
+                    if cancel_at == 'export':
+                        cancelled.set()
+                    done({'ok': True, **self.snapshot})
+                def publish(state):
+                    if cancel_at == 'upload':
+                        cancelled.set()
+                service = RMFGService(self.temp.name, self.auth, publish, Obj(submit=export))
+                self.addCleanup(service.close)
+                service.jobs = self.jobs
+                done = threading.Event(); results = []
+                service.submit('fusion_rmfg', {'action': 'prepare'},
+                               lambda result: (results.append(result), done.set()), cancelled.is_set)
+                self.assertTrue(done.wait(3))
+                self.assertEqual(results[0]['errorCode'], 'cancelled')
+                self.assertFalse(self.client.calls)
+
+    def test_export_failure_prevents_submission(self):
+        bridge = Obj(submit=lambda tool,args,done,cancelled: done({'ok': False, 'error': 'Unsupported scope'}))
+        service = RMFGService(self.temp.name, self.auth, lambda state: None, bridge)
+        self.addCleanup(service.close)
+        service.jobs = self.jobs
+        done = threading.Event(); results = []
+        service.submit('fusion_rmfg', {'action': 'prepare'},
+                       lambda result: (results.append(result), done.set()), lambda: False)
+        self.assertTrue(done.wait(3))
+        self.assertFalse(results[0]['ok'])
+        self.assertFalse(self.client.calls)
 
     def test_stale_check_does_not_submit_supplier_request(self):
         job=self.ready()

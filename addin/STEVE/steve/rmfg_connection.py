@@ -57,7 +57,8 @@ class RMFGConnection:
                 if self.auth.status()['state'] == 'connected':
                     self.auth.access_token()
             state = self.auth.status()['state']
-            self._state(rmfgState='reconnect' if state == 'authorizing' else state)
+            self._state(rmfgState='reconnect' if state == 'authorizing' else state,
+                        rmfgCheckoutEnabled=self.auth.checkout_available())
         except Exception as error:
             # Only our bounded errors can be displayed; OS/network exceptions can include secrets.
             message = str(error) if isinstance(error, RMFGError) else 'RMFG connection unavailable. Unlock the system credential store or reconnect.'

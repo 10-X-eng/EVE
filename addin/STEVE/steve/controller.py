@@ -62,10 +62,15 @@ def message_input(text, context=None, images=None):
     return result
 
 
-def manufacturing_context(context, enabled):
+def manufacturing_context(context, enabled, rmfg_state='unchecked'):
     # Real Fusion messages always carry context. Preserve context-free callers
     # when DFM is off while explicitly refreshing the switch in bound chats.
-    return {**(context or {}), 'dfmEnabled': enabled} if context is not None or enabled else None
+    if context is None and not enabled:
+        return None
+    result = {**(context or {}), 'dfmEnabled': enabled}
+    if enabled:
+        result['rmfgConnection'] = rmfg_state
+    return result
 
 
 def thread_config():
@@ -189,7 +194,7 @@ class Controller:
                       "codexUpdateChecking": False, "codexUpdateStatus": "", "codexUpdating": False, "codexPendingVersion": "", "codexRestarting": False,
                       "threadId": None, "history": [], "historyCursor": None, "historyLoading": False,
                       "runtimeIssue": False, "debugLogging": self.debug.enabled, "dfmEnabled": self.dfm.enabled,
-                      "rmfgState": "unchecked", "rmfgBusy": False, "rmfgError": "", "rmfgCode": "", "rmfgUpload": None,
+                      "rmfgState": "unchecked", "rmfgBusy": False, "rmfgError": "", "rmfgCode": "", "rmfgCheckoutEnabled": False, "rmfgCheckout": None,
                       "debugLogPath": str(self.debug.path)}
         self.rmfg = RMFGConnection(self.debug.folder.parent, self._update_state, self.open_browser)
         self.rmfg_service = RMFGService(self.debug.folder.parent, self.rmfg.auth, self._update_state, self.fusion_tools)
@@ -198,6 +203,7 @@ class Controller:
         self.updates = UpdateChecker(self._update_state)
         self.downloader = UpdateDownloader(self._update_state)
         self.runtime_updater = RuntimeUpdater(self._update_state, home=self.debug.folder.parent)
+        self.rmfg.action('rmfgRefresh')
 
     def _update_state(self, changes):
         queue_install = False
@@ -253,9 +259,25 @@ class Controller:
 
     def dispatch(self, action, payload=None, capture_context=None):
         payload = payload or {}
-        if action == 'rmfgUploadDecision':
-            if not self._closed:
-                self.rmfg_service.decide(payload.get('jobId'), payload.get('approved'))
+        if action == 'rmfgOpenCheckout':
+            with self._lock:
+                checkout = self.state.get('rmfgCheckout')
+                if self._closed or self.state.get('rmfgCheckoutOpening'):
+                    return False
+                if not checkout or checkout['id'] != payload.get('checkoutId') or checkout['threadId'] != self.thread_id:
+                    raise ValueError('Open the checkout shown for this conversation.')
+                self.state['rmfgCheckoutOpening'] = True
+            def open_checkout():
+                try:
+                    url = self.rmfg_service.checkout.open_url(checkout['id'])
+                    if not self._closed and self.open_browser(url) is False:
+                        self._update_state({'error': 'The browser could not open RMFG checkout. Try again after checking your default browser.'})
+                except Exception:
+                    self._update_state({'error': 'Checkout could not open. Check your RMFG connection and ask STEVE to refresh this checkout.'})
+                finally:
+                    self._update_state({'rmfgCheckoutOpening': False})
+            threading.Thread(target=open_checkout, name='STEVE-RMFG-checkout', daemon=True).start()
+            self.emit()
             return True
         if action in ('rmfgConnect', 'rmfgRefresh', 'rmfgDisconnect', 'rmfgCancel'):
             if not self._closed:
@@ -742,7 +764,7 @@ class Controller:
             raise ValueError("Pause the current task before changing the job.")
         if command == "resume" and (not self.state["job"] or self.state["job"]["status"] == "complete"):
             raise ValueError("Create a new job to start more work; this job is complete or missing.")
-        context = manufacturing_context(payload.get("fusionContext"), self.dfm.enabled)
+        context = manufacturing_context(payload.get("fusionContext"), self.dfm.enabled, self.state['rmfgState'])
         self._task_context = context
         self.state.update(taskDocument={"id": context.get("document_id"), "name": context.get("name")} if context else None,
                           jobNotice="", error="", busy=True, status="Preparing job")
@@ -825,6 +847,9 @@ class Controller:
                     if code_message is not None:
                         code_message["toolStatus"] = "completed" if result.get("ok") else "failed"
                     self.state["status"] = "Stopping" if self._cancel else "Thinking"
+                    if params.get('tool') == 'rmfg_checkout' and result.get('checkoutId'):
+                        self.state['rmfgCheckout'] = ({'id': result['checkoutId'], 'threadId': self.thread_id}
+                                                      if result.get('checkoutAvailable') else None)
             self.emit()
             client.reply(request_id, tool_response(result))
         try:
@@ -836,7 +861,7 @@ class Controller:
             if tool in {entry["name"] for entry in TOOLS}:
                 self.debug.record("tool.started", **identifiers, arguments=arguments)
             validate_call(tool, arguments)
-            if tool in ('fusion_dfm_plan', 'fusion_dfm_check', 'fusion_rmfg', 'rmfg_materials') and not self.dfm.enabled:
+            if tool in ('fusion_dfm_plan', 'fusion_dfm_check', 'fusion_rmfg', 'rmfg_materials', 'rmfg_checkout') and not self.dfm.enabled:
                 raise ToolError('dfm_disabled', 'DFM is off in STEVE.')
             with self._lock:
                 if cancelled():
@@ -849,11 +874,12 @@ class Controller:
                         "view_chat_image": "Reopen saved picture",
                         "fusion_rmfg": "RMFG sheet-metal check",
                         "rmfg_materials": "Read RMFG material catalog",
+                        "rmfg_checkout": "Prepare RMFG checkout",
                     }.get(tool, tool)})
                 code_message = python_activity(tool, arguments, uuid4().hex)
                 if code_message:
                     self.state["messages"].append(code_message)
-            if tool in ('fusion_rmfg', 'rmfg_materials'):
+            if tool in ('fusion_rmfg', 'rmfg_materials', 'rmfg_checkout'):
                 with self._lock:
                     self.state['status'] = 'Checking with RMFG'
                 self.emit()
@@ -1056,7 +1082,7 @@ class Controller:
             raise
 
     def _send(self, text, context=None, images=None):
-        context = manufacturing_context(context, self.dfm.enabled)
+        context = manufacturing_context(context, self.dfm.enabled, self.state['rmfgState'])
         images = validate_images(images)
         if (not text and not images) or self.state["busy"]:
             return
@@ -1125,7 +1151,7 @@ class Controller:
                     or payload.get("threadId") != self.thread_id or payload.get("turnId") != self.turn_id):
                 raise RuntimeError("That response has ended or is stopping. Send this message again to start a new turn.")
             self.client.request("turn/steer", {"threadId": self.thread_id, "expectedTurnId": self.turn_id,
-                                               "input": message_input(text, manufacturing_context(payload.get("fusionContext"), self.dfm.enabled), images)})
+                                               "input": message_input(text, manufacturing_context(payload.get("fusionContext"), self.dfm.enabled, self.state['rmfgState']), images)})
             with self._lock:
                 message["delivery"] = "sent"
             self._record_chat_images(payload["threadId"], payload["turnId"], images, message=text)
