@@ -643,6 +643,33 @@ geometry or uploading it. Actual RMFG browser authorization and a supplier repor
 for formed sheet metal are still pending. macOS Fusion behavior itself has not
 been tested by these Windows live runs.
 
+## Multiple cavities and separate openings
+
+`scripts/fusion_multiple_cavities_smoke.py` separates guarded fixture creation
+from read-only measurement. It creates three 20/20/10 mm solids, each with two
+separate radius-2, height-4 mm internal cavities. The variants have no openings,
+two radius-1 passages through one cavity's 3 mm bottom/top walls, or four passages
+through both cavities. The zero-sealed-void criterion is an explicit synthetic
+fixture requirement, not a resin/powder manufacturing default.
+
+Native Fusion 2705.1.25 returned respectively 2, 1 and 0 sealed voids. Paging one
+shell at a time required 3, 2 and 1 pages, so the check cannot stop after seeing
+the exterior shell or the first open cavity. Independently calculated material
+volumes matched 3899.469035, 3880.619479 and 3861.769923 mm³; dimensions stayed
+20/20/10 mm. The actual resin and powder runners produced concerns for the first
+two variants. The fully open variant passed the stated topology requirement but
+the report stayed incomplete because practical escape remained unknown.
+
+Inspection preserved every body revision; setup preserved all pre-existing bodies.
+The first setup attempt tried to assign the read-only construction-plane visibility
+property. The development transaction rolled back; a read-only check confirmed no
+fixture components remained and the original block revision was unchanged before
+the corrected setup ran. No production API helper or prompt changed in this block.
+
+This covers multiple-cavity/opening topology, not hole sizing, flow, wash access,
+orientation-dependent suction, complete support coverage or reliable depowdering.
+It does not establish improved generated designs or a qualified material profile.
+
 ## Machine currency across a complete plan
 
 A regression reproduced a mismatch between fresh reports and historical plan
