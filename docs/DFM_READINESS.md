@@ -1,7 +1,8 @@
 # DFM implementation and qualification status
 
-The DFM preview is experimental. The process issues remain open; passing
-unit tests, package CI or individual geometry fixtures does not qualify a
+The DFM preview is experimental. The initial DFM milestone (#23–#30) is closed
+out at the maintainer's request for 0.6.2. The limitations below remain documented;
+passing unit tests, package CI or individual geometry fixtures does not qualify a
 manufacturing process. PRs #31–#47 were merged in dependency order for the 0.6.0
 preview; their implemented scope and remaining qualification are listed below.
 The 0.6.1 follow-up merges #49–#51: paired additive machine discovery, consistent
@@ -30,7 +31,7 @@ not a passing manufacturing assessment.
 
 | Issue | Implemented and exercised | Remaining qualification or implementation |
 | --- | --- | --- |
-| #24 Foundation (delivered) | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases; actual-runtime Claude/Grok/Ollama on/off/on delivery and enforcement with scripted inference/fake CAD | Shared implementation is complete; broader outcome benchmarks and live macOS Fusion remain tracked by #23 and process issues |
+| #24 Foundation (delivered) | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases; actual-runtime Claude/Grok/Ollama on/off/on delivery and enforcement with scripted inference/fake CAD | Shared implementation is complete; broader outcome benchmarks and live macOS Fusion remain documented limitations |
 | #25 Milling/drilling | Full cylindrical bands, partial cylindrical radii; native and SAT-imported pocket/shaft measurements; counterbore spans and intersected-band rejection; successful native open-pocket recognition, missing-extension hole handling and sharp-pocket empty-candidate reporting; library-derived cutter criterion; two paired model repair cases | Broader recognition and entitled hole recognition, tooling/reach/workholding qualification, general sharp/NURBS corner detection and measured design-quality improvement |
 | #26 FDM/FFF | Explicit build-frame envelopes, rotated/repeated assemblies, planar underside slopes, sampled walls and open-surface rejection; selected trimmed-face distances on known slots before/after rigid placement; synthetic boundary profiles | A confirmed printer/material profile; broader fine-feature, directional/assembly clearance and support/bridge coverage; paired additive design outcomes and independent printing review |
 | #27 Sheet metal/RMFG | Native rule and existing flat-pattern metadata; paged native bend lines on a 2 mm bent-strip fixture (R3 inside, 90 degrees, 20 mm bend lines); single-body STEP export; optional OAuth, protected storage, automatic scoped uploads, immutable retry jobs, scoped reports and multi-part hosted checkout (contract-tested) | Multi-bend/relief/sequence and tooling qualification; real account authorization and supplier upload/report with an actionable finding and live checkout; live macOS export |
