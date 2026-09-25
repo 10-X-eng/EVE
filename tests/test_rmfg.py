@@ -10,6 +10,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'addin/STEVE'))
 from steve.rmfg import RMFGAuth, RMFGClient, RMFGError
 from steve.secure_store import SecureStore
+from steve.rmfg_connection import RMFGConnection
+from unittest.mock import Mock
 
 
 class Store:
@@ -72,6 +74,46 @@ class RMFGTests(unittest.TestCase):
         self.auth.transport = transport
         self.auth.access_token()
         self.assertEqual(self.store.value['tokens']['refresh_token'], 'replacement')
+
+    def test_reopening_and_connect_reuse_saved_login_without_browser(self):
+        self.connected()
+        self.store.value['connection'] = 'saved-account'
+        browser = Mock()
+        for action in ('rmfgRefresh', 'rmfgConnect', 'rmfgRefresh'):
+            states = []
+            connection = RMFGConnection('.', states.append, browser, auth=self.auth)
+            connection._work(action)
+            connection.close()
+            self.assertEqual(states[-2]['rmfgState'], 'connected')
+            self.assertEqual(self.auth.connection_id(), 'saved-account')
+        browser.assert_not_called()
+        self.assertEqual(self.calls, [])
+
+    def test_reopen_rotates_expired_token_and_next_open_reuses_it(self):
+        self.connected()
+        self.store.value['connection'] = 'saved-account'
+        self.now += 100
+        self.responses.append({**self.token(), 'refresh_token': 'rotated'})
+        browser = Mock()
+        for _ in range(2):
+            states = []
+            connection = RMFGConnection('.', states.append, browser, auth=self.auth)
+            connection._work('rmfgRefresh')
+            connection.close()
+            self.assertEqual(states[-2]['rmfgState'], 'connected')
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.store.value['tokens']['refresh_token'], 'rotated')
+        self.assertEqual(self.auth.connection_id(), 'saved-account')
+        browser.assert_not_called()
+
+    def test_checkout_permission_upgrade_is_separate_from_saved_login(self):
+        self.connected()
+        connection = RMFGConnection('.', Mock(), Mock(), auth=self.auth)
+        self.assertTrue(connection._restore('rmfgConnect'))
+        self.assertFalse(connection._restore('rmfgEnableCheckout'))
+        self.store.value['tokens']['scope'] = 'designs dfm quotes carts'
+        self.assertTrue(connection._restore('rmfgEnableCheckout'))
+        self.assertEqual(self.calls, [])
 
     def test_ambiguous_refresh_requires_reconnect_without_replaying_token(self):
         self.connected()

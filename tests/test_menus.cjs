@@ -68,6 +68,8 @@ const {chromium} = require('playwright');
     await page.locator('#rmfg-settings > summary').click();
     assert.equal(await page.locator('#rmfg-disconnect').isVisible(), true);
     assert.equal(await page.locator('#rmfg-enable-checkout').isVisible(), true);
+    await page.locator('#rmfg-enable-checkout').click();
+    assert.equal(await page.evaluate(() => window.testActions.at(-1).action), 'rmfgEnableCheckout');
     await send({rmfgCheckoutEnabled: true});
     assert.equal(await page.locator('#rmfg-enable-checkout').isVisible(), false);
     await page.locator('#history-button').click();

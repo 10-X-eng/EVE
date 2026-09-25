@@ -279,7 +279,7 @@ class Controller:
             threading.Thread(target=open_checkout, name='STEVE-RMFG-checkout', daemon=True).start()
             self.emit()
             return True
-        if action in ('rmfgConnect', 'rmfgRefresh', 'rmfgDisconnect', 'rmfgCancel'):
+        if action in ('rmfgConnect', 'rmfgEnableCheckout', 'rmfgRefresh', 'rmfgDisconnect', 'rmfgCancel'):
             if not self._closed:
                 self.rmfg.action(action)
             return True

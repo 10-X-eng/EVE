@@ -20,7 +20,7 @@ class RMFGConnection:
         if action == 'rmfgCancel':
             self._cancel.set()
             return
-        if action not in ('rmfgConnect', 'rmfgRefresh', 'rmfgDisconnect'):
+        if action not in ('rmfgConnect', 'rmfgEnableCheckout', 'rmfgRefresh', 'rmfgDisconnect'):
             raise ValueError('Unknown RMFG connection action.')
         with self._lock:
             if self._closed.is_set() or self._running:
@@ -38,7 +38,7 @@ class RMFGConnection:
         try:
             if action == 'rmfgDisconnect':
                 self.auth.disconnect()
-            elif action == 'rmfgConnect':
+            elif action in ('rmfgConnect', 'rmfgEnableCheckout') and not self._restore(action):
                 attempt = self.auth.begin()
                 self._attempt = attempt
                 self._state(rmfgState='authorizing', rmfgCode=attempt.user_code)
@@ -71,3 +71,10 @@ class RMFGConnection:
     def close(self):
         self._closed.set()
         self._cancel.set()
+
+    def _restore(self, action):
+        """Reuse saved credentials; only missing checkout permissions need new consent."""
+        if self.auth.status()['state'] != 'connected':
+            return False
+        self.auth.access_token()
+        return action == 'rmfgConnect' or self.auth.checkout_available()

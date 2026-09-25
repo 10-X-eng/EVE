@@ -550,7 +550,7 @@ $("install-codex").onclick=()=>act("setupHelp",{page:"codex"});
 $("debug-logging").onchange=(event)=>act("debugLogging",{enabled:event.target.checked});
 $("dfm-enabled").onchange=(event)=>act("dfm",{enabled:event.target.checked});
 $("rmfg-connect").onclick=()=>act("rmfgConnect");
-$("rmfg-enable-checkout").onclick=$("rmfg-connect").onclick;
+$("rmfg-enable-checkout").onclick=()=>act("rmfgEnableCheckout");
 $("rmfg-open-checkout").onclick=()=>state.rmfgCheckout && act("rmfgOpenCheckout",{checkoutId:state.rmfgCheckout.id});
 $("rmfg-refresh").onclick=()=>act("rmfgRefresh");
 $("rmfg-disconnect").onclick=()=>act("rmfgDisconnect");

@@ -3,7 +3,9 @@
 Click the **STEVE logo** and turn on **Design for manufacturing**. Then open the
 **Accounts & providers** menu (person icon), expand **RMFG sheet metal**, and choose **Connect RMFG**. Approve the
 connection in your browser and return to Fusion. RMFG is a separate supplier
-account; it does not replace your AI provider. **Check RMFG connection** reads
+account; it does not replace your AI provider. STEVE restores the saved connection
+on startup and refreshes expired access tokens automatically. **Connect RMFG**
+also reuses an existing connection. **Check RMFG connection** reads
 the saved connection and refreshes an expired access token. **Disconnect RMFG**
 removes the local connection and attempts to revoke it with RMFG.
 
@@ -32,6 +34,9 @@ its snapshot, material configuration and ruleset; it is not a universal DFM pass
 Changed geometry requires a new snapshot and upload.
 
 ## Quote parts and open checkout
+
+After installing an update that adds tools, start a new chat with **+** to use
+them. Existing Codex chats retain the tool definitions they started with.
 
 Ask naturally: “Quote two of this bracket and seven of that cover, then get them
 ready for checkout.” STEVE uses the checked snapshots and established materials,
