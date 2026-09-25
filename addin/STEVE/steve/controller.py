@@ -23,6 +23,8 @@ from .grok_transport import GrokTransport
 from .ollama_transport import OllamaTransport
 from .claude_transport import ClaudeTransport
 from .grok_auth import login_url_allowed
+from .openrouter_auth import KEYS_URL as OPENROUTER_KEYS_URL, login_url_allowed as openrouter_login_url_allowed
+from .openrouter_transport import OpenRouterTransport
 from .updates import UpdateChecker
 from .runtime_updates import RuntimeUpdater
 from .downloads import UpdateDownloader
@@ -147,12 +149,13 @@ def python_activity(tool, arguments, identifier):
 
 
 class Controller:
-    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport, claude_factory=ClaudeTransport):
+    def __init__(self, publish, transport_factory=Transport, open_browser=webbrowser.open, fusion_tools=None, debug_log=None, grok_factory=GrokTransport, ollama_factory=OllamaTransport, claude_factory=ClaudeTransport, openrouter_factory=OpenRouterTransport):
         self.publish = publish
         self.factory = transport_factory
         self.grok_factory = grok_factory
         self.ollama_factory = ollama_factory
         self.claude_factory = claude_factory
+        self.openrouter_factory = openrouter_factory
         self.open_browser = open_browser
         self.fusion_tools = fusion_tools
         self.debug = debug_log or DebugLog(data_home())
@@ -551,6 +554,7 @@ class Controller:
                 "codex": "https://learn.chatgpt.com/docs/quickstart?setup=app",
                 "ollama": "https://ollama.com/download",
                 "claude": "https://code.claude.com/docs/en/setup",
+                "openrouter": OPENROUTER_KEYS_URL,
                 "local": "https://github.com/10-X-eng/STEVE/blob/main/docs/INSTALL.md#local-ollama",
             }
             destination = destinations.get(payload.get("page"))
@@ -666,7 +670,8 @@ class Controller:
                               account=None, models=[], accountChecked=False, loginPending=False, device=None,
                               localStatus="", providerVersion="", status="Checking local Ollama" if self.state["provider"] == "ollama" else "Checking your account")
         self.emit()
-        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory, "claude": self.claude_factory}.get(self.state["provider"], self.factory)
+        factory = {"grok": self.grok_factory, "ollama": self.ollama_factory, "claude": self.claude_factory,
+                   "openrouter": self.openrouter_factory}.get(self.state["provider"], self.factory)
         client = factory(lambda method, params: self._notification(method, params) if self.client is client else None)
         self.client = client
         client.debug = self.debug
@@ -973,6 +978,7 @@ class Controller:
                         models.append({"id": model.get("model") or model["id"],
                                        "name": model.get("displayName") or model["id"],
                                        "isDefault": bool(model.get("isDefault")),
+                                       "group": model.get("group", ""),
                                        "supportsImages": model.get("supportsImages", "image" in model.get("inputModalities", ["text", "image"])),
                                        "defaultEffort": model.get("defaultReasoningEffort") or "",
                                        "efforts": [{"id": e["reasoningEffort"], "description": e.get("description", "")}
@@ -1064,7 +1070,7 @@ class Controller:
         url = result.get("verificationUrl") if device else result.get("authUrl")
         parsed = urlparse(url or "")
         try:
-            allowed = login_url_allowed(url or "") if self.state["provider"] == "grok" else parsed.scheme == "https" and parsed.hostname in ("auth.openai.com", "chatgpt.com", "auth.chatgpt.com")
+            allowed = login_url_allowed(url or "") if self.state["provider"] == "grok" else openrouter_login_url_allowed(url or "") if self.state["provider"] == "openrouter" else parsed.scheme == "https" and parsed.hostname in ("auth.openai.com", "chatgpt.com", "auth.chatgpt.com")
             if not allowed:
                 raise RuntimeError("Codex returned an unexpected sign-in address.")
             if device:
