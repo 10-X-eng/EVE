@@ -4,6 +4,9 @@ The DFM preview is experimental. The process issues remain open; passing
 unit tests, package CI or individual geometry fixtures does not qualify a
 manufacturing process. PRs #31–#47 were merged in dependency order for the 0.6.0
 preview; their implemented scope and remaining qualification are listed below.
+The 0.6.1 follow-up merges #49–#51: paired additive machine discovery, consistent
+currency checks across all planned machines, and sourced Form 4/Fuse 1+ nominal
+envelopes. These additions do not close the manufacturing qualification gates.
 
 ## Shared workflow
 
