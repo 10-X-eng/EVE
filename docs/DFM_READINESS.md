@@ -1,7 +1,8 @@
 # DFM implementation and qualification status
 
-The DFM preview is experimental. The process issues remain open; passing
-unit tests, package CI or individual geometry fixtures does not qualify a
+The DFM preview is experimental. The initial DFM milestone (#23–#30) is closed
+out at the maintainer's request for 0.6.2. The limitations below remain documented;
+passing unit tests, package CI or individual geometry fixtures does not qualify a
 manufacturing process. PRs #31–#47 were merged in dependency order for the 0.6.0
 preview; their implemented scope and remaining qualification are listed below.
 The 0.6.1 follow-up merges #49–#51: paired additive machine discovery, consistent
@@ -30,10 +31,10 @@ not a passing manufacturing assessment.
 
 | Issue | Implemented and exercised | Remaining qualification or implementation |
 | --- | --- | --- |
-| #24 Foundation | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases; actual-runtime Claude/Grok/Ollama on/off/on delivery and enforcement with scripted inference/fake CAD | Broader real-provider/panel workflows and independently reviewed outcome corpus; live macOS Fusion |
+| #24 Foundation (delivered) | Saved/session plans, shared-instance updates, stage ordering, native identity, clear/reset semantics, source/unit checks, failed/stale reports; live query/edit/recheck cases; actual-runtime Claude/Grok/Ollama on/off/on delivery and enforcement with scripted inference/fake CAD | Shared implementation is complete; broader outcome benchmarks and live macOS Fusion remain documented limitations |
 | #25 Milling/drilling | Full cylindrical bands, partial cylindrical radii; native and SAT-imported pocket/shaft measurements; counterbore spans and intersected-band rejection; successful native open-pocket recognition, missing-extension hole handling and sharp-pocket empty-candidate reporting; library-derived cutter criterion; two paired model repair cases | Broader recognition and entitled hole recognition, tooling/reach/workholding qualification, general sharp/NURBS corner detection and measured design-quality improvement |
 | #26 FDM/FFF | Explicit build-frame envelopes, rotated/repeated assemblies, planar underside slopes, sampled walls and open-surface rejection; selected trimmed-face distances on known slots before/after rigid placement; synthetic boundary profiles | A confirmed printer/material profile; broader fine-feature, directional/assembly clearance and support/bridge coverage; paired additive design outcomes and independent printing review |
-| #27 Sheet metal/RMFG | Native rule and existing flat-pattern metadata; paged native bend lines on a 2 mm bent-strip fixture (R3 inside, 90 degrees, 20 mm bend lines); single-body STEP export; optional OAuth, protected storage, upload approval, immutable retry jobs and scoped reports | Multi-bend/relief/sequence and tooling qualification; real account authorization and approved supplier upload/report with an actionable finding; live macOS export |
+| #27 Sheet metal/RMFG | Native rule and existing flat-pattern metadata; paged native bend lines on a 2 mm bent-strip fixture (R3 inside, 90 degrees, 20 mm bend lines); single-body STEP export; optional OAuth, protected storage, automatic scoped uploads, immutable retry jobs, scoped reports and multi-part hosted checkout (contract-tested) | Multi-bend/relief/sequence and tooling qualification; real account authorization and supplier upload/report with an actionable finding and live checkout; live macOS export |
 | #28 Turning | Axis/trimming classification and full bands on native/SAT stepped shafts with a groove and bore; wrong-axis rejection and sourced diameter boundaries | Machine/tool/workholding profile, tool approach/reach/groove fit, interrupted and more complex turning fixtures, paired design outcomes |
 | #29 Resin | Build frame, sampled walls, closed-void screening; sealed/open/multiple-cavity fixtures, unavailable-volume handling and selected face distances with synthetic slot criteria | Confirmed resin/machine/support intent; Drainage/flow/suction-cup and broader fine-feature coverage; paired resin outcomes |
 | #30 Powder | Shared envelope/wall/closed-void and selected face-distance measurements with process-specific guidance and synthetic profiles | Select and qualify one actual polymer or metal process/profile; escape passages and removal evidence; post-processing, broader fine features and paired outcomes. No powder variant is production-qualified |
@@ -55,7 +56,7 @@ are in [RMFG.md](RMFG.md).
   macOS package tests do not establish live Fusion behavior on macOS.
 - A local STEP export and offline RMFG contracts do not establish that a real
   supplier accepts the part or produces an actionable DFM report. Account sign-in
-  and a separately approved snapshot upload are still required for that test.
+  and a successful snapshot upload/report are still required for that test.
 - Analytic SAT round trips do not establish STEP import or arbitrary supplier-file
   support. The development MCP's command callback cannot run ImportManager's STEP
   import; its attempted idle dispatch was rejected and cleaned up.

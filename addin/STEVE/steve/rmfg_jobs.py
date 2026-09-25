@@ -49,7 +49,7 @@ class RMFGJobs:
         return job
 
     def prepare(self, snapshot):
-        """Store exact exported bytes before approval; never accepts an input path."""
+        """Store exact exported bytes for upload; never accepts an input path."""
         with self.guard.locked():
             self.folder.mkdir(parents=True, exist_ok=True)
             files = list(self.folder.glob('*.step'))
@@ -58,31 +58,21 @@ class RMFGJobs:
             job = {'id': uuid4().hex, 'connection': self.auth.connection_id(),
                    'binding': fields(snapshot, 'documentKey partToken revision'),
                    'body': snapshot['body'], 'sha256': hashlib.sha256(snapshot['step']).hexdigest(),
-                   'bytes': len(snapshot['step']), 'state': 'awaiting_approval', 'uploadKey': uuid4().hex}
+                   'bytes': len(snapshot['step']), 'state': 'prepared', 'uploadKey': uuid4().hex}
             (self.folder / (job['id']+'.step')).write_bytes(snapshot['step'])
             self._write(job)
             return job
-
-    def decide(self, job_id, approved):
-        with self.guard.locked():
-            job = self.read(job_id)
-            if job['state'] != 'awaiting_approval':
-                raise RMFGError('That upload request is no longer awaiting approval.')
-            job['state'] = 'approved' if approved else 'declined'
-            self._write(job)
-            if not approved:
-                (self.folder / (job['id']+'.step')).unlink(missing_ok=True)
 
     def upload(self, job_id):
         with self.guard.locked():
             job = self.read(job_id)
             if job.get('designId'):
                 raise RMFGError('This snapshot was already uploaded. Use status for this same job; do not submit another upload.')
-            if job['state'] not in ('approved', 'uploading'):
-                raise RMFGError('Approve this exact snapshot in STEVE before uploading.')
+            if job['state'] not in ('prepared', 'uploading'):
+                raise RMFGError('This snapshot is not ready for upload. Prepare a new snapshot.')
             data = (self.folder / (job['id']+'.step')).read_bytes()
             if hashlib.sha256(data).hexdigest() != job['sha256']:
-                raise RMFGError('The approved snapshot changed. Request a new upload; do not reuse this job.')
+                raise RMFGError('The stored snapshot changed. Prepare a new snapshot; do not reuse this job.')
             job['state'] = 'uploading'
             self._write(job)  # Persist the write key before a possibly ambiguous network result.
             result = self.client.analyze(data, job['uploadKey'])

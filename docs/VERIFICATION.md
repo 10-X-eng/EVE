@@ -121,10 +121,17 @@ The add-in, packaging, installer, and workflow now cover macOS on Apple silicon.
 - [ ] Complete ChatGPT browser sign-in and receive a streamed reply.
 - [ ] Paste a screenshot from the macOS clipboard and attach an image file.
 - [ ] Run a query and an execute tool call; capture the viewport.
-- [ ] Open the logs folder from the account menu and confirm Finder shows it.
+- [ ] Open the logs folder from STEVE logo → Diagnostics and confirm Finder shows it.
 - [ ] Stop the add-in and quit Fusion; confirm no `codex-app-server` or `codex-code-mode-host` process remains.
 - [ ] Verify the Gatekeeper path for `Install STEVE.command` on a clean Mac, including the Privacy & Security approval.
 
 ## Repository delivery
 
 The source is published in the public STEVE repository. The build workflow performs package and installer verification on GitHub-hosted Windows and macOS runners before automatically publishing new versions pushed to `main`. Already-published versions are skipped. GitHub build validation does not replace the live Fusion checks listed above.
+
+## Settings and RMFG checkout update
+
+- Local regression suite: 398 tests run, 11 skipped, no failures. Menu, image, renderer and real-browser streaming checks passed; portability audit passed 151 files.
+- Browser menu checks cover keyboard focus, exclusive account/settings/history panels, outside/Escape dismissal, action routing, busy locks, and 320/436/760 px layouts. The settings menu was visually inspected at 436 px.
+- RMFG controlled-response tests cover automatic scoped uploads, cancellation, multiple quoted parts and quantities, effective supplier defaults, stale geometry, mismatched quotes/carts, blocked/expired quotes, identical retry keys, DFM-only connection compatibility and checkout-link privacy. Real-runtime Claude/Grok/Ollama fixtures enforce all five DFM/supplier tools while DFM is off.
+- No live supplier quote/cart or payment was created for this update. Live supplier report and hosted-checkout validation remain documented limitations; #27 is closed with the initial DFM milestone for 0.6.2.

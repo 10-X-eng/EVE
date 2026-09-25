@@ -12,7 +12,7 @@ Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your
 
 For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
 
-> **Preview 0.6.1 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.6.2 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What STEVE can do
 
@@ -27,7 +27,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 - **Check measured outcomes.** STEVE can report measured checks and feature-health changes separately from whether its Python completed. Missing coverage and failed checks remain visible.
 - **Consider manufacturing (experimental).** Enable **DFM** in the menu and tell STEVE how a part will be made. It can retain per-body process stages and sourced limits, then run measured Python checks with explicit concerns and unknowns. This is an experimental checking workflow, not a certified process-rule library; see [DFM scope and validation](docs/DFM.md).
 - **Use the intended machine's capabilities.** Separate [machine definition files](docs/MACHINES.md) supply sourced limits for selected process stages. Definitions are version-bound, with unsupported capabilities left unknown. The catalog covers nominal envelopes for four FDM, resin and polymer SLS printers; additional machines can be added without changing the DFM engine.
-- **Optional RMFG sheet-metal checks (experimental).** Connect your supplier account, approve the selected part's STEP upload, and review a revision-bound supplier report. No purchases or automatic risk acceptance. See [setup, supported geometry and validation limits](docs/RMFG.md).
+- **Optional RMFG sheet-metal checks (experimental).** Connect your supplier account and enable DFM; STEVE automatically uploads the relevant part's STEP snapshot and reads its revision-bound supplier report. Ask for a quote to combine checked parts and quantities in one cart, then choose **Open checkout** to review and pay on RMFG. See [setup, supported geometry and validation limits](docs/RMFG.md).
 
 ### Show STEVE what you mean
 
@@ -42,7 +42,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 - **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
 - **See tool activity and Python.** Expandable code cards show the actual Python STEVE submits to Fusion, with running, waiting, and completion states. A compact indicator also names the current Fusion or saved-image tool. Scripts appear when submitted; the runtime does not stream partial tool arguments.
 - **Work toward a job.** Use `/jobs <objective>` for tasks that need multiple turns. Codex manages continuation, completion, and optional token budgets; STEVE provides status, edit, pause, resume, and clear controls.
-- **Get notified about updates.** STEVE checks for new releases on startup and every 12 hours while running. Choose **Update STEVE** to download and verify the latest complete release, then install automatically after you save your work and quit Fusion. No terminal command is needed. **Download only** remains available, and the account menu also has **Check for updates**.
+- **Get notified about updates.** STEVE checks for new releases on startup and every 12 hours while running. Choose **Update STEVE** to download and verify the latest complete release, then install automatically after you save your work and quit Fusion. No terminal command is needed. **Download only** remains available, and the **STEVE logo → Updates** menu also has **Check for updates**.
 - **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
 - **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
 - **Return to old chats.** Browse and search local conversation history, reopen a previous session, and continue where you left off.
@@ -53,7 +53,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 
 STEVE has a dockable dark interface, readable Markdown and code blocks, and incremental streaming that preserves existing message elements as text arrives. Open it from Fusion's **Quick Access toolbar** across workspaces, or through Design **Utilities > Add-ins** and command search.
 
-The account menu includes a remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
+Click the **STEVE logo → Diagnostics** for the remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
 
 ### Jobs
 
@@ -102,7 +102,7 @@ Choose **Ollama (local)** to use a model running on your computer, with no sign-
 
 Get the complete Windows package from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `STEVE-0.6.1-windows-x64.zip` package:
+With an `STEVE-0.6.2-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -113,7 +113,7 @@ With an `STEVE-0.6.1-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `STEVE-0.6.1-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `STEVE-0.6.2-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
 2. Save your work and quit Fusion.
@@ -130,7 +130,7 @@ STEVE checks for a saved sign-in before opening a new login. Model availability 
 
 The preview supports **Windows x64** and **macOS on Apple silicon**, and requires Fusion and an internet connection. The installers are currently unsigned. They install per user, preserve the previous managed installation during updates, and refuse to replace a STEVE folder they did not install.
 
-Codex updates independently of STEVE. The account menu shows the running Codex version and checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
+Codex updates independently of STEVE. Click the **STEVE logo → Updates** to see the running Codex version. STEVE checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
 
 To reload an updated development add-in, **Stop STEVE, then Run it again** in Scripts and Add-ins. Start a **New conversation** after changes to tool definitions.
 
@@ -186,7 +186,7 @@ python3 scripts/build_package.py
 python3 scripts/verify_package.py
 ```
 
-Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from the account menu without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from **STEVE logo → Updates** without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
 
 Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
 

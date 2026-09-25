@@ -17,8 +17,9 @@ The following distinctions were checked against the handlers and validators:
 
 | Tool | Essential calling distinctions |
 | --- | --- |
+| `rmfg_checkout` | Quote saved checked jobs and quantities in one pinned document; status/create use returned `checkoutId`; quote retries reuse that receipt; status pages findings; creation checks quote identity, settings and current snapshots, then exposes a hosted checkout button without payment |
 | `rmfg_materials` | DFM enabled and connection required; catalog IDs configure supplier checks; omit cursor first, then use `next_cursor` while `has_more` |
-| `fusion_rmfg` | Pinned target and sheet-metal plan; prepare exports then requires user upload approval; other actions require `job_id` from returned `jobId`; status pages with `nextOffset`; check requires ready analysis and every part/material pair; retry reuses approved bytes; reports remain snapshot evidence |
+| `fusion_rmfg` | Pinned target and sheet-metal plan; prepare exports and automatically uploads the scoped part; other actions require `job_id` from returned `jobId`; status pages with `nextOffset`; check requires ready analysis and every part/material pair; retry reuses stored bytes; reports remain snapshot evidence |
 | `fusion_dfm_plan` | Omitted stages reads; a supplied complete ordered plan replaces; `[]` clears only on user request; native repeated parts share metadata; persistence differs for saved/unsaved documents |
 | `fusion_dfm_check` | Read-only code, an existing zero-based plan stage, helper-recorded findings and report scope; successful execution is not a manufacturing pass |
 | `fusion_search_docs` | Installed names/docstrings versus sample titles; installed scope defaults; sample index may download but query stays local; continue returned offsets |
@@ -40,7 +41,7 @@ and product-specific viewport support rather than merely shortening prose.
 
 A real local Codex 0.153.4 process with a loopback inference fixture retained its
 original dynamic tools despite replacement lists supplied on resume, including
-after a fresh process. Therefore this change keeps the four DFM/supplier tools
+after a fresh process. Therefore STEVE keeps its DFM/supplier tools
 registered, with execution gated by the DFM switch. It does not silently fork or
 rewrite existing chats. This is observed behavior of that installed version,
 not a claim that every future runtime must behave identically. OpenAI documents
@@ -48,7 +49,8 @@ dynamic-tool persistence in its [app-server reference](https://learn.chatgpt.com
 Reload the source add-in and start a new chat to use revised tool descriptions.
 Existing chats retain their registered descriptions; their history is not rewritten.
 
-The core prompt and 13-tool inventory are unchanged. The repeated Python-context
+The original description audit kept the core prompt and 13-tool inventory unchanged.
+The checkout workflow adds `rmfg_checkout`, for 14 tools total. The repeated Python-context
 paragraph moved out of three descriptions into one on-demand reference. Serialized
 schema character counts are recorded in the DFM evaluation; they are not a claim
 about a provider's tokenizer, full context window or latency.

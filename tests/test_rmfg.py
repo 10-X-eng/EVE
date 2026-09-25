@@ -10,6 +10,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'addin/STEVE'))
 from steve.rmfg import RMFGAuth, RMFGClient, RMFGError
 from steve.secure_store import SecureStore
+from steve.rmfg_connection import RMFGConnection
+from unittest.mock import Mock
 
 
 class Store:
@@ -45,12 +47,12 @@ class RMFGTests(unittest.TestCase):
     def connected(self):
         self.store.write({'state':'connected','tokens':{**self.token(),'expires_at':self.now+100}})
 
-    def test_device_flow_requests_only_dfm_scopes_and_respects_poll_interval(self):
+    def test_device_flow_requests_dfm_and_checkout_without_payments_and_respects_poll_interval(self):
         self.responses.append({'device_code':'private-code','user_code':'PUBLIC-CODE',
             'verification_uri_complete':'https://www.rmfg.com/connect?code=PUBLIC-CODE',
             'interval':5,'expires_in':600})
         attempt = self.auth.begin()
-        self.assertEqual(self.calls[0][2]['scope'], 'designs dfm')
+        self.assertEqual(self.calls[0][2]['scope'], 'designs dfm quotes carts')
         self.assertEqual(self.auth.poll(attempt), 'pending')
         self.assertEqual(len(self.calls), 1)
         self.now += 5
@@ -72,6 +74,46 @@ class RMFGTests(unittest.TestCase):
         self.auth.transport = transport
         self.auth.access_token()
         self.assertEqual(self.store.value['tokens']['refresh_token'], 'replacement')
+
+    def test_reopening_and_connect_reuse_saved_login_without_browser(self):
+        self.connected()
+        self.store.value['connection'] = 'saved-account'
+        browser = Mock()
+        for action in ('rmfgRefresh', 'rmfgConnect', 'rmfgRefresh'):
+            states = []
+            connection = RMFGConnection('.', states.append, browser, auth=self.auth)
+            connection._work(action)
+            connection.close()
+            self.assertEqual(states[-2]['rmfgState'], 'connected')
+            self.assertEqual(self.auth.connection_id(), 'saved-account')
+        browser.assert_not_called()
+        self.assertEqual(self.calls, [])
+
+    def test_reopen_rotates_expired_token_and_next_open_reuses_it(self):
+        self.connected()
+        self.store.value['connection'] = 'saved-account'
+        self.now += 100
+        self.responses.append({**self.token(), 'refresh_token': 'rotated'})
+        browser = Mock()
+        for _ in range(2):
+            states = []
+            connection = RMFGConnection('.', states.append, browser, auth=self.auth)
+            connection._work('rmfgRefresh')
+            connection.close()
+            self.assertEqual(states[-2]['rmfgState'], 'connected')
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.store.value['tokens']['refresh_token'], 'rotated')
+        self.assertEqual(self.auth.connection_id(), 'saved-account')
+        browser.assert_not_called()
+
+    def test_checkout_permission_upgrade_is_separate_from_saved_login(self):
+        self.connected()
+        connection = RMFGConnection('.', Mock(), Mock(), auth=self.auth)
+        self.assertTrue(connection._restore('rmfgConnect'))
+        self.assertFalse(connection._restore('rmfgEnableCheckout'))
+        self.store.value['tokens']['scope'] = 'designs dfm quotes carts'
+        self.assertTrue(connection._restore('rmfgEnableCheckout'))
+        self.assertEqual(self.calls, [])
 
     def test_ambiguous_refresh_requires_reconnect_without_replaying_token(self):
         self.connected()
@@ -129,6 +171,28 @@ class RMFGTests(unittest.TestCase):
         for payload in ({**self.token(),'scope':'designs'}, {**self.token(),'expires_in':float('nan')}):
             with self.assertRaises(RMFGError):
                 self.auth.validate_tokens(payload)
+
+    def test_old_dfm_connection_remains_usable_and_checkout_requires_new_scopes(self):
+        self.connected()
+        self.assertEqual(self.auth.access_token(), 'fixture-access')
+        self.assertFalse(self.auth.checkout_available())
+        with self.assertRaisesRegex(RMFGError, 'enable quotes and checkout'):
+            self.auth.access_token({'quotes', 'carts'})
+        self.store.value['tokens']['scope'] = 'designs dfm quotes carts'
+        self.assertTrue(self.auth.checkout_available())
+        self.assertEqual(self.auth.access_token({'quotes', 'carts'}), 'fixture-access')
+
+    def test_checkout_transport_uses_exact_items_and_keys_without_payment(self):
+        client = RMFGClient(lambda: 'fixture', self.transport)
+        items = [{'design_id': 'design-1', 'quantity': 3, 'configuration': {'parts': [{'part_id': 'p', 'material_id': 'm'}]}}]
+        self.responses.extend([{'id': 'q'}, {'id': 'q'}, {'id': 'c'}, {'id': 'c'}])
+        client.create_quote(items, 'quote-key')
+        client.quote('q')
+        client.create_cart(items, 'cart-key')
+        client.cart('c')
+        self.assertEqual([call[1] for call in self.calls], ['/v1/quotes', '/v1/quotes/q', '/v1/carts', '/v1/carts/c'])
+        self.assertEqual(self.calls[0][2], self.calls[2][2])
+        self.assertEqual(self.calls[2][-1], 'cart-key')
 
     def test_dfm_request_cannot_accept_risks_or_order_parts(self):
         client = RMFGClient(lambda:'token', self.transport)

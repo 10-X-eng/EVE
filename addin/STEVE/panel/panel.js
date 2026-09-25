@@ -350,15 +350,20 @@ function renderControls() {
   $("rmfg-code").hidden=!state.rmfgCode;
   $("rmfg-code").textContent=state.rmfgCode ? "Browser approval code: "+state.rmfgCode : "";
   $("rmfg-connect").hidden=state.rmfgState==="connected" || !!state.rmfgBusy;
+  $("rmfg-enable-checkout").hidden=state.rmfgState!=="connected" || !!state.rmfgCheckoutEnabled;
+  $("rmfg-enable-checkout").disabled=!!state.rmfgBusy;
+  $("rmfg-checkout").hidden=!state.rmfgCheckout || state.rmfgCheckout.threadId!==state.threadId;
+  $("rmfg-open-checkout").disabled=!!state.rmfgCheckoutOpening;
   $("rmfg-refresh").disabled=!!state.rmfgBusy;
   $("rmfg-cancel").hidden=state.rmfgState!=="authorizing" || !state.rmfgBusy;
   $("rmfg-disconnect").hidden=state.rmfgState!=="connected";
   $("rmfg-disconnect").disabled=!!state.rmfgBusy;
-  $("rmfg-upload").hidden=!state.rmfgUpload;
-  $("rmfg-upload-detail").textContent=state.rmfgUpload ? state.rmfgUpload.body+" · "+Math.max(1,Math.ceil(state.rmfgUpload.bytes/1024))+" KB" : "";
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
   const update=state.updateInfo;
   $("installed-version").textContent=state.version?`STEVE ${state.version}`:"STEVE";
+  $("app-version").textContent=state.version?`v${state.version}`:"";
+  $("updates-badge").hidden=!update && !state.codexUpdateInfo && !state.codexPendingVersion;
+  $("updates-badge").textContent=state.codexPendingVersion?"Restart ready":"Available";
   $("update-status").textContent=state.updateInstallFailure||state.updateStatus||"Checks for new releases automatically.";
   $("check-updates").disabled=!!state.updateChecking;
   $("check-updates").textContent=state.updateChecking?"Checking…":"Check for updates";
@@ -420,10 +425,23 @@ function renderControls() {
   renderHistory();
 }
 
+const headerMenus = {"app-menu":"app-menu-button", "account-menu":"account-button"};
+function showHeaderMenu(id, open, focus = false) {
+  if(open){
+    for(const other of Object.keys(headerMenus))if(other!==id)showHeaderMenu(other,false);
+    showHistory(false);
+  }
+  $(id).hidden=!open;
+  $(headerMenus[id]).setAttribute("aria-expanded",String(open));
+  if(focus){
+    if(open)Array.from($(id).querySelectorAll("select:not(:disabled), input:not(:disabled), button:not(:disabled), summary")).find(element=>element.getClientRects().length)?.focus();
+    else $(headerMenus[id]).focus();
+  }
+}
 function showHistory(open) {
   $("history-panel").hidden=!open;
   $("history-button").setAttribute("aria-expanded",String(open));
-  if(open){$("account-menu").hidden=true;$("account-button").setAttribute("aria-expanded","false");$("history-search").focus();}
+  if(open){for(const id of Object.keys(headerMenus))showHeaderMenu(id,false);$("history-search").focus();}
 }
 function renderHistory() {
   const query=$("history-search").value.trim().toLocaleLowerCase();
@@ -525,18 +543,18 @@ $("local-help").onclick=$("local-setup").onclick=()=>act("setupHelp",{page:"loca
 $("device-login").onclick=()=>act("deviceLogin");
 $("cancel-login").onclick=()=>act("cancelLogin");
 $("refresh-account").onclick=()=>act("accountRefresh",{refreshToken:true});
-$("logout").onclick=()=>{act("logout");$("account-menu").hidden=true;$("account-button").setAttribute("aria-expanded","false");};
+$("logout").onclick=()=>{act("logout");showHeaderMenu("account-menu",false,true);};
 $("reconnect").onclick=()=>act("connect");
 $("repair-steve").onclick=()=>act("setupHelp",{page:"steve"});
 $("install-codex").onclick=()=>act("setupHelp",{page:"codex"});
 $("debug-logging").onchange=(event)=>act("debugLogging",{enabled:event.target.checked});
 $("dfm-enabled").onchange=(event)=>act("dfm",{enabled:event.target.checked});
 $("rmfg-connect").onclick=()=>act("rmfgConnect");
+$("rmfg-enable-checkout").onclick=()=>act("rmfgEnableCheckout");
+$("rmfg-open-checkout").onclick=()=>state.rmfgCheckout && act("rmfgOpenCheckout",{checkoutId:state.rmfgCheckout.id});
 $("rmfg-refresh").onclick=()=>act("rmfgRefresh");
 $("rmfg-disconnect").onclick=()=>act("rmfgDisconnect");
 $("rmfg-cancel").onclick=()=>act("rmfgCancel");
-$("rmfg-approve").onclick=()=>state.rmfgUpload && act("rmfgUploadDecision",{jobId:state.rmfgUpload.id,approved:true});
-$("rmfg-decline").onclick=()=>state.rmfgUpload && act("rmfgUploadDecision",{jobId:state.rmfgUpload.id,approved:false});
 $("open-logs").onclick=()=>act("openLogs");
 $("check-updates").onclick=()=>{dismissedUpdate="";act("checkUpdates");};
 $("menu-update").onclick=()=>act("openUpdate",{page:"notes"});
@@ -559,7 +577,8 @@ $("model").onchange=(event)=>act("model",{model:event.target.value});
 $("provider").onchange=(event)=>act("provider",{provider:event.target.value});
 $("welcome-provider").onchange=$("provider").onchange;
 $("effort").onchange=(event)=>act("effort",{effort:event.target.value});
-$("account-button").onclick=()=>{const menu=$("account-menu");menu.hidden=!menu.hidden;$("account-button").setAttribute("aria-expanded",String(!menu.hidden));};
+$("account-button").onclick=()=>showHeaderMenu("account-menu",$("account-menu").hidden,true);
+$("app-menu-button").onclick=()=>showHeaderMenu("app-menu",$("app-menu").hidden,true);
 // Returning from the external browser should immediately reveal a saved sign-in.
 let lastAccountCheck=0;
 function checkAccountOnReturn(){
@@ -569,8 +588,17 @@ function checkAccountOnReturn(){
 }
 window.addEventListener("focus",checkAccountOnReturn);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkAccountOnReturn();});
-document.addEventListener("keydown",(event)=>{if(event.key==="Escape"){showHistory(false);$("account-menu").hidden=true;$("account-button").setAttribute("aria-expanded","false");}});
-document.addEventListener("click",(event)=>{if(!event.target.closest("#account-menu, #account-button")){$("account-menu").hidden=true;$("account-button").setAttribute("aria-expanded","false");}});
+document.addEventListener("keydown",(event)=>{
+  if(event.key!=="Escape")return;
+  for(const id of Object.keys(headerMenus))if(!$(id).hidden){showHeaderMenu(id,false,true);return;}
+  if(!$("history-panel").hidden){showHistory(false);$("history-button").focus();}
+});
+document.addEventListener("click",(event)=>{
+  for(const [id,button] of Object.entries(headerMenus))if(!event.target.closest(`#${id}, #${button}`))showHeaderMenu(id,false);
+});
+document.addEventListener("focusin",(event)=>{
+  for(const [id,button] of Object.entries(headerMenus))if(!event.target.closest(`#${id}, #${button}`))showHeaderMenu(id,false);
+});
 document.querySelectorAll(".suggestion").forEach((button)=>button.onclick=()=>{
   if(!state.account){$("login").focus();return;}
   $("message").value=button.dataset.prompt;resize();$("message").focus();render();

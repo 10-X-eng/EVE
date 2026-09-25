@@ -41,6 +41,45 @@ html, html body {
 #app.signed-out #composer { display: none; }
 #app.signed-out .error { margin-top: 10px; }
 #app .account-menu { top: 55px; }
+/* The brand opens app settings; the person icon is reserved for connections. */
+#app .brand { border: 0; padding: 6px; margin-left: -6px; border-radius: 9px; background: transparent; color: inherit; text-align: left; gap: 9px; min-width: 0; }
+#app .brand:hover, #app .brand[aria-expanded="true"] { background: #ffffff09; }
+.brand > img, .header-actions { flex-shrink: 0; }
+.brand-chevron { width: 14px; height: 14px; color: #a6b6b0; flex-shrink: 0; }
+.brand[aria-expanded="true"] .brand-chevron { transform: rotate(180deg); }
+#app .header-menu { position: absolute; z-index: 5; top: 57px; left: 12px; right: 12px; max-height: calc(100% - 72px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #506258 transparent; padding: 16px; border: 1px solid #42594e; border-radius: 12px; background: #202b26; color: #edece5; box-shadow: 0 15px 40px #0008; }
+.menu-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; }
+.account-menu .menu-title { margin-bottom: 4px; }
+.header-menu p { font-size: 11px; line-height: 1.6; color: #a6b6b0; overflow-wrap: anywhere; }
+.header-menu small { font-size: 9px; font-weight: 400; color: #a6b6b0; }
+.dfm-setting { padding: 2px 0 10px; }
+.dfm-setting .debug-toggle { gap: 12px; }
+.dfm-setting small { display: block; margin-top: 4px; }
+.dfm-setting p { margin: 9px 0 3px; }
+.header-menu input[role="switch"] { appearance: none; position: relative; flex-shrink: 0; width: 32px; height: 18px; margin: 0; border: 1px solid #6b8176; border-radius: 10px; background: #394940; cursor: pointer; }
+.header-menu input[role="switch"]::before { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #c1cec7; }
+.header-menu input[role="switch"]:checked { background: #a6dbc7; border-color: #a6dbc7; }
+.header-menu input[role="switch"]:checked::before { left: 16px; background: #20382c; }
+.header-menu input[role="switch"]:disabled { opacity: .42; cursor: default; }
+.settings-group { border-top: 1px solid #354340; }
+.settings-group > summary { display: flex; align-items: center; gap: 10px; padding: 14px 0; cursor: pointer; font-size: 12px; list-style: none; }
+.settings-group > summary::-webkit-details-marker { display: none; }
+.settings-group > summary::after { content: ''; width: 6px; height: 6px; border-right: 1px solid #a6b6b0; border-bottom: 1px solid #a6b6b0; transform: rotate(45deg); margin: 0 4px 3px auto; flex-shrink: 0; }
+.settings-group[open] > summary::after { transform: rotate(225deg); margin-bottom: -3px; }
+.settings-group > summary:hover { color: #b5dfcc; }
+.settings-group > summary:focus-visible { outline: 2px solid #a6dbc7; outline-offset: 2px; border-radius: 4px; }
+.settings-content { padding: 0 0 14px; }
+.settings-content > p:first-child { margin-top: 0; }
+.settings-content .secondary-button { margin: 3px 0; }
+.settings-content .update-settings:first-child { border-top: 0; padding-top: 0; }
+.settings-content .update-settings + .update-settings { margin-top: 14px; }
+.settings-badge { font-size: 9px; padding: 3px 6px; border-radius: 4px; background: #31493d; color: #b5dfcc; }
+.menu-footer { border-top: 1px solid #354340; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#app-version { font-size: 10px; color: #a6b6b0; }
+.supplier-checkout { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; margin-bottom: 10px; border: 1px solid #42594e; border-radius: 10px; background: #202b26; }
+.supplier-checkout strong { display: block; font-size: 12px; }
+.supplier-checkout span { display: block; margin-top: 4px; font-size: 10px; line-height: 1.5; color: #a6b6b0; }
+@media (max-width: 400px) { #app .brand .beta { display: none; } }
 #refresh-account { margin-top: 5px; }
 .runtime-setup { margin: 22px 18px; }
 .runtime-setup h2 { font-weight: 500; font-size: 23px; }
@@ -159,6 +198,4 @@ html, html body {
 .job-help code { color:#b9dcc8; }
 .image-viewer img { display:block; width:100%; max-height:75vh; object-fit:contain; }
 #close-image { position:absolute; right:8px; top:5px; padding:0; width:26px; height:26px; background:transparent; border:0; color:#edece5; font-size:24px; }
-.rmfg-upload { padding:12px; margin-bottom:10px; border:1px solid var(--accent, #b5dfcd); border-radius:12px; background:#23312c; font-size:12px; }
-.rmfg-upload p { margin:6px 0; line-height:1.4; overflow-wrap:anywhere; }
 #rmfg-settings { margin-top:14px; }

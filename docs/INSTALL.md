@@ -1,8 +1,8 @@
 # Install STEVE for Autodesk Fusion
 
-STEVE 0.6.1 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
+STEVE 0.6.2 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
 
-Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.6.1-windows-x64.zip` or `STEVE-0.6.1-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.6.2-windows-x64.zip` or `STEVE-0.6.2-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
 ## Install on Windows
 
@@ -13,7 +13,7 @@ Download the package for your computer from the [STEVE releases page](https://gi
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `Get-FileHash .\STEVE-0.6.1-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+To verify the download, run `Get-FileHash .\STEVE-0.6.2-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
 ## Install on macOS
 
@@ -25,7 +25,7 @@ To verify the download, run `Get-FileHash .\STEVE-0.6.1-windows-x64.zip -Algorit
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `shasum -a 256 STEVE-0.6.1-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+To verify the download, run `shasum -a 256 STEVE-0.6.2-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
 ## First conversation
 
@@ -74,7 +74,7 @@ STEVE checks the allocated context before each turn and reserves space for the r
 
 ## Codex updates
 
-Codex can update without a new STEVE release. In the account menu, **Check Codex updates** checks OpenAI's latest stable release for your platform. STEVE also checks automatically on startup and every 12 hours. The menu shows the version currently running.
+Codex can update without a new STEVE release. Under **STEVE logo → Updates**, **Check Codex updates** checks OpenAI's latest stable release for your platform. STEVE also checks automatically on startup and every 12 hours. The menu shows the version currently running.
 
 Choose **Update Codex** to download the complete app-server package into STEVE's local data folder. STEVE verifies OpenAI's SHA-256 digest and tests startup, model discovery, Fusion tool declarations, and Codex's goal protocol before selecting it. This does not sign in or generate a model response. Downloading does not interrupt your current task or overwrite its runtime.
 
@@ -84,7 +84,7 @@ If an updated runtime causes a problem, choose **Use bundled Codex**, then click
 
 ## Update or reload
 
-STEVE checks the public GitHub releases on startup and every 12 hours while running. A notice appears when a newer complete package is available for your platform, including preview releases. Use **Check for updates** in the account menu to check immediately, including when you are signed out.
+STEVE checks the public GitHub releases on startup and every 12 hours while running. A notice appears when a newer complete package is available for your platform, including preview releases. Use **Check for updates** under **STEVE logo → Updates** to check immediately, including when you are signed out.
 
 Choose **Update STEVE** and confirm. STEVE downloads the newest complete release for your platform into Downloads, verifies its SHA-256, stages the package, and starts a detached installer. Wait until the menu says **Update queued**, then save your work and quit Fusion. The installer waits for Fusion to exit, checks every packaged file, backs up the managed add-in, and installs the release. Reopen Fusion afterward. Neither Fusion nor your conversation is stopped automatically, and no terminal command is needed. **Download only** saves the verified ZIP without scheduling installation. If the install fails, STEVE reports it when reopened and records details in `pending-updates/STEVE-<version>-<platform>/install-result.txt` under its local data folder. Downloads use unique filenames so existing files are preserved. Network failures do not interrupt your task; retry from the menu.
 
@@ -102,8 +102,8 @@ For a development checkout, use **Stop**, then **Run** in Scripts and Add-ins af
 - **macOS says the installer cannot be opened:** run it through Terminal as described above, or allow it under System Settings > Privacy & Security.
 - **Installer reports an unmanaged STEVE folder:** preserve or rename your existing manually installed folder before installing. The installer will not overwrite it.
 - **Sign-in does not finish:** return to STEVE and choose **Check again**, or use the device-code sign-in option. Use an account with access to the selected provider: Codex access for ChatGPT, or Grok access for xAI.
-- **Codex setup needed:** after a Codex update, try **Use bundled Codex**, then **Restart STEVE** in the account menu first. If the bundled runtime is damaged, extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
-- **An operation fails:** enable **Debug logging** in the account menu, reproduce the problem, then choose **Open logs folder**. Review logs for private design information before sharing them.
+- **Codex setup needed:** after a Codex update, try **Use bundled Codex**, then **Restart STEVE** in the STEVE logo menu first. If the bundled runtime is damaged, extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
+- **An operation fails:** enable **Debug logging** under **STEVE logo → Diagnostics**, reproduce the problem, then choose **Open logs folder**. Review logs for private design information before sharing them.
 
 STEVE's local sign-in, history, preferences, image cache, and optional logs are under `%LOCALAPPDATA%\STEVE` on Windows and `~/Library/Application Support/STEVE` on macOS. These chats do not sync to the ChatGPT website.
 

@@ -63,12 +63,13 @@ class DfmProviderRuntimeTests(unittest.TestCase):
                 'wall': {'value': 1.2, 'units': 'mm', 'basis': 'requirement', 'source': 'Explicit fixture requirement'}}}]
             check = {**target, 'stage': 0, 'title': 'Compare fixture wall', 'code':
                 "def run(context):\n context['dfm'].compare('Fixture wall', 0.8, 'wall', '>=', 'mm', 'Scripted adapter fixture, not live geometry')\n context['dfm'].unknown('Manufacturing coverage', 'No printer or slicer validation')"}
-            # A deliberately noncompliant model attempts all four gated tools
+            # A deliberately noncompliant model attempts all five gated tools
             # while off, then reads the original plan after re-enabling.
             schedule = [
                 ('fusion_dfm_plan', {**target, 'stages': stages}), ('fusion_dfm_check', check), None,
                 ('fusion_dfm_plan', target), ('fusion_dfm_check', check),
-                ('rmfg_materials', {}), ('fusion_rmfg', {**target, 'action': 'prepare'}), None,
+                ('rmfg_materials', {}), ('fusion_rmfg', {**target, 'action': 'prepare'}),
+                ('rmfg_checkout', {'document_id': tools.document_id, 'action': 'quote', 'items': [{'job_id': 'fixture-job', 'quantity': 1}]}), None,
                 ('fusion_dfm_plan', target), ('fusion_dfm_check', check), None,
             ]
             calls, delivered = [], []
@@ -166,7 +167,7 @@ class DfmProviderRuntimeTests(unittest.TestCase):
             supplier = stack.enter_context(patch.object(controller.rmfg_service, 'submit'))
             submit = stack.enter_context(patch.object(tools, 'submit', wraps=tools.submit))
             thread = None
-            for enabled, end in ((True, 3), (False, 8), (True, 11)):
+            for enabled, end in ((True, 3), (False, 9), (True, 12)):
                 controller.dispatch('dfm', {'enabled': enabled})
                 wait_for(lambda: controller.state['dfmEnabled'] == enabled)
                 controller.dispatch('send', {'text': 'Inspect the fixture without edits', 'fusionContext': {
@@ -176,14 +177,14 @@ class DfmProviderRuntimeTests(unittest.TestCase):
                 self.assertEqual(controller.thread_id, thread)
                 self.assertEqual(controller.state['taskDocument']['id'], tools.document_id)
 
-            self.assertEqual(len(delivered), 8)
-            self.assertEqual([row.get('errorCode') for row in delivered[2:6]], ['dfm_disabled'] * 4)
-            self.assertTrue(all(not row['executionStarted'] for row in delivered[2:6]))
-            self.assertTrue(all('ordinary Fusion tools' in row['recovery'] for row in delivered[2:6]))
+            self.assertEqual(len(delivered), 9)
+            self.assertEqual([row.get('errorCode') for row in delivered[2:7]], ['dfm_disabled'] * 5)
+            self.assertTrue(all(not row['executionStarted'] for row in delivered[2:7]))
+            self.assertTrue(all('ordinary Fusion tools' in row['recovery'] for row in delivered[2:7]))
             supplier.assert_not_called()
             self.assertEqual(submit.call_count, 4)
-            self.assertEqual(delivered[0]['plan'], delivered[6]['plan'])
-            for row in (delivered[1], delivered[7]):
+            self.assertEqual(delivered[0]['plan'], delivered[7]['plan'])
+            for row in (delivered[1], delivered[8]):
                 self.assertTrue(row['ok'])
                 self.assertEqual(row['executionMode'], 'query')
                 self.assertEqual(row['dfm']['status'], 'concerns')
@@ -191,7 +192,7 @@ class DfmProviderRuntimeTests(unittest.TestCase):
                 self.assertEqual(row['dfm']['planHash'], delivered[0]['reportBinding']['planHash'])
             self.assertEqual(host.executions, 0)
             self.assertEqual(body.revisionId, 'r1')
-            for index, enabled in ((0, True), (3, False), (8, True)):
+            for index, enabled in ((0, True), (3, False), (9, True)):
                 request = calls[index]
                 messages = request.get('messages', request.get('input', []))
                 latest = next(m for m in reversed(messages) if m.get('role') == 'user')
@@ -202,7 +203,7 @@ class DfmProviderRuntimeTests(unittest.TestCase):
                 self.assertEqual(public['document_id'], tools.document_id)
                 self.assertNotIn('task_key', public)
                 names = {t.get('name') or t.get('function', {}).get('name') for t in request['tools']}
-                self.assertTrue({'fusion_dfm_plan', 'fusion_dfm_check', 'rmfg_materials', 'fusion_rmfg'} <= names)
+                self.assertTrue({'fusion_dfm_plan', 'fusion_dfm_check', 'rmfg_materials', 'fusion_rmfg', 'rmfg_checkout'} <= names)
 
 
 if __name__ == '__main__':
