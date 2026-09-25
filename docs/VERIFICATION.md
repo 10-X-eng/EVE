@@ -135,3 +135,18 @@ The source is published in the public STEVE repository. The build workflow perfo
 - Browser menu checks cover keyboard focus, exclusive account/settings/history panels, outside/Escape dismissal, action routing, busy locks, and 320/436/760 px layouts. The settings menu was visually inspected at 436 px.
 - RMFG controlled-response tests cover automatic scoped uploads, cancellation, multiple quoted parts and quantities, effective supplier defaults, stale geometry, mismatched quotes/carts, blocked/expired quotes, identical retry keys, DFM-only connection compatibility and checkout-link privacy. Real-runtime Claude/Grok/Ollama fixtures enforce all five DFM/supplier tools while DFM is off.
 - No live supplier quote/cart or payment was created for this update. Live supplier report and hosted-checkout validation remain documented limitations; #27 is closed with the initial DFM milestone for 0.6.2.
+
+## In-Fusion update development checks
+
+On September 25, 2026, Fusion 2705.1.25 on Windows successfully stopped a disposable
+managed add-in, replaced it with a separately staged version, restarted it and
+received the new version's startup receipt while Fusion stayed open. A second
+fixture deliberately omitted the receipt: the helper restored the previous files
+and restarted the previous version after the startup timeout. Both fixture add-ins
+were unlinked afterward. The active Untitled document and SelectCommand were
+unchanged; the user's running STEVE and design geometry were not replaced or edited.
+
+These tests exercise the real Autodesk lifecycle and file-swap helper. Live macOS
+reload and a complete released STEVE-to-STEVE update with chat restoration still
+need user verification. Unit coverage checks payload tampering, unmanaged targets,
+rename failures, interrupted-swap recovery, idle handoff and download reuse.

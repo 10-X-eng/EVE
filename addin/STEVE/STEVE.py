@@ -12,6 +12,8 @@ from .steve.clipboard import read_clipboard_image
 from .steve.version import VERSION
 from .steve.transport import data_home
 from .steve.upgrade import migrate_data
+from .steve.app_update import launch_live_update
+from .steve.update_transaction import write_json
 
 COMMAND_ID = "10X_STEVE_Open"
 PALETTE_ID = "10X_STEVE_Panel"
@@ -29,6 +31,7 @@ _pending_lock = threading.Lock()
 _event_pending = False
 _running = False
 _want_visible = False
+_update_wake_stop = threading.Event()
 
 
 def _log_error():
@@ -88,6 +91,22 @@ class StateEvent(adsk.core.CustomEventHandler):
                 _palette.sendInfoToHTML("clipboardImage", json.dumps(clipboard))
             except RuntimeError:
                 pass
+        if _controller and _fusion_tools and not _clipboard_busy and state and state.get('updateInstallReady'):
+            _controller.check_update_failure()
+            # Never cancel a user's command or a native operation to apply an update.
+            command = _fusion_tools.command_state()
+            if command['activeCommand'] == 'SelectCommand' or (
+                    command['activeCommand'] == 'Electron::Group' and command['readAllowed']):
+                prepared = _controller.take_prepared_update()
+                if prepared:
+                    helper, resume = prepared
+                    try:
+                        request = json.loads((helper / 'request.json').read_text(encoding='utf-8'))
+                        request['resume'] = {**resume, 'showPalette': _want_visible}
+                        write_json(helper / 'request.json', request)
+                        launch_live_update(_app, helper)
+                    except Exception as error:
+                        _controller.update_launch_failed(str(error))
 
 
 def _read_pasted_image(request_id, controller):
@@ -214,7 +233,24 @@ def run(context):
         _fusion_tools = FusionTools(_app)
         _controller = Controller(_publish, fusion_tools=_fusion_tools)
         _controller.dispatch("connect")
+        handoff_file = data_home() / 'update-handoff.json'
+        if handoff_file.is_file():
+            handoff = json.loads(handoff_file.read_text(encoding='utf-8'))
+            if (handoff.get('target') == str(Path(__file__).parent.resolve())
+                    and handoff.get('version') == VERSION):
+                _controller.dispatch('restoreAfterUpdate', handoff)
+                if handoff.get('showPalette'):
+                    _show_palette()
+                write_json(data_home() / 'update-loaded.json', {'nonce': handoff['nonce'], 'version': VERSION})
+                handoff_file.unlink()
         _controller.start_update_checks()
+        _update_wake_stop.clear()
+        def update_wake():
+            while not _update_wake_stop.wait(1):
+                controller = _controller
+                if controller and controller.state.get('updateInstallReady'):
+                    _publish(controller.snapshot())
+        threading.Thread(target=update_wake, daemon=True, name='STEVE-Update-Idle').start()
         _app.log(f"STEVE {VERSION} loaded. Open STEVE from the Quick Access toolbar or command search.")
     except Exception:
         _log_error()
@@ -224,6 +260,7 @@ def run(context):
 def stop(context):
     global _running, _controller, _palette, _want_visible, _event_pending, _fusion_tools, _pending_clipboard, _clipboard_busy
     _running = False
+    _update_wake_stop.set()
     _want_visible = False
     if _controller:
         _controller.close()

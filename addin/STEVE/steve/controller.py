@@ -26,7 +26,7 @@ from .grok_auth import login_url_allowed
 from .updates import UpdateChecker
 from .runtime_updates import RuntimeUpdater
 from .downloads import UpdateDownloader
-from .app_update import stage_update, launch_update, previous_install_result
+from .app_update import stage_update, prepare_live_update, previous_install_result, managed
 from .version import VERSION
 from .jobs import job_command, validate_job
 from .images import ImageStore, validate_images, MAX_STORED_IMAGE_BYTES
@@ -176,6 +176,10 @@ class Controller:
         self._lock = threading.RLock()
         self._commands = queue.Queue()
         self._active_tools = {}
+        self._prepared_update = None
+        self._update_handoff = False
+        self._handling_command = False
+        self._auto_download_versions = set()
         self.documentation = Documentation()
         self._documentation_slots = threading.BoundedSemaphore(2)
         self._job_revision = 0
@@ -200,8 +204,8 @@ class Controller:
         self.rmfg_service = RMFGService(self.debug.folder.parent, self.rmfg.auth, self._update_state, self.fusion_tools)
         self._worker = threading.Thread(target=self._work, name="STEVE-Actions", daemon=True)
         self._worker.start()
-        self.updates = UpdateChecker(self._update_state)
-        self.downloader = UpdateDownloader(self._update_state)
+        self.updates = UpdateChecker(self._release_checked)
+        self.downloader = UpdateDownloader(self._update_state, home=self.debug.folder.parent)
         self.runtime_updater = RuntimeUpdater(self._update_state, home=self.debug.folder.parent)
         self.rmfg.action('rmfgRefresh')
 
@@ -230,13 +234,61 @@ class Controller:
             with self._lock:
                 if self._closed:
                     return
-            launch_update(package)
+            helper = prepare_live_update(package, Path(__file__).resolve().parents[1],
+                                         self.debug.folder.parent, version)
+            with self._lock:
+                if self._closed:
+                    return
+                self._prepared_update = helper
         except Exception as exc:
             self._update_state({"updateInstalling": False,
                                 "updateStatus": f"Couldn’t prepare installation: {exc}"})
         else:
             self._update_state({"updateInstalling": False, "updateInstallReady": True,
-                                "updateStatus": "Update queued. Save your work and quit Fusion to apply it. Wait for installation to finish, then Restart Fusion to use the new STEVE version."})
+                                "updateStatus": "Update verified. Waiting for STEVE and Fusion to be idle before restarting STEVE."})
+
+    def _release_checked(self, changes):
+        self._update_state(changes)
+        release = changes.get('updateInfo')
+        with self._lock:
+            if (self._closed or not release or release['version'] in self._auto_download_versions
+                    or not managed(Path(__file__).resolve().parents[1])):
+                return
+            self._auto_download_versions.add(release['version'])
+        self.downloader.request(release)
+
+    def take_prepared_update(self):
+        """Called on the Fusion thread only after its command/clipboard checks pass."""
+        with self._lock:
+            if (not self._prepared_update or self._closed or self._update_handoff
+                    or self._handling_command or self._commands.unfinished_tasks
+                    or self._send_queued or self._active_tools
+                    or any(self.state.get(k) for k in ('busy', 'jobBusy', 'loginPending', 'codexUpdating',
+                                                     'codexRestarting', 'rmfgBusy', 'rmfgCheckoutOpening'))
+                    or (self.state['job'] or {}).get('status') == 'active'
+                    or self.state['connection'] == 'starting'):
+                return None
+            self._update_handoff = True
+            return self._prepared_update, {'threadId': self.thread_id, 'provider': self.state['provider'],
+                                          'account': copy.deepcopy(self.state['account'])}
+
+    def update_launch_failed(self, message):
+        with self._lock:
+            self._update_handoff = False
+            self._prepared_update = None
+        self._update_state({'updateInstallReady': False, 'updateStatus': 'Couldn’t prepare installation: ' + message})
+
+    def check_update_failure(self):
+        if self._update_handoff and self._prepared_update:
+            try:
+                request = json.loads((self._prepared_update / 'request.json').read_text(encoding='utf-8'))
+                result = Path(request['result'])
+                if result.is_file():
+                    message = result.read_text(encoding='utf-8')[:2048]
+                    if message.startswith('Installation failed:'):
+                        self.update_launch_failed(message)
+            except (OSError, ValueError, KeyError):
+                pass
 
     def start_update_checks(self):
         self.updates.request()
@@ -259,6 +311,9 @@ class Controller:
 
     def dispatch(self, action, payload=None, capture_context=None):
         payload = payload or {}
+        with self._lock:
+            if self._update_handoff and action != 'sync':
+                return False
         if action == 'rmfgOpenCheckout':
             with self._lock:
                 checkout = self.state.get('rmfgCheckout')
@@ -294,6 +349,8 @@ class Controller:
         with self._lock:
             if self._closed:
                 return
+            if self._update_handoff and action != 'sync':
+                return False
             if self.state["codexRestarting"] and action not in ("sync", "debugLogging", "openLogs", "setupHelp"):
                 return False
             if action == "restartRuntime":
@@ -393,14 +450,17 @@ class Controller:
 
     def _work(self):
         while True:
+            queued = True
             try:
                 item = self._commands.get(timeout=2 if self.state["loginPending"] else None)
             except queue.Empty:
+                queued = False
                 # Recover when the browser callback succeeds but its notification is missed.
                 item = ("accountRefresh", {})
             if item is None or self._closed:
                 return
             action, payload = item
+            self._handling_command = True
             try:
                 self._handle(action, payload)
             except Exception as exc:
@@ -446,9 +506,17 @@ class Controller:
                     self.emit()
                     if self.state["connection"] == "ready" and self.state["account"]:
                         self.dispatch("history")
+                self._handling_command = False
+                if queued:
+                    self._commands.task_done()
 
     def _handle(self, action, payload):
-        if action == "provider":
+        if action == 'restoreAfterUpdate':
+            if (payload.get('threadId') and self.state['provider'] == payload.get('provider')
+                    and self.state['account'] and self.state['account'] == payload.get('account')):
+                self.state['history'] = [{'id': payload['threadId'], 'title': 'Current conversation', 'updatedAt': 0}]
+                self._open_history(payload['threadId'])
+        elif action == "provider":
             if self.state["busy"] or self.state["loginPending"]:
                 return
             self.provider_choice.save(payload.get("provider"))
