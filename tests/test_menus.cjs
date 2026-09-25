@@ -19,7 +19,7 @@ const {chromium} = require('playwright');
     });
     await page.goto(pathToFileURL(path.resolve(__dirname, '../addin/STEVE/panel/index.html')).href);
     const snapshot = {connection: 'ready', account: {email: 'designer@example.com', planType: 'Plus'},
-      accountChecked: true, models: [], messages: [], busy: false, status: 'Ready', version: '0.6.1',
+      accountChecked: true, models: [], messages: [], busy: false, status: 'Ready', version: '0.6.2',
       codexVersion: '0.155.1', codexPendingVersion: '0.155.2', dfmEnabled: true, rmfgState: 'connected'};
     const send = async patch => {
       Object.assign(snapshot, patch);
