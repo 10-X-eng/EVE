@@ -1,5 +1,7 @@
 # First milestone verification
 
+- DFM follow-up (0.6.1): #49–#51 were merged and pulled main matched the tested integration tree. The release branch passed 383 local Python tests (11 skipped), with package installation covered separately by clean Windows/macOS CI. Local focused DFM/catalog, panel/image and 147-file portability checks passed. Live Fusion verified 24 nominal-envelope cases and three machine-definition currency cases without changing body revisions. These are scoped checks, not process qualification.
+
 - Experimental DFM (0.6.0): the merged main tree matched the final reviewed branch and passed 381 local Python tests (11 skipped), panel/image checks, a real-browser streaming check and the portability audit. Live Windows Fusion measurements and scoped manufacturing limitations are recorded in [DFM evaluation](DFM_EVALUATION.md) and [readiness](DFM_READINESS.md). Machine definitions are sourced data, not full process qualification. Live macOS DFM and an authorized RMFG supplier report remain unverified.
 
 The implementation is a prototype with user-confirmed streaming in Fusion; remaining lifecycle and visual checks are listed below. This document separates automated evidence, user-reported live results, and checks still required.
