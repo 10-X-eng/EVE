@@ -6,14 +6,13 @@ from .version import VERSION
 
 
 def highlights():
-    return {'version': VERSION, 'title': 'Reliable paused-job controls', 'items': [
-        'Paused jobs recover their Resume button when the runtime is idle. If a response is still finishing, the panel explains the wait and no longer offers Pause again.',
-        'Image gallery in the top bar: browse, import, rename and reuse images across conversations.',
-        'Your existing pictures appear automatically. Enable Available to STEVE for references it may find in any chat; access starts off.',
-        'STEVE now has guidance to build and check one functional part before moving on, then verify assembly fit.',
-        'Update controls explain why they are waiting and clearly announce the STEVE restart. Fusion stays open.',
-        'Close-ups keep the camera outside the assembly. STEVE can temporarily isolate a part for a clear screenshot, then restore visibility.',
-    ], 'note': 'Start a new chat after updating so STEVE receives the gallery lookup tools and the capture tool’s isolate option. Gallery Attach also works in older chats.'}
+    return {'version': VERSION, 'title': 'Long chats, reliable jobs and working links', 'items': [
+        'Continue long conversations without the old 200-entry cutoff, including paused jobs.',
+        'The panel shows 200 recent entries at a time. Use Show earlier messages and Back to latest to browse without deleting saved history or model context.',
+        'Paused jobs recover Resume when idle. If a response is still finishing, the panel explains the wait instead of offering Pause again.',
+        'Reply links open in your browser again.',
+        'A late turn-start reply can no longer replace the current turn ID and incorrectly reject its tool calls.',
+    ], 'note': 'These fixes work in existing chats. If upgrading from before 0.8.0, start a new chat for gallery lookup tools and screenshot isolation; Gallery Attach also works in older chats.'}
 
 
 class ReleaseNotes:

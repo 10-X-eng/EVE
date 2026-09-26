@@ -1,10 +1,14 @@
-# STEVE 0.8.1 — Paused-job controls (unreleased)
+# STEVE 0.8.1 — Long chats, reliable jobs and working links
 
-- Fixes a stale busy state that could leave a paused job’s Resume button disabled. The panel now handles runtime idle notifications and refreshes activity when job controls open. Pause is hidden for paused jobs; a genuinely unfinished response explains why Resume is waiting. Active Fusion tools are not interrupted or treated as finished.
-- Clarifies that you should **start a new chat after updating** to give STEVE the gallery lookup tools and the capture tool’s `isolate` option. Gallery **Attach** works in older chats too.
-- In Design, ask STEVE to isolate a part for its screenshot. It hides other bodies/components temporarily and restores visibility afterward. Isolated views help inspect individual parts; assembly fit still requires a view with surrounding parts present.
+- **Long conversations:** removes the 200-entry send cutoff. Tool-heavy chats and paused jobs can continue in the same conversation after switching or saving documents.
+- **Responsive transcript:** the panel displays a rolling window of 200 entries. **Show earlier messages** pages backward; **Back to latest** returns to the live conversation. Saved history and model context are preserved; this display window does not replace the runtime’s context compaction.
+- **Paused jobs:** Resume recovers when the runtime is idle. Pause is hidden for paused jobs; an unfinished response explains the wait. Status refresh cannot interrupt active Fusion tools or overwrite a newer turn.
+- **Working links:** fixes the missing import that prevented reply links from opening the system browser. Non-web URLs remain blocked.
+- **Tool-call race:** prevents a late turn-start response from replacing a newer automatic turn ID and incorrectly rejecting valid tools as inactive. Cancelled and genuinely stale requests remain blocked.
 
-Managed installations can use **Settings → Updates → Update & restart STEVE** once the download is ready and work is idle. Fusion stays open. Release highlights appear inside STEVE after the update.
+These fixes work in existing chats. If upgrading from before 0.8.0, start a new chat for the gallery lookup tools and screenshot isolation introduced in that version.
+
+Use **Settings → Updates → Update & restart STEVE** once the download is ready and work is idle. Fusion stays open.
 
 # STEVE 0.8.0 — Shared image gallery and clearer updates
 

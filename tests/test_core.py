@@ -221,6 +221,93 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(self.controller.snapshot()["accountChecked"])
         self.assertEqual(self.controller.snapshot()["account"]["email"], "test@example.com")
 
+    def test_long_chat_continues_on_same_thread_after_document_switch_and_save(self):
+        self.controller.dispatch('send', {'text':'Begin on document A'}, capture_context=lambda action: {'document_id':'doc-a','name':'Untitled'})
+        eventually(lambda: self.controller.turn_id == 'turn-1' and not self.controller._send_queued)
+        self.client.complete()
+        self.controller.state['messages'].extend({'role':'tool','text':'Step completed','id':f'step-{i}'} for i in range(250))
+        paused = {'status':'paused','objective':'Keep this job and its history'}
+        self.controller.state['job'] = paused.copy()
+        for document, name in [('doc-b','Other saved part'),('doc-a','Saved original part')]:
+            self.controller.dispatch('send', {'text':'Continue this design'}, capture_context=lambda action: {'document_id':document,'name':name})
+            eventually(lambda: self.controller.turn_id == 'turn-1' and not self.controller._send_queued)
+            self.assertEqual(self.controller.thread_id, 'thread-1')
+            self.assertEqual(self.controller.state['taskDocument'], {'id':document,'name':name})
+            self.assertEqual(self.controller.state['error'], '')
+            self.assertEqual(self.controller.state['job'], paused)
+            self.client.complete()
+        self.assertEqual(sum(method == 'thread/start' for method, _ in self.client.calls), 1)
+        self.assertEqual(sum(method == 'turn/start' for method, _ in self.client.calls), 3)
+        self.assertTrue(any(m.get('id') == 'step-0' for m in self.controller.state['messages']))
+
+    def test_transcript_pages_are_bounded_without_discarding_history_or_job_state(self):
+        self.controller.thread_id = 'thread-1'
+        messages = [{'role':'assistant','text':f'Message {i}','id':str(i)} for i in range(405)]
+        self.controller.state['messages'] = messages
+        paused = {'status':'paused','objective':'Saved goal'}
+        self.controller.state['job'] = paused.copy()
+        latest = self.controller.snapshot()
+        self.assertEqual(len(latest['messages']), 200)
+        self.assertEqual(latest['messageOffset'], 205)
+        self.assertFalse(latest['showingOlderMessages'])
+        calls = len(self.client.calls)
+        page = lambda before: self.controller._handle('transcriptPage', {'threadId':'thread-1','provider':'chatgpt','before':before})
+        page(latest['messageOffset'])
+        older = self.controller.snapshot()
+        self.assertEqual([m['id'] for m in older['messages']], [str(i) for i in range(5,205)])
+        messages.append({'role':'assistant','text':'Live reply','id':'405'})
+        self.assertEqual(self.controller.snapshot()['messages'], older['messages'])
+        page(older['messageOffset'])
+        self.assertEqual(len(self.controller.snapshot()['messages']), 5)
+        page(None)
+        self.assertEqual(self.controller.snapshot()['messages'][-1]['id'], '405')
+        self.assertEqual(len(self.controller.state['messages']), 406)
+        self.assertEqual(self.controller.state['job'], paused)
+        self.assertEqual(len(self.client.calls), calls)  # Paging never rewrites model context.
+        page(205)
+        self.controller.thread_id = 'different-thread'
+        self.controller.state['messages'] = [{'role':'assistant','text':'Other chat'}]
+        page(5)  # A late click from the old chat must not change the new one.
+        self.assertFalse(self.controller.snapshot()['showingOlderMessages'])
+
+    def test_reply_links_open_browser_and_reject_non_web_urls(self):
+        for url in ('https://example.com/docs?q=part#section', 'http://localhost:8080/reference'):
+            self.controller.dispatch('openLink', {'url':url})
+            eventually(lambda: url in self.urls)
+        for url in ('javascript:alert(1)', 'file:' + '/' * 3 + 'private', 'https://example.com/a b', None):
+            with self.assertRaisesRegex(ValueError, 'Only web links'):
+                self.controller._handle('openLink', {'url':url})
+        self.assertEqual(len(self.urls), 2)
+        with patch.object(self.controller, 'open_browser', return_value=False):
+            with self.assertRaisesRegex(RuntimeError, 'could not open'):
+                self.controller._handle('openLink', {'url':'https://example.com/'})
+
+    def test_late_start_reply_cannot_replace_an_automatic_continuation_turn(self):
+        request = self.client.request
+        def start(method, params=None, **kwargs):
+            result = request(method, params, **kwargs)
+            if method == 'turn/start':
+                self.client.complete()
+                self.client.notify('turn/started', {'threadId':'thread-1','turn':{'id':'continuation'}})
+            return result
+        self.controller.state['job'] = {'status':'active','objective':'Continue a job'}
+        with patch.object(self.client, 'request', side_effect=start):
+            self.controller.dispatch('send', {'text':'Continue'})
+            eventually(lambda: not self.controller._send_queued and any(m == 'turn/start' for m, _ in self.client.calls))
+        self.assertEqual(self.controller.turn_id, 'continuation')
+        submitted = []
+        class Fusion:
+            def submit(self, tool, args, complete, cancelled):
+                submitted.append((tool, cancelled()))
+                complete({'ok':True})
+        self.controller.fusion_tools = Fusion()
+        self.client.on_request('current', 'item/tool/call', {'threadId':'thread-1','turnId':'continuation',
+            'tool':'fusion_inspect_document','arguments':{}})
+        self.assertEqual(submitted, [('fusion_inspect_document',False)])
+        self.client.on_request('old', 'item/tool/call', {'threadId':'thread-1','turnId':'turn-1',
+            'tool':'fusion_inspect_document','arguments':{}})
+        self.assertEqual(len(submitted), 1)
+
     def test_dfm_switch_publishes_context_and_does_not_change_mid_turn(self):
         eventually(lambda: not self.controller.state['rmfgBusy'])
         self.assertFalse(self.controller.snapshot()['dfmEnabled'])
