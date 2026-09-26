@@ -13,6 +13,7 @@ let dismissedError = "";
 let dismissedUpdate = "";
 let submitting = false;
 let renderedThread = null;
+let renderedTranscriptPage = "latest";
 let renderedProvider = null;
 let renderedHistory = "";
 let draftImages = [];
@@ -367,7 +368,7 @@ function updateMessageView(view, message) {
 function planTurns() {
   const turns = [];
   state.messages.forEach((message, index) => {
-    const key = `${state.threadId || ""}:${message.role}:${message.id ?? index}`;
+    const key = `${state.threadId || ""}:${message.role}:${message.id ?? ((state.messageOffset || 0) + index)}`;
     if (message.role === "user") { turns.push({key, user: {message, key}, blocks: []}); return; }
     if (!turns.length) turns.push({key: `${state.threadId || ""}:lead`, user: null, blocks: []});
     const turn = turns[turns.length - 1];
@@ -404,7 +405,7 @@ function renderMessages() {
     }
     if (turn.blocks.length) place(turnView.section, turnView.head, slot++);
     turn.blocks.forEach((block, b) => {
-      const live = !!state.busy && t === turns.length - 1 && b === turn.blocks.length - 1;
+      const live = !state.showingOlderMessages && !!state.busy && t === turns.length - 1 && b === turn.blocks.length - 1;
       if (block.type === "activity") {
         let view = messageViews.get(block.key);
         if (!view) { view = createActivity(); messageViews.set(block.key, view); changed = true; }
@@ -436,6 +437,9 @@ function render() {
   const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
   const wasEmpty = messageViews.size === 0;
   const threadChanged = renderedThread !== (state.threadId || null);
+  const transcriptPage = state.showingOlderMessages ? String(state.messageOffset || 0) : "latest";
+  const pageChanged = transcriptPage !== renderedTranscriptPage;
+  renderedTranscriptPage = transcriptPage;
   const provider=state.provider||"chatgpt";
   if(renderedProvider && renderedProvider!==provider){
     if(clipboardRequest)clearTimeout(clipboardRequest.timer);
@@ -454,11 +458,16 @@ function render() {
   }
   if (renderMessages()) {
     if (!state.messages.length) scroll.scrollTop = 0;
+    else if (pageChanged && state.showingOlderMessages) scroll.scrollTop = 0;
+    else if (pageChanged) scroll.scrollTop = scroll.scrollHeight;
     else if (nearBottom || wasEmpty || threadChanged) scroll.scrollTop = scroll.scrollHeight;
   }
 }
 
 function renderControls() {
+  $("transcript-pages").hidden = !state.olderMessagesCount && !state.showingOlderMessages;
+  $("transcript-older").hidden = !state.olderMessagesCount;
+  $("transcript-latest").hidden = !state.showingOlderMessages;
   renderJob();
   const connected=state.connection==="ready" && !state.codexRestarting;
   const local=state.provider==="ollama";
@@ -736,10 +745,13 @@ function renderJob() {
   $("job-target-note").textContent = job && state.jobHasTarget ? "Resuming keeps this job’s original document and selection." : "Starting or resuming uses the active Fusion document. Open the intended document first.";
   const unavailable = !state.account || state.connection !== "ready" || !!state.jobBusy;
   $("job-button").disabled = unavailable;
-  $("job-pause").hidden = !job || (job.status !== "active" && !state.busy);
+  $("job-pause").hidden = !job || job.status !== "active";
   $("job-pause").disabled = unavailable;
   $("job-resume").hidden = !job || job.status === "active" || job.status === "complete";
   $("job-resume").disabled = unavailable || !!state.busy;
+  $("job-resume").title = state.busy && job?.status !== "active" ? "The current response is finishing. Resume becomes available when it is idle." : "";
+  $("job-wait-note").hidden = !job || job.status === "active" || job.status === "complete" || !state.busy;
+  $("job-wait-note").textContent = "The current response is finishing. Resume will be available when it is idle.";
   $("job-resume").textContent = job?.status === "budgetLimited" ? "Resume with budget below" : "Resume";
   $("job-clear").hidden = !job;
   $("job-clear").disabled = unavailable;
@@ -837,6 +849,8 @@ $("job-button").onclick=()=>{showPlusMenu(false);openJob();};
 $("job-strip").onclick=()=>openJob();
 $("job-close").onclick=()=>$("job-dialog").close();
 $("job-pause").onclick=()=>act("job",{command:"pause"});
+$("transcript-older").onclick=()=>act("transcriptPage",{threadId:state.threadId,provider:state.provider||"chatgpt",before:state.messageOffset});
+$("transcript-latest").onclick=()=>act("transcriptPage",{threadId:state.threadId,provider:state.provider||"chatgpt"});
 $("job-clear").onclick=()=>act("job",{command:"clear"});
 $("job-resume").onclick=()=>{
   try { act("job",{command:"resume",tokenBudget:jobBudget()}); $("job-dialog").close(); }

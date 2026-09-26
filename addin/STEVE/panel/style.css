@@ -413,3 +413,4 @@ button.chip:hover:not(:disabled) { border-color: var(--accent); }
 .release-notice .text-button { white-space: nowrap; }
 #release-notes-items { padding-left: 20px; line-height: 1.65; }
 #release-notes-items li { margin: 10px 0; }
+#transcript-pages { display: flex; gap: 12px; padding: 8px 16px; }

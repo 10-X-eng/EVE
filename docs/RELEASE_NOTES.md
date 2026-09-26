@@ -1,3 +1,15 @@
+# STEVE 0.8.1 — Long chats, reliable jobs and working links
+
+- **Long conversations:** removes the 200-entry send cutoff. Tool-heavy chats and paused jobs can continue in the same conversation after switching or saving documents.
+- **Responsive transcript:** the panel displays a rolling window of 200 entries. **Show earlier messages** pages backward; **Back to latest** returns to the live conversation. Saved history and model context are preserved; this display window does not replace the runtime’s context compaction.
+- **Paused jobs:** Resume recovers when the runtime is idle. Pause is hidden for paused jobs; an unfinished response explains the wait. Status refresh cannot interrupt active Fusion tools or overwrite a newer turn.
+- **Working links:** fixes the missing import that prevented reply links from opening the system browser. Non-web URLs remain blocked.
+- **Tool-call race:** prevents a late turn-start response from replacing a newer automatic turn ID and incorrectly rejecting valid tools as inactive. Cancelled and genuinely stale requests remain blocked.
+
+These fixes work in existing chats. If upgrading from before 0.8.0, start a new chat for the gallery lookup tools and screenshot isolation introduced in that version.
+
+Use **Settings → Updates → Update & restart STEVE** once the download is ready and work is idle. Fusion stays open.
+
 # STEVE 0.8.0 — Shared image gallery and clearer updates
 
 - **What’s new:** a small notice after updating opens these version highlights inside STEVE. Dismiss it once; reopen them anytime from Settings → Updates. Notes work offline.

@@ -10,7 +10,7 @@
   <script src="markdown.js?v=1" defer></script>
   <script src="images.js?v=3" defer></script>
   <script src="gallery.js?v=1" defer></script>
-  <script src="panel.js?v=34" defer></script>
+  <script src="panel.js?v=35" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -155,6 +155,10 @@
           <button class="suggestion" data-prompt="Inspect my active Fusion workspace and available APIs. Explain what you can do here, including modeling, assemblies, or manufacturing where supported."><span class="suggestion-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span>Explore what's possible<small>Modeling, assemblies, CAM and more</small></span><span class="suggestion-arrow">↗</span></button>
         </div>
       </section>
+      <nav id="transcript-pages" aria-label="Conversation pages" hidden>
+        <button id="transcript-older" class="text-button" type="button">Show earlier messages</button>
+        <button id="transcript-latest" class="text-button" type="button" hidden>Back to latest</button>
+      </nav>
       <section id="conversation" class="conversation" aria-label="Conversation" hidden></section>
       <div id="thinking" class="thinking" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="thinking-label">Thinking</span></div>
     </main>
@@ -211,6 +215,7 @@
     <div class="job-heading"><div><span class="eyebrow">Keep working toward an outcome</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
     <p id="job-summary"></p><p id="job-usage" class="job-note"></p><p id="job-target-note" class="job-note"></p>
     <div class="job-actions"><button id="job-pause" type="button" class="secondary-button">Pause</button><button id="job-resume" type="button" class="secondary-button">Resume</button><button id="job-clear" type="button" class="text-button">Clear job</button></div>
+    <p id="job-wait-note" class="job-note" role="status" hidden></p>
     <form id="job-form">
       <label for="job-objective">Objective</label><textarea id="job-objective" rows="4" maxlength="4000" required placeholder="Create a mounting bracket and verify its dimensions…"></textarea>
       <label for="job-budget">Token budget <span class="job-note">(optional)</span></label><input id="job-budget" type="number" min="1" max="9007199254740991" step="1" placeholder="No token limit">

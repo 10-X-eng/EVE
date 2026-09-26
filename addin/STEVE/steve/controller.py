@@ -4,6 +4,7 @@ import os
 import json
 from pathlib import Path
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -178,6 +179,10 @@ class Controller:
         self.client = None
         self.thread_id = None
         self.turn_id = None
+        self._turn_revision = 0
+        self._runtime_status = None
+        self._transcript_key = None
+        self._transcript_end = None
         self.default_model = None
         self.login_id = None
         self._closed = False
@@ -312,7 +317,16 @@ class Controller:
 
     def snapshot(self):
         with self._lock:
-            return {**copy.deepcopy(self.state), "turnId": self.turn_id,
+            key = (self.state['provider'], self.thread_id)
+            if key != self._transcript_key:
+                self._transcript_key, self._transcript_end = key, None
+            messages = self.state['messages']
+            end = len(messages) if self._transcript_end is None else min(self._transcript_end, len(messages))
+            start = max(0, end - 200)
+            return {**copy.deepcopy({**self.state, 'messages': messages[start:end]}),
+                    'messageOffset': start, 'olderMessagesCount': start,
+                    'showingOlderMessages': self._transcript_end is not None,
+                    'newerMessagesCount': len(messages) - end, "turnId": self.turn_id,
                     "activeTools": [dict(entry[3]) for entry in self._active_tools.values()
                                     if self.state["busy"] and entry[:3] == (self.client, self.thread_id, self.turn_id)],
                     "canSteer": bool(self.turn_id and self.state["busy"] and not self._cancel)}
@@ -703,6 +717,16 @@ class Controller:
                 raise ValueError("Only web links from a reply can be opened.")
             if self.open_browser(url) is False:
                 raise RuntimeError("The link could not open in your browser.")
+        elif action == 'transcriptPage':
+            with self._lock:
+                if payload.get('threadId') != self.thread_id or payload.get('provider') != self.state['provider']:
+                    return
+                end = payload.get('before')
+                if end is not None and (type(end) is not int or not 1 <= end <= len(self.state['messages'])):
+                    raise ValueError('Choose an earlier transcript page or return to the latest messages.')
+                self._transcript_key = (self.state['provider'], self.thread_id)
+                self._transcript_end = end
+            self.emit()
         elif action == "setupHelp":
             destinations = {
                 "steve": install_guide_url(),
@@ -898,6 +922,8 @@ class Controller:
                                     previous and previous["objective"] != job["objective"]):
             self._job_contexts[key] = copy.deepcopy(self._task_context)
         self.state["jobHasTarget"] = bool(self._job_contexts.get(key))
+        if self._runtime_status == (self.thread_id, 'idle'):
+            self._idle_job()
         if not self.turn_id:
             active = bool(job and job["status"] == "active" and not self._cancel)
             self.state.update(busy=active, status="Continuing job" if active else "Ready")
@@ -910,6 +936,26 @@ class Controller:
                 self._set_job_state(result.get("goal"))
         self.emit()
         return result.get("goal")
+
+    def _idle_job(self):
+        """An authoritative idle thread may release a stale paused-job busy flag."""
+        job = self.state['job']
+        if (not job or job['status'] == 'active' or self._send_queued or self._active_tools):
+            return
+        self.turn_id = None
+        self._finish_code_activity()
+        self.state.update(busy=False, waitingForFusion=False, status='Ready')
+
+    def _refresh_job_activity(self):
+        with self._lock:
+            if not self.state['job'] or self.state['job']['status'] == 'active' or not self.state['busy']:
+                return
+            thread, revision = self.thread_id, self._turn_revision
+        result = self.client.request('thread/read', {'threadId': thread, 'includeTurns': False})
+        with self._lock:
+            if (thread == self.thread_id and revision == self._turn_revision
+                    and result.get('thread', {}).get('status', {}).get('type') == 'idle'):
+                self._idle_job()
 
     def _ensure_thread(self):
         if self.thread_id:
@@ -936,6 +982,7 @@ class Controller:
         if command in ("status", "help", "edit"):
             if self.thread_id:
                 self._job_rpc("get")
+                self._refresh_job_activity()
             self.state["jobNotice"] = "" if self.state["job"] else "No job yet. Describe an objective to get started."
             return
         if not self.state["account"] or self.state["connection"] != "ready":
@@ -1289,11 +1336,10 @@ class Controller:
             raise RuntimeError("Start Ollama and refresh models to begin." if self.state["provider"] == "ollama" else "Sign in with your selected provider to start a conversation.")
         if self.state["provider"] == "ollama" and not self.state["models"]:
             raise RuntimeError("Download a local model with tool support, then refresh models.")
-        if len(self.state["messages"]) >= 200:
-            raise RuntimeError("Start a new conversation to keep STEVE responsive.")
         references = [self.images.remember(image) for image in images]
         with self._lock:
             self.turn_id = None
+            self._transcript_end = None
             self._task_context = context
             self.state.update(busy=True, error="", status="Thinking")
             self.state.update(taskDocument={"id": context.get("document_id"), "name": context.get("name")} if context else None,
@@ -1319,10 +1365,12 @@ class Controller:
         effort = self.state["effort"] or self.state["defaultEffort"]
         if effort:
             params["effort"] = effort
+        with self._lock:
+            revision = self._turn_revision
         result = self.client.request("turn/start", params)
         with self._lock:
             message["delivery"] = "sent"
-            if self.state["busy"]:
+            if self.state["busy"] and revision == self._turn_revision:
                 self.turn_id = result["turn"]["id"]
         self._record_chat_images(params["threadId"], result["turn"]["id"], images, message=text)
         self.emit()
@@ -1479,7 +1527,14 @@ class Controller:
             elif method in ("thread/goal/updated", "thread/goal/cleared"):
                 self._job_revision += 1
                 self._set_job_state(params.get("goal") if method.endswith("updated") else None)
+            elif method == 'thread/status/changed':
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, params.get('status', {}).get('type'))
+                if params.get('status', {}).get('type') == 'idle':
+                    self._idle_job()
             elif method == "turn/started":
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, 'active')
                 self.turn_id = params["turn"]["id"]
                 self.state.update(busy=True, status="Stopping" if self._cancel else "Thinking")
                 if self._cancel:
@@ -1516,6 +1571,8 @@ class Controller:
                 turn = params.get("turn", {})
                 if turn.get("id") and self.turn_id and turn["id"] != self.turn_id:
                     return
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, 'idle')
                 self._active_tools.clear()
                 self._finish_code_activity()
                 continuing = bool(self.state["job"] and self.state["job"]["status"] == "active" and not self._cancel)
