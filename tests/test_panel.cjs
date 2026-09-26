@@ -262,6 +262,29 @@ console.log('Update confirmation controls passed.');
   vm.runInContext(`state.updateDownload={state:'ready',version:'0.3.0'};`, context);
   context.renderControls();
   assert.equal(elements.get('update-steve-now').hidden, false);
+  // A verified download must explain why applying is blocked, then recover when idle.
+  for (const [field, value, explanation] of [
+    ['busy', true, /STEVE is still working/],
+    ['job', {status:'active'}, /Pause or finish the current job/],
+    ['jobBusy', true, /job operation/],
+    ['loginPending', true, /Finish or cancel sign-in/],
+    ['codexUpdating', true, /Codex update to finish/],
+  ]) {
+    vm.runInContext(`state.busy=false;state.job=null;state.jobBusy=false;state.loginPending=false;state.codexUpdating=false;
+      state[${JSON.stringify(field)}]=${JSON.stringify(value)};`, context);
+    context.renderControls();
+    for (const id of ['update-steve-now','menu-update-now']) {
+      assert.equal(elements.get(id).disabled, true);
+      assert.match(elements.get(id).title, explanation);
+    }
+    assert.match(elements.get('update-hint').textContent, explanation);
+    assert.match(elements.get('download-status').textContent, explanation);
+  }
+  vm.runInContext(`state.codexUpdating=false;`, context);
+  context.renderControls();
+  assert.equal(elements.get('update-steve-now').disabled, false);
+  assert.equal(elements.get('menu-update-now').title, '');
+  assert.match(elements.get('update-hint').textContent, /Update downloaded and verified/);
   vm.runInContext(`state.updateInstallReady=true;`, context);
   context.renderControls();
   assert.equal(elements.get('update-steve-now').hidden, true);

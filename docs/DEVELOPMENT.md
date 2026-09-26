@@ -2,6 +2,28 @@
 
 STEVE is a Fusion add-in for Windows x64 and macOS on Apple silicon, with ChatGPT sign-in, streaming chat, persistent history, and a general Python execution bridge into Fusion's installed APIs.
 
+## Part-by-part design behavior
+
+The shared prompt defaults to functional geometry: establish part functions and shared
+interfaces, build one logical part, query its actual geometry and inspect a viewport,
+correct discrepancies, then continue. Repeated parts may reuse a verified source.
+Assembly integration requires another check; a later interface change invalidates earlier
+checks on the affected parts. Basic design verification is independent of the DFM toggle.
+The verification result also directs correction before dependent construction.
+
+This is model guidance, not a runtime-enforced design gate. Existing checks validate only
+the measurements the script actually records and a bounded feature-health sample. Neither
+a passing script nor a screenshot proves the design works. Current instructions are sent
+on thread creation and history resume; changing source does not update an already running
+conversation. Model compliance still needs a live Fusion trial.
+
+For that trial, request a two-part enclosure with specified mating clearance and screw
+interfaces. Check the trace for a completed and measured base before lid construction,
+visual inspection, correction of any mismatch, and final assembly clearance/interference
+checks. Repeat with DFM off: basic fit checks should remain. Ask for a change to the mating
+interface and confirm both parts are rechecked. An unspecified critical screw interface
+should trigger inspection or a focused question, not fabricated hardware dimensions.
+
 ## STEVE Dream
 
 ChatGPT threads enable Codex's native `image_generation` feature; other providers keep

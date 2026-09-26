@@ -1,5 +1,7 @@
 # First milestone verification
 
+- September 26, 2026: the maintainer confirmed the installed 0.7.0 → 0.7.1 in-Fusion update worked on Windows. The confirmation button still displayed obsolete wording about closing Fusion; local changes correct the label and explicitly announce the STEVE restart. This report does not establish live macOS updater coverage.
+
 - 0.7.0 release candidate: 439 Python tests passed locally (11 skipped), plus panel/image fixtures and real Edge checks for Settings, streaming DOM retention and Dream. The bundled runtime smoke test passed without inference. The Windows ZIP built and passed the portability audit. Local fixture installation was blocked by the installer's running-Fusion guard; Windows/macOS CI must verify installation before publication. The redesigned Dream transcript was also inspected at 440px and 340px widths.
 
 - DFM follow-up (0.6.1): #49–#51 were merged and pulled main matched the tested integration tree. The release branch passed 383 local Python tests (11 skipped), with package installation covered separately by clean Windows/macOS CI. Local focused DFM/catalog, panel/image and 147-file portability checks passed. Live Fusion verified 24 nominal-envelope cases and three machine-definition currency cases without changing body revisions. These are scoped checks, not process qualification.

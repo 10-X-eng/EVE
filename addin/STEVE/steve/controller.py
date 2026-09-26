@@ -256,7 +256,7 @@ class Controller:
                                 "updateStatus": f"Couldn’t prepare installation: {exc}"})
         else:
             self._update_state({"updateInstalling": False, "updateInstallReady": True,
-                                "updateStatus": "Update verified. Waiting for STEVE and Fusion to be idle before restarting STEVE."})
+                                "updateStatus": "Update ready. STEVE will restart as soon as STEVE and Fusion are idle. Fusion and your documents will stay open."})
 
     def _release_checked(self, changes):
         self._update_state(changes)
@@ -622,7 +622,7 @@ class Controller:
                     return
                 self.state["updateInstalling"] = True
                 self.state["updateInstallFailure"] = None
-                self.state["updateStatus"] = "Preparing the update…"
+                self.state["updateStatus"] = "Preparing to restart STEVE… Fusion and your documents will stay open."
             self.emit()
             threading.Thread(target=self._prepare_update, args=(dict(download), release["version"]),
                              name="STEVE-Install-Preparation", daemon=True).start()
