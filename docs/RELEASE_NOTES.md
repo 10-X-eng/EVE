@@ -1,3 +1,11 @@
+# STEVE 0.8.1 — Paused-job controls (unreleased)
+
+- Fixes a stale busy state that could leave a paused job’s Resume button disabled. The panel now handles runtime idle notifications and refreshes activity when job controls open. Pause is hidden for paused jobs; a genuinely unfinished response explains why Resume is waiting. Active Fusion tools are not interrupted or treated as finished.
+- Clarifies that you should **start a new chat after updating** to give STEVE the gallery lookup tools and the capture tool’s `isolate` option. Gallery **Attach** works in older chats too.
+- In Design, ask STEVE to isolate a part for its screenshot. It hides other bodies/components temporarily and restores visibility afterward. Isolated views help inspect individual parts; assembly fit still requires a view with surrounding parts present.
+
+Managed installations can use **Settings → Updates → Update & restart STEVE** once the download is ready and work is idle. Fusion stays open. Release highlights appear inside STEVE after the update.
+
 # STEVE 0.8.0 — Shared image gallery and clearer updates
 
 - **What’s new:** a small notice after updating opens these version highlights inside STEVE. Dismiss it once; reopen them anytime from Settings → Updates. Notes work offline.

@@ -10,7 +10,7 @@
   <script src="markdown.js?v=1" defer></script>
   <script src="images.js?v=3" defer></script>
   <script src="gallery.js?v=1" defer></script>
-  <script src="panel.js?v=34" defer></script>
+  <script src="panel.js?v=35" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -211,6 +211,7 @@
     <div class="job-heading"><div><span class="eyebrow">Keep working toward an outcome</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
     <p id="job-summary"></p><p id="job-usage" class="job-note"></p><p id="job-target-note" class="job-note"></p>
     <div class="job-actions"><button id="job-pause" type="button" class="secondary-button">Pause</button><button id="job-resume" type="button" class="secondary-button">Resume</button><button id="job-clear" type="button" class="text-button">Clear job</button></div>
+    <p id="job-wait-note" class="job-note" role="status" hidden></p>
     <form id="job-form">
       <label for="job-objective">Objective</label><textarea id="job-objective" rows="4" maxlength="4000" required placeholder="Create a mounting bracket and verify its dimensions…"></textarea>
       <label for="job-budget">Token budget <span class="job-note">(optional)</span></label><input id="job-budget" type="number" min="1" max="9007199254740991" step="1" placeholder="No token limit">

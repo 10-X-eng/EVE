@@ -736,10 +736,13 @@ function renderJob() {
   $("job-target-note").textContent = job && state.jobHasTarget ? "Resuming keeps this job’s original document and selection." : "Starting or resuming uses the active Fusion document. Open the intended document first.";
   const unavailable = !state.account || state.connection !== "ready" || !!state.jobBusy;
   $("job-button").disabled = unavailable;
-  $("job-pause").hidden = !job || (job.status !== "active" && !state.busy);
+  $("job-pause").hidden = !job || job.status !== "active";
   $("job-pause").disabled = unavailable;
   $("job-resume").hidden = !job || job.status === "active" || job.status === "complete";
   $("job-resume").disabled = unavailable || !!state.busy;
+  $("job-resume").title = state.busy && job?.status !== "active" ? "The current response is finishing. Resume becomes available when it is idle." : "";
+  $("job-wait-note").hidden = !job || job.status === "active" || job.status === "complete" || !state.busy;
+  $("job-wait-note").textContent = "The current response is finishing. Resume will be available when it is idle.";
   $("job-resume").textContent = job?.status === "budgetLimited" ? "Resume with budget below" : "Resume";
   $("job-clear").hidden = !job;
   $("job-clear").disabled = unavailable;

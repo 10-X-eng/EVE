@@ -122,7 +122,11 @@ const runChecks = async () => {
       check(document.getElementById('job-summary').textContent.includes('<fixture>') && !document.querySelector('fixture'), 'Unsafe job rendering');
       document.getElementById('job-pause').click(); await frame();
       check(jobCalls.some(c=>c.action==='job' && c.payload.command==='pause'), 'Pause was sent as model text');
+      snapshot.job.status='paused'; send(); await frame();
+      check(document.getElementById('job-pause').hidden, 'Paused jobs must not offer Pause again');
+      check(document.getElementById('job-resume').disabled && !document.getElementById('job-wait-note').hidden, 'A finishing response must explain why Resume waits');
       snapshot.busy=false; snapshot.job.status='paused'; send(); await frame();
+      check(!document.getElementById('job-resume').disabled && document.getElementById('job-wait-note').hidden, 'Idle paused jobs must expose Resume');
       snapshot.dfmEnabled=true; snapshot.rmfgState='connected';
       send(); await frame();
       check(!document.getElementById('rmfg-settings').hidden, 'Connected RMFG controls must remain available with DFM on');

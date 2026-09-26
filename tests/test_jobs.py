@@ -1,6 +1,7 @@
 """Job lifecycle at STEVE's controller boundary, including automatic turns."""
 import copy
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 from test_core import FakeClient, ROOT, eventually
@@ -183,6 +184,68 @@ class JobTests(unittest.TestCase):
         self.assertLess(methods.index("thread/goal/set"), methods.index("thread/resume"))
         self.assertEqual(self.controller.state["job"]["status"], "paused")
         self.assertFalse(self.controller.state["jobHasTarget"])
+
+    def test_paused_job_becomes_resumable_on_idle_even_without_turn_completed(self):
+        for idle_first in (False, True):
+            with self.subTest(idle_first=idle_first):
+                self.client.job = None
+                self.controller.state['job'] = None
+                self.controller.state['busy'] = False
+                self.controller.turn_id = None
+                self.client.turn_number = 0
+                self.create()
+                idle = lambda: self.client.notify('thread/status/changed', {'threadId':'thread-1','status':{'type':'idle'}})
+                if idle_first:
+                    idle()
+                    self.assertTrue(self.controller.state['busy'])  # Active jobs still continue.
+                self.client.job['status'] = 'paused'
+                self.client.notify('thread/goal/updated', {'threadId':'thread-1','goal':copy.deepcopy(self.client.job)})
+                if not idle_first:
+                    self.assertTrue(self.controller.state['busy'])  # Pause is not proof the turn ended.
+                    idle()
+                self.assertFalse(self.controller.state['busy'])
+                self.assertIsNone(self.controller.turn_id)
+                self.controller.dispatch('job', {'command':'resume'}, capture_context=self.capture)
+                eventually(lambda: self.controller.turn_id == 'job-turn-2' and not self.controller.state['jobBusy'])
+                self.assertEqual(self.captures[-1], 'resume:binding-a')
+
+    def test_open_job_refresh_recovers_idle_state_and_ignores_racing_new_turn(self):
+        self.create()
+        self.client.job['status'] = 'paused'
+        self.client.notify('thread/goal/updated', {'threadId':'thread-1','goal':copy.deepcopy(self.client.job)})
+        request = self.client.request
+        def read(method, params=None, **kwargs):
+            if method == 'thread/read':
+                self.assertFalse(params['includeTurns'])
+                return {'thread':{'status':{'type':'idle'}}}
+            return request(method, params, **kwargs)
+        with patch.object(self.client, 'request', side_effect=read):
+            self.controller.dispatch('job', {'command':'status'})
+            eventually(lambda: not self.controller.state['jobBusy'])
+        self.assertFalse(self.controller.state['busy'])
+        self.client.start_job_turn()
+        def racing_read(method, params=None, **kwargs):
+            if method == 'thread/read':
+                self.client.start_job_turn()
+                return {'thread':{'status':{'type':'idle'}}}
+            return request(method, params, **kwargs)
+        with patch.object(self.client, 'request', side_effect=racing_read):
+            self.controller.dispatch('job', {'command':'status'})
+            eventually(lambda: not self.controller.state['jobBusy'])
+        self.assertTrue(self.controller.state['busy'])
+        self.assertEqual(self.controller.turn_id, 'job-turn-3')
+
+    def test_idle_notification_never_releases_running_fusion_work_or_other_thread(self):
+        self.create()
+        self.client.job['status'] = 'paused'
+        self.client.notify('thread/goal/updated', {'threadId':'thread-1','goal':copy.deepcopy(self.client.job)})
+        self.client.notify('thread/status/changed', {'threadId':'other','status':{'type':'idle'}})
+        self.assertTrue(self.controller.state['busy'])
+        self.controller._active_tools['fixture'] = (self.client, self.controller.thread_id, self.controller.turn_id, {'label':'Fixture tool'})
+        self.client.notify('thread/status/changed', {'threadId':'thread-1','status':{'type':'idle'}})
+        self.assertTrue(self.controller.state['busy'])
+        self.assertEqual(self.controller.turn_id, 'job-turn-1')
+        self.controller._active_tools.clear()
 
 
 if __name__ == "__main__":

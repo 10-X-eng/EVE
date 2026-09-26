@@ -178,6 +178,8 @@ class Controller:
         self.client = None
         self.thread_id = None
         self.turn_id = None
+        self._turn_revision = 0
+        self._runtime_status = None
         self.default_model = None
         self.login_id = None
         self._closed = False
@@ -898,6 +900,8 @@ class Controller:
                                     previous and previous["objective"] != job["objective"]):
             self._job_contexts[key] = copy.deepcopy(self._task_context)
         self.state["jobHasTarget"] = bool(self._job_contexts.get(key))
+        if self._runtime_status == (self.thread_id, 'idle'):
+            self._idle_job()
         if not self.turn_id:
             active = bool(job and job["status"] == "active" and not self._cancel)
             self.state.update(busy=active, status="Continuing job" if active else "Ready")
@@ -910,6 +914,26 @@ class Controller:
                 self._set_job_state(result.get("goal"))
         self.emit()
         return result.get("goal")
+
+    def _idle_job(self):
+        """An authoritative idle thread may release a stale paused-job busy flag."""
+        job = self.state['job']
+        if (not job or job['status'] == 'active' or self._send_queued or self._active_tools):
+            return
+        self.turn_id = None
+        self._finish_code_activity()
+        self.state.update(busy=False, waitingForFusion=False, status='Ready')
+
+    def _refresh_job_activity(self):
+        with self._lock:
+            if not self.state['job'] or self.state['job']['status'] == 'active' or not self.state['busy']:
+                return
+            thread, revision = self.thread_id, self._turn_revision
+        result = self.client.request('thread/read', {'threadId': thread, 'includeTurns': False})
+        with self._lock:
+            if (thread == self.thread_id and revision == self._turn_revision
+                    and result.get('thread', {}).get('status', {}).get('type') == 'idle'):
+                self._idle_job()
 
     def _ensure_thread(self):
         if self.thread_id:
@@ -936,6 +960,7 @@ class Controller:
         if command in ("status", "help", "edit"):
             if self.thread_id:
                 self._job_rpc("get")
+                self._refresh_job_activity()
             self.state["jobNotice"] = "" if self.state["job"] else "No job yet. Describe an objective to get started."
             return
         if not self.state["account"] or self.state["connection"] != "ready":
@@ -1479,7 +1504,14 @@ class Controller:
             elif method in ("thread/goal/updated", "thread/goal/cleared"):
                 self._job_revision += 1
                 self._set_job_state(params.get("goal") if method.endswith("updated") else None)
+            elif method == 'thread/status/changed':
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, params.get('status', {}).get('type'))
+                if params.get('status', {}).get('type') == 'idle':
+                    self._idle_job()
             elif method == "turn/started":
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, 'active')
                 self.turn_id = params["turn"]["id"]
                 self.state.update(busy=True, status="Stopping" if self._cancel else "Thinking")
                 if self._cancel:
@@ -1516,6 +1548,8 @@ class Controller:
                 turn = params.get("turn", {})
                 if turn.get("id") and self.turn_id and turn["id"] != self.turn_id:
                     return
+                self._turn_revision += 1
+                self._runtime_status = (self.thread_id, 'idle')
                 self._active_tools.clear()
                 self._finish_code_activity()
                 continuing = bool(self.state["job"] and self.state["job"]["status"] == "active" and not self._cancel)
