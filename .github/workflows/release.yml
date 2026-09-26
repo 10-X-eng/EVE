@@ -52,7 +52,7 @@ jobs:
         run: node tests/test_panel.cjs
       - name: Test image attachments
         run: node tests/test_images.cjs
-      - name: Test Settings, streaming and Dream in Edge
+      - name: Test Settings, streaming, Dream and gallery in Edge
         run: |
           npm install --prefix "$env:RUNNER_TEMP/steve-browser-tests" --no-package-lock --no-save playwright@1.62.1
           if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
@@ -63,10 +63,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Streaming browser checks failed' }
           node tests/test_dream.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Dream browser checks failed' }
+          node tests/test_gallery.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Gallery browser checks failed' }
       - name: Check actual runtime protocol without inference
         run: python scripts/smoke_runtime.py
       - name: Install complete package into a fixture and verify it
         run: python scripts/verify_package.py
+      - name: Verify complete-package update, migration and rollback
+        run: python scripts/verify_update.py
       - name: Upload verified Windows package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -123,6 +127,8 @@ jobs:
         run: python scripts/smoke_runtime.py
       - name: Install complete package into a fixture and verify it
         run: python scripts/verify_package.py
+      - name: Verify complete-package update, migration and rollback
+        run: python scripts/verify_update.py
       - name: Upload verified macOS package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

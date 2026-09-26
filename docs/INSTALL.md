@@ -1,8 +1,8 @@
 # Install STEVE for Autodesk Fusion
 
-STEVE 0.7.1 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, an OpenRouter account with credits, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, or STEVE account is required, and you never copy an API key.
+STEVE 0.8.0 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, an OpenRouter account with credits, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, or STEVE account is required, and you never copy an API key.
 
-Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.7.1-windows-x64.zip` or `STEVE-0.7.1-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
+Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.8.0-windows-x64.zip` or `STEVE-0.8.0-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
 ## Install on Windows
 
@@ -13,7 +13,7 @@ Download the package for your computer from the [STEVE releases page](https://gi
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). See [OpenRouter setup](#openrouter-experimental) for its credits and model choice. Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `Get-FileHash .\STEVE-0.7.1-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
+To verify the download, run `Get-FileHash .\STEVE-0.8.0-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
 ## Install on macOS
 
@@ -25,7 +25,7 @@ To verify the download, run `Get-FileHash .\STEVE-0.7.1-windows-x64.zip -Algorit
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
 6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). See [OpenRouter setup](#openrouter-experimental) for its credits and model choice. Existing STEVE sign-in is checked automatically.
 
-To verify the download, run `shasum -a 256 STEVE-0.7.1-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
+To verify the download, run `shasum -a 256 STEVE-0.8.0-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
 ## First conversation
 
@@ -95,6 +95,20 @@ Choose **Update Codex** to download the complete app-server package into STEVE's
 When the menu says the update is ready, finish or pause your task, then click **Restart STEVE** in that same menu. STEVE restarts its conversation engine, reopens your current chat, and refreshes the model catalog. Fusion and the add-in stay open. Saved sign-in, chats, images, and preferences stay in place. **Refresh models** under **Settings → Provider & account** can also reload the catalog without resetting your chat. OpenAI controls which models your account can access.
 
 If an updated runtime causes a problem, choose **Use bundled Codex**, then click **Restart STEVE**. The original runtime is preserved. Download failures leave your current runtime selected. These checks cover startup compatibility; they cannot guarantee every behavior of future Codex releases. Independently installed runtimes live in the `runtimes` subdirectory of STEVE's local data folder. Updating a separate Codex CLI or desktop app does not update this copy.
+
+## Image gallery
+
+After updating, **New in STEVE** opens a short summary of changes. Dismiss it once;
+find it again under **Settings → Updates → What’s new in this version**. Notes work offline.
+
+Open the image icon in STEVE's top bar. Existing cached images are indexed automatically,
+without moving their files or changing old chats. **Available to STEVE** enables an image
+for lookup across conversations; all imported and migrated images start disabled.
+**Attach** adds an image to your current draft without enabling it globally or sending it.
+You can edit names, search, import PNG/JPEG/WebP images up to 8 MiB, or remove gallery entries.
+Turning access off or removing an entry prevents future gallery lookup; it cannot erase
+pictures already sent into a chat. Removing an entry retains its cached file for history.
+Start a new chat after updating for the new model tools. Manual Attach works in older chats.
 
 ## Update or reload
 

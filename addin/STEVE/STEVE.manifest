@@ -3,7 +3,7 @@
   "type": "addin",
   "author": "10-X-eng",
   "description": {"": "STEVE — Your engineering partner inside Autodesk Fusion. Work alongside your design with ChatGPT, Grok, Claude, or local Ollama."},
-  "version": "0.7.1",
+  "version": "0.8.0",
   "runOnStartup": true,
   "supportedOS": "windows|mac",
   "editEnabled": true

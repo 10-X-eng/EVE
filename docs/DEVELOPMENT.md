@@ -24,6 +24,38 @@ checks. Repeat with DFM off: basic fit checks should remain. Ask for a change to
 interface and confirm both parts are rechecked. An unspecified critical screw interface
 should trigger inspection or a focused question, not fabricated hardware dimensions.
 
+## Shared image gallery
+
+Release highlights ship in `release_notes.py`; update them with each version bump.
+The notice is acknowledged per version in `release-notes-seen.json` in the user data
+folder. Settings can reopen the bundled notes without network access. Run
+`python scripts/verify_update.py` after building to verify complete-package staging,
+activation, migration, rollback and retry without touching Fusion. Optionally pass
+`--previous-archive` with a prior release ZIP and its sibling checksum file.
+
+`gallery.py` maintains `images/gallery.json` alongside the existing content-addressed
+image files and chat indexes. First use discovers valid cached PNG/JPEG/WebP assets and
+recovers names from bounded chat catalogs. Later scans discover new images. Migration
+never moves/deletes files, rewrites chat indexes, or enables an entry. Duplicate hashes
+share an entry; removal leaves a disabled tombstone so rescanning cannot resurrect it.
+Explicit reimport restores a removed entry with access off. Damaged images are skipped;
+a damaged gallery index fails closed and is preserved for recovery. Atomic replacement
+and the existing cross-process writer lock protect edits and migrations.
+
+The gallery bridge runs file work on a worker and publishes results through Fusion's
+custom event, separately from streaming state. Add-in update handoff waits for the gallery
+worker. UI management is not exposed as model tools. `list_gallery_images` filters enabled
+metadata; `view_gallery_image` rechecks permission before delivering pixels into the
+expected active turn. No gallery pixels are injected by listing, and no model can enable
+images. Gallery access is shared across AI providers on this OS account; existing chats
+keep their original tool definitions, so new gallery tools require a new conversation.
+
+Run `python -m unittest discover -s tests -p 'test_gallery*.py'` and
+`node tests/test_gallery.cjs`. Also run the full suite and the update/package verification
+scripts before release. Migration/rollback fixtures must preserve image hashes, chat
+indexes, enabled states and removed tombstones. Live Fusion visual behavior still needs
+user confirmation; standalone browser tests do not substitute for it.
+
 ## STEVE Dream
 
 ChatGPT threads enable Codex's native `image_generation` feature; other providers keep
