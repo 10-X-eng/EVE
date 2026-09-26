@@ -1,8 +1,22 @@
-# Unreleased — OpenRouter provider (experimental)
+# STEVE 0.7.0 — Redesigned panel, Dream, providers and in-Fusion updates
+
+- **Readable replies:** replies now render tables, links, nested and task lists, and fenced code with syntax highlighting, a language label and **Copy**. Links open in your browser.
+- **Fusion steps fold away:** each run of Python steps is one activity block ("Ran 4 steps in Fusion · 1 failed") that stays open while STEVE works and collapses when the reply arrives. Expand a step to read its script or the exception it raised. The transcript no longer fills with code.
+- **One status line:** the footer names what STEVE is doing and which tool it is using. The pinned document, the current job and DFM show as chips above the message box instead of separate banners.
+- **Simpler navigation:** the gear opens a short Settings list — AI provider, Manufacturing (DFM and RMFG), Updates, Diagnostics — where each row shows its current state and opens its own page. The **+** button beside the message box holds Attach images, Dream and jobs. The header is shorter and the welcome screen fits the docked panel.
+- **STEVE Dream (experimental):** generate concept images through ChatGPT's Codex connection, refine them in chat, reuse them as visual references, and save originals to Downloads. Concepts persist in chat history and are available to image lookup tools. Image generation consumes Codex limits and is currently enabled only for ChatGPT.
+- **In-Fusion updates:** managed installations download updates automatically. Choose **Update & restart STEVE** to apply when idle, with rollback if startup fails. Users upgrading from 0.6.2 must use the old installer once to receive this updater.
+- **Ollama servers:** configure a host, port, URL path/query and optional API key for a shared or private Ollama server.
 
 - **OpenRouter:** choose **OpenRouter (experimental)** and **Sign in with OpenRouter**. OpenRouter creates a key labeled STEVE in your account; STEVE stores it in the macOS Keychain or Windows' per-user encryption. Usage is paid from your OpenRouter credits.
 - **Model choice:** models with tool calling and at least 64K context appear grouped by company, with each model's effort levels. **Most popular** is the default.
 - **Limits:** web search is unavailable for OpenRouter, and text-only models cannot receive images. Tool-calling quality varies by model. Live OpenRouter sign-in and inference still need verification; see [verification status](VERIFICATION.md).
+
+## Install or upgrade to 0.7.0
+
+Download the complete platform ZIP from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases/tag/v0.7.0): **STEVE-0.7.0-windows-x64.zip** or **STEVE-0.7.0-macos-arm64.zip**. Extract it, close Fusion, and run the included installer. This one-time manual installation gives 0.6.2 users the new in-Fusion updater. Chats and preferences are retained.
+
+Dream and the redesigned panel passed automated browser checks. Live image generation and refinement succeeded with Codex; native Fusion appearance and live macOS verification remain user checks. See [verification status](VERIFICATION.md) for provider and updater limits.
 
 # STEVE 0.6.2 — RMFG checkout and simpler settings
 
@@ -28,7 +42,7 @@ See [machine definitions](https://github.com/10-X-eng/STEVE/blob/main/docs/MACHI
 
 ## Update or install
 
-Open **STEVE logo → Updates → Check for updates**, then choose **Update STEVE**. Save your work and quit Fusion when prompted. Chats and preferences are retained.
+Open **Settings (⚙) → Updates → Check for updates**, then choose **Update STEVE**. Save your work and quit Fusion when prompted. Chats and preferences are retained.
 
 - **Windows x64:** extract **STEVE-0.6.2-windows-x64.zip** and run **Install STEVE.exe**.
 - **macOS (Apple silicon):** extract **STEVE-0.6.2-macos-arm64.zip** and run **Install STEVE.command** through Terminal (`bash ` followed by dragging the file into the window).

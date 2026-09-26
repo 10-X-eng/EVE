@@ -3,7 +3,8 @@
 const $ = (id) => document.getElementById(id);
 const preview = new URLSearchParams(location.search).get("preview");
 let state = {connection:"starting",account:null,accountChecked:false,models:[],model:"",messages:[],busy:false,loginPending:false,status:"Checking your account",error:""};
-let messageViews = [];
+let messageViews = new Map();
+let turnViews = new Map();
 let renderedControls = "";
 let renderFrame = null;
 let renderedModels = "";
@@ -19,38 +20,19 @@ let draftImageRevision = 0;
 let nextDraftImage = 0;
 let clipboardRequest = null;
 const imageCache = new Map();
+const ICONS = {
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg>',
+  cross: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 3.5v.5M3.5 19h17L12 4z"/></svg>',
+  spinner: '<span class="spinner" aria-hidden="true"></span>',
+};
+const STEP_PHASES = {completed:"Completed", failed:"Failed", unconfirmed:"Completion unconfirmed"};
 
 function escapeHTML(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
-function inline(text) {
-  // Code spans are isolated so markdown cannot rewrite their contents.
-  return text.split(/(`[^`]+`)/g).map((part) => {
-    if (part.startsWith("`") && part.endsWith("`")) return `<code>${escapeHTML(part.slice(1,-1))}</code>`;
-    return escapeHTML(part).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>");
-  }).join("");
-}
 function markdown(text) {
-  // Parse fences line by line, including unfinished blocks during streaming.
-  let html = "", paragraph = [], list = null, code = null;
-  const flush = () => { if(paragraph.length){html += `<p>${paragraph.map(inline).join("<br>")}</p>`;paragraph=[];} if(list){html+=`</${list}>`;list=null;} };
-  for (const line of String(text).split("\n")) {
-    if (/^\s*```/.test(line)) {
-      if(code !== null){html += `<pre><code>${escapeHTML(code.join("\n"))}</code></pre>`;code=null;}
-      else{flush();code=[];}
-      continue;
-    }
-    if(code !== null){code.push(line);continue;}
-    if(!line.trim()){flush();continue;}
-    const heading=line.match(/^#{1,4}\s+(.+)$/);
-    const bullet=line.match(/^\s*([-*]|\d+\.)\s+(.+)$/);
-    if(heading){flush();html+=`<h3>${inline(heading[1])}</h3>`;}
-    else if(bullet){const tag=/\d/.test(bullet[1])?"ol":"ul";if(list!==tag){flush();html+=`<${tag}>`;list=tag;}html+=`<li>${inline(bullet[2])}</li>`;}
-    else if(line.startsWith("> ")){flush();html+=`<blockquote>${inline(line.slice(2))}</blockquote>`;}
-    else{if(list)flush();paragraph.push(line);}
-  }
-  if(code !== null)html+=`<pre><code>${escapeHTML(code.join("\n"))}</code></pre>`;
-  flush();return html;
+  return SteveMarkdown.render(text);
 }
 
 async function bridge(action,payload={}) {
@@ -64,7 +46,7 @@ function act(action,payload={}) {
 }
 
 function openImage(url, name) {
-  if (!SteveImages.imageURL(url)) return;
+  if (!SteveImages.storedImageURL(url)) return;
   $("expanded-image").src = url;
   $("expanded-image").alt = name;
   $("image-viewer").showModal();
@@ -125,19 +107,75 @@ function renderMessageImages(article, body, images) {
   const gallery=document.createElement("div");gallery.className="message-images";
   article.insertBefore(gallery,body);
   images.forEach(reference=>{
+    const card=document.createElement("div");card.className=reference.generated?"concept-image":"reference-image";
     const button=document.createElement("button");button.type="button";button.className="saved-image";
     button.textContent=reference.name||"Reference image";button.disabled=true;
-    gallery.append(button);
+    card.append(button);gallery.append(card);
+    if(reference.generated){
+      const caption=document.createElement("div");caption.className="concept-caption";
+      caption.innerHTML='<span class="dream-tag">✧ Dream</span><span class="concept-note">Visual reference · not verified geometry</span>';
+      const actions=document.createElement("div");actions.className="concept-actions";
+      for(const [label, action] of [["Refine","refine"],["Use as reference","reference"],["Save","save"]]){
+        const control=document.createElement("button");control.type="button";control.className="chip-button";
+        control.textContent=label;
+        if(action==="save"){
+          control.title="Save the original image to Downloads";
+          control.onclick=async()=>{
+            control.disabled=true;
+            try{await bridge("saveConcept",{id:reference.id});control.textContent="Saved to Downloads";}
+            catch(error){state.error=error.message;dismissedError="";render();}
+            finally{control.disabled=false;}
+          };
+        }else{
+          control.className+=" concept-draft-action";
+          control.dataset.action=action;
+          control.title=action==="refine"?"Ask STEVE for a new version of this concept":"Attach this concept to your next message";
+          control.disabled=!canUseConcept(action);
+          control.onclick=()=>useConcept(reference,action);
+        }
+        actions.append(control);
+      }
+      card.append(caption,actions);
+    }
     if(!reference.id)return;
     if(!imageCache.has(reference.id)) imageCache.set(reference.id,
       bridge("imageAssets",{ids:[reference.id]}).then(result=>result?.images?.[reference.id]).catch(()=>null));
     imageCache.get(reference.id).then(url=>{
-      if(!SteveImages.imageURL(url)){button.textContent="Image preview unavailable";return;}
+      if(!SteveImages.storedImageURL(url)){button.textContent="Image preview unavailable";return;}
       const img=document.createElement("img");img.src=url;img.alt=reference.name||"Reference image";img.loading="lazy";
-      button.replaceChildren(img);button.disabled=false;button.title="View reference image";
+      button.replaceChildren(img);button.disabled=false;button.title="View image";
       button.onclick=()=>openImage(url,reference.name||"Reference image");
     });
   });
+  return gallery;
+}
+function canUseConcept(action) {
+  const model=state.models?.find(model=>model.id===state.model);
+  return !!state.account && state.connection==="ready" && !state.busy && !state.jobBusy &&
+    !state.updateInstalling && !state.updateInstallReady && !submitting && !clipboardRequest &&
+    model?.supportsImages!==false && (action!=="refine" || (state.provider||"chatgpt")==="chatgpt");
+}
+async function useConcept(reference, action) {
+  if(!canUseConcept(action))return;
+  if($("message").value.trim() || draftImages.length){state.error="Send or clear your draft before choosing a concept.";dismissedError="";render();return;}
+  const provider=state.provider, threadId=state.threadId, revision=draftImageRevision;
+  try{
+    const url=await (imageCache.get(reference.id) || bridge("imageAssets",{ids:[reference.id]}).then(result=>result?.images?.[reference.id]));
+    const prepared=await SteveImages.prepare(SteveImages.storedFile(url,reference.name));
+    if(state.provider!==provider || state.threadId!==threadId || !canUseConcept(action) ||
+       revision!==draftImageRevision || $("message").value.trim() || draftImages.length)return;
+    draftImages=[{id:++nextDraftImage,...prepared}];draftImageRevision++;
+    $("message").value=action==="refine"?"Refine this concept: ":"Use this concept as a visual reference. ";
+    renderDraftImages();resize();$("message").focus();
+  }catch(error){state.error=error.message;dismissedError="";}
+  render();
+}
+function dreamDraft() {
+  if(!canUseConcept("refine"))return;
+  const text=$("message").value.trim();
+  const prompt=text?"Generate a concept image for: " + text:"Generate a concept image for ";
+  if(prompt.length>32000){state.error="Shorten your draft before using Dream.";dismissedError="";render();return;}
+  $("message").value=prompt;resize();$("message").focus();render();
 }
 async function reuseMessage(message) {
   if($("message").value.trim() || draftImages.length){state.error="Send or clear your current draft before reusing this message.";dismissedError="";render();return;}
@@ -170,77 +208,220 @@ function patchChildren(parent, next) {
         else current.replaceData(0, current.length, node.data);
       }
     } else {
+      if (node.attributes) {
+        for (const {name, value} of Array.from(node.attributes)) if (current.getAttribute(name) !== value) current.setAttribute(name, value);
+        for (const {name} of Array.from(current.attributes)) if (!node.hasAttribute(name)) current.removeAttribute(name);
+      }
       patchChildren(current, node);
     }
   });
   while (parent.childNodes.length > desired.length) parent.lastChild.remove();
 }
 
-function createCodeActivity(article, message) {
-  article.className = "message code-activity";
-  article.innerHTML = '<details class="code-card"><summary><span class="code-symbol" aria-hidden="true">&lt;/&gt;</span><span class="code-copy"><span class="code-title"></span><span class="code-meta"></span></span><span class="code-chevron" aria-hidden="true">⌄</span></summary><pre tabindex="0" aria-label="Submitted Fusion Python"><code></code></pre></details>';
-  const details = article.firstChild;
-  details.open = !message.historical;
-  return {details, code: article.querySelector("code"), pre: article.querySelector("pre"),
-    title: article.querySelector(".code-title"), meta: article.querySelector(".code-meta")};
+// Collapsible sections remember whether the person overrode the automatic open state.
+function trackToggle(view) {
+  view.auto = null; view.manual = false;
+  view.details.addEventListener("toggle", () => { view.manual = view.details.open !== view.auto; });
+}
+function setOpen(view, open) {
+  if (view.auto === open) return;
+  view.auto = open;
+  if (!view.manual && view.details.open !== open) view.details.open = open;
 }
 
-function updateCodeActivity(view, message) {
+// One step per Python script STEVE submits to Fusion.
+function createStep() {
+  const details = document.createElement("details");
+  details.className = "step code-card";
+  details.innerHTML = '<summary><span class="step-icon" aria-hidden="true"></span><span class="step-title"></span><span class="step-meta code-meta"></span></summary>' +
+    '<div class="step-body"><div class="code-tools"><span class="code-lang">Python</span><button type="button" class="copy-code">Copy</button></div>' +
+    '<pre tabindex="0" aria-label="Submitted Fusion Python"><code></code></pre><div class="step-error" hidden></div></div>';
+  const q = selector => details.querySelector(selector);
+  const view = {details, icon: q(".step-icon"), title: q(".step-title"), meta: q(".step-meta"), pre: q("pre"), code: q("code"), error: q(".step-error"), source: null, status: null};
+  trackToggle(view);
+  return view;
+}
+function stepPhase(status) {
+  if (status !== "running") return STEP_PHASES[status] || STEP_PHASES.unconfirmed;
+  return state.status === "Stopping" ? "Stopping" : state.waitingForFusion ? "Waiting for Fusion" : "Running in Fusion";
+}
+function updateStep(view, message) {
   const status = message.toolStatus || "unconfirmed";
-  const phase = status === "running"
-    ? (state.status === "Stopping" ? "Stopping" : state.waitingForFusion ? "Waiting for Fusion" : "Running in Fusion")
-    : ({completed:"Completed", failed:"Failed", unconfirmed:"Completion unconfirmed"}[status] || "Completion unconfirmed");
   const lines = (message.code || "").split("\n").length;
-  const meta = `${phase} · Python · ${lines} ${lines === 1 ? "line" : "lines"}`;
-  const signature = JSON.stringify([message.code, message.title, meta]);
+  const error = typeof message.error === "string" ? message.error : "";
+  const meta = status === "failed" && error ? `Failed · ${error}` : `${stepPhase(status)} · ${lines} ${lines === 1 ? "line" : "lines"}`;
+  const title = message.title || "Fusion Python";
+  const signature = JSON.stringify([message.code, title, meta, status, error, !!message.historical]);
   if (view.signature === signature) return false;
   view.signature = signature;
-  view.details.dataset.status = status;
-  if (view.title.textContent !== message.title) view.title.textContent = message.title || "Fusion Python";
-  if (view.meta.textContent !== meta) view.meta.textContent = meta;
-  if (view.code.textContent !== message.code) {
-    const follow = view.pre.scrollHeight - view.pre.scrollTop - view.pre.clientHeight < 36;
-    view.code.textContent = message.code || "";
-    if (follow) view.pre.scrollTop = view.pre.scrollHeight;
+  if (view.status !== status) {
+    view.status = status;
+    view.details.dataset.status = status;
+    view.icon.innerHTML = status === "running" ? ICONS.spinner : status === "completed" ? ICONS.check : status === "failed" ? ICONS.cross : ICONS.warn;
   }
+  if (view.title.textContent !== title) view.title.textContent = title;
+  if (view.meta.textContent !== meta) view.meta.textContent = meta;
+  if (view.source !== message.code) {
+    view.source = message.code;
+    view.code.innerHTML = SteveMarkdown.highlight(message.code || "", "python");
+    view.pre.scrollTop = 0;
+  }
+  if (view.error.textContent !== error) view.error.textContent = error;
+  view.error.hidden = !error;
+  setOpen(view, status === "running" && !message.historical);
   return true;
 }
 
+// Consecutive steps form one activity block that stays open while STEVE works and folds up when it is done.
+function createActivity() {
+  const details = document.createElement("details");
+  details.className = "activity";
+  details.innerHTML = '<summary><span class="activity-icon" aria-hidden="true"></span><span class="activity-title"></span><span class="activity-meta"></span><span class="chevron" aria-hidden="true"></span></summary><div class="steps"></div>';
+  const q = selector => details.querySelector(selector);
+  const view = {details, icon: q(".activity-icon"), title: q(".activity-title"), meta: q(".activity-meta"), steps: q(".steps"), stepViews: new Map(), state: null};
+  trackToggle(view);
+  return view;
+}
+function updateActivity(view, block, live) {
+  let changed = false, slot = 0;
+  block.steps.forEach(({message, key}) => {
+    let step = view.stepViews.get(key);
+    if (!step) { step = createStep(); view.stepViews.set(key, step); changed = true; }
+    if (view.steps.childNodes[slot] !== step.details) { view.steps.insertBefore(step.details, view.steps.childNodes[slot] || null); changed = true; }
+    slot++;
+    changed = updateStep(step, message) || changed;
+  });
+  while (view.steps.childNodes.length > slot) { view.steps.lastChild.remove(); changed = true; }
+  for (const key of Array.from(view.stepViews.keys())) if (!block.steps.some(step => step.key === key)) view.stepViews.delete(key);
+  const statuses = block.steps.map(step => step.message.toolStatus || "unconfirmed");
+  const running = block.steps.find(step => step.message.toolStatus === "running");
+  const failed = statuses.filter(status => status === "failed").length;
+  const unconfirmed = statuses.filter(status => status === "unconfirmed").length;
+  const count = block.steps.length;
+  const historical = block.steps.every(step => step.message.historical);
+  const steps = `${count} ${count === 1 ? "step" : "steps"}`;
+  let name, title, meta;
+  if (running || live) {
+    // The open step row carries its own title; the summary only says that work is in progress.
+    name = "live"; title = running ? (state.status === "Stopping" ? "Stopping" : state.waitingForFusion ? "Waiting for Fusion" : "Working in Fusion") : "Working in Fusion"; meta = steps;
+  } else {
+    title = `Ran ${steps} in Fusion`;
+    name = failed ? "failed" : unconfirmed ? "unconfirmed" : "done";
+    meta = failed ? `${failed} failed` : unconfirmed ? `${unconfirmed} unconfirmed` : "";
+  }
+  const signature = JSON.stringify([name, title, meta, live, historical]);
+  if (view.signature !== signature) {
+    view.signature = signature; changed = true;
+    if (view.state !== name) {
+      view.state = name;
+      view.details.dataset.state = name;
+      view.icon.innerHTML = name === "live" ? ICONS.spinner : name === "failed" ? ICONS.cross : name === "unconfirmed" ? ICONS.warn : ICONS.check;
+    }
+    if (view.title.textContent !== title) view.title.textContent = title;
+    if (view.meta.textContent !== meta) view.meta.textContent = meta;
+    setOpen(view, live && !historical);
+  }
+  return changed;
+}
+
+function ensureMessageView(key, message) {
+  let view = messageViews.get(key);
+  if (view) return view;
+  const article = document.createElement("article");
+  article.className = `message ${message.role === "user" ? "user" : "assistant"}${message.concept ? " concept" : ""}`;
+  const body = document.createElement("div"); body.className = "message-body"; article.append(body);
+  view = {article, body, text: null, images: null, gallery: null};
+  messageViews.set(key, view);
+  return view;
+}
+function userHTML(message) {
+  return `${message.text ? `<p>${escapeHTML(message.text)}</p>` : ""}` +
+    `${message.selectionCount ? `<small class="message-note">${Number(message.selectionCount)} selected at send</small>` : ""}` +
+    `${message.delivery === "pending" ? '<small class="message-note">Sending…</small>' : message.delivery === "failed" ?
+      '<small class="message-note delivery-failed">Delivery unconfirmed</small><button class="text-button reuse-message" type="button">Reuse message</button>' : ""}`;
+}
+function updateMessageView(view, message) {
+  let changed = false;
+  const images = JSON.stringify(message.images || []);
+  if (view.images !== images) {
+    view.gallery?.remove();
+    view.gallery = renderMessageImages(view.article, view.body, message.images || []);
+    view.images = images; changed = true;
+  }
+  view.gallery?.querySelectorAll(".concept-draft-action").forEach(button => {
+    const disabled = !canUseConcept(button.dataset.action); if (button.disabled !== disabled) button.disabled = disabled;
+  });
+  if (message.conceptStatus && view.article.dataset.conceptStatus !== message.conceptStatus) { view.article.dataset.conceptStatus = message.conceptStatus; changed = true; }
+  const signature = JSON.stringify([message.text, message.delivery, message.selectionCount]);
+  if (view.text !== signature) {
+    const template = document.createElement("template");
+    template.innerHTML = message.role === "user" ? userHTML(message) : markdown(message.text);
+    patchChildren(view.body, template.content);
+    const reuse = view.body.querySelector(".reuse-message"); if (reuse) reuse.onclick = () => reuseMessage(message);
+    view.text = signature; changed = true;
+  }
+  return changed;
+}
+
+// Messages are grouped into turns: the request, then STEVE's steps and replies.
+function planTurns() {
+  const turns = [];
+  state.messages.forEach((message, index) => {
+    const key = `${state.threadId || ""}:${message.role}:${message.id ?? index}`;
+    if (message.role === "user") { turns.push({key, user: {message, key}, blocks: []}); return; }
+    if (!turns.length) turns.push({key: `${state.threadId || ""}:lead`, user: null, blocks: []});
+    const turn = turns[turns.length - 1];
+    if (message.role === "tool") {
+      const last = turn.blocks[turn.blocks.length - 1];
+      if (last && last.type === "activity") last.steps.push({message, key});
+      else turn.blocks.push({type: "activity", key: "activity:" + key, steps: [{message, key}]});
+    } else turn.blocks.push({type: "message", key, message});
+  });
+  return turns;
+}
 function renderMessages() {
   const conversation = $("conversation");
   let changed = false;
-  state.messages.forEach((message, index) => {
-    const key = `${state.threadId || ""}:${message.role}:${message.id ?? index}`;
-    let view = messageViews[index];
-    if (!view || view.key !== key) {
-      const article = document.createElement("article");
-      article.className = `message ${message.role === "user" ? "user" : "assistant"}`;
-      let codeView;
-      if (message.role === "tool") codeView = createCodeActivity(article, message);
-      else article.innerHTML = `<div class="message-head">${message.role === "user" ? "YOU" : '<img src="mark.svg" alt=""> STEVE'}</div><div class="message-body"></div>`;
-      if (view) conversation.replaceChild(article, view.article);
-      else conversation.appendChild(article);
-      view = {key, article, body: article.lastChild, text: null, codeView};
-      if (!codeView) renderMessageImages(article,view.body,message.images||[]);
-      messageViews[index] = view;
-      changed = true;
+  const turns = planTurns();
+  const usedViews = new Set(), usedTurns = new Set();
+  const place = (parent, node, index) => {
+    if (parent.childNodes[index] !== node) { parent.insertBefore(node, parent.childNodes[index] || null); changed = true; }
+  };
+  turns.forEach((turn, t) => {
+    let turnView = turnViews.get(turn.key);
+    if (!turnView) {
+      const section = document.createElement("section"); section.className = "turn";
+      const head = document.createElement("div"); head.className = "turn-head"; head.innerHTML = '<img src="mark.svg" alt=""> STEVE';
+      turnView = {section, head}; turnViews.set(turn.key, turnView); changed = true;
     }
-    if (view.codeView) { changed = updateCodeActivity(view.codeView, message) || changed; return; }
-    const signature=JSON.stringify([message.text,message.delivery,message.selectionCount]);
-    if (view.text !== signature) {
-      const template = document.createElement("template");
-      template.innerHTML = message.role === "user"
-        ? `${message.text?`<p>${escapeHTML(message.text).replace(/\n/g,"<br>")}</p>`:""}${message.selectionCount?`<small class="message-note">${Number(message.selectionCount)} selected at send</small>`:""}${message.delivery==="pending"?'<small class="message-note">Sending…</small>':message.delivery==="failed"?'<small class="message-note delivery-failed">Delivery unconfirmed</small><button class="text-button reuse-message" type="button">Reuse message</button>':""}` : markdown(message.text);
-      patchChildren(view.body, template.content);
-      const reuse=view.body.querySelector(".reuse-message");if(reuse)reuse.onclick=()=>reuseMessage(message);
-      view.text = signature;
-      changed = true;
+    usedTurns.add(turn.key);
+    place(conversation, turnView.section, t);
+    let slot = 0;
+    if (turn.user) {
+      const view = ensureMessageView(turn.user.key, turn.user.message); usedViews.add(turn.user.key);
+      place(turnView.section, view.article, slot++);
+      changed = updateMessageView(view, turn.user.message) || changed;
     }
+    if (turn.blocks.length) place(turnView.section, turnView.head, slot++);
+    turn.blocks.forEach((block, b) => {
+      const live = !!state.busy && t === turns.length - 1 && b === turn.blocks.length - 1;
+      if (block.type === "activity") {
+        let view = messageViews.get(block.key);
+        if (!view) { view = createActivity(); messageViews.set(block.key, view); changed = true; }
+        usedViews.add(block.key);
+        place(turnView.section, view.details, slot++);
+        changed = updateActivity(view, block, live) || changed;
+      } else {
+        const view = ensureMessageView(block.key, block.message); usedViews.add(block.key);
+        place(turnView.section, view.article, slot++);
+        changed = updateMessageView(view, block.message) || changed;
+      }
+    });
+    while (turnView.section.childNodes.length > slot) { turnView.section.lastChild.remove(); changed = true; }
   });
-  while (messageViews.length > state.messages.length) {
-    messageViews.pop().article.remove();
-    changed = true;
-  }
+  while (conversation.childNodes.length > turns.length) { conversation.lastChild.remove(); changed = true; }
+  for (const key of Array.from(messageViews.keys())) if (!usedViews.has(key)) messageViews.delete(key);
+  for (const key of Array.from(turnViews.keys())) if (!usedTurns.has(key)) turnViews.delete(key);
   return changed;
 }
 
@@ -253,7 +434,7 @@ function render() {
   const scroll = $("scroll-area");
   // Read before changing content, and finish scrolling in this same frame.
   const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100;
-  const wasEmpty = messageViews.length === 0;
+  const wasEmpty = messageViews.size === 0;
   const threadChanged = renderedThread !== (state.threadId || null);
   const provider=state.provider||"chatgpt";
   if(renderedProvider && renderedProvider!==provider){
@@ -265,7 +446,8 @@ function render() {
   if(threadChanged && renderedThread)imageCache.clear();
   renderedThread = state.threadId || null;
   const controls = JSON.stringify({...state, messages: undefined,
-    hasMessages: state.messages.length > 0, draft: $("message").value, draftImageRevision, submitting, clipboardPending:!!clipboardRequest, dismissedError});
+    hasMessages: state.messages.length > 0, runningStep: state.messages.some(m => m.role === "tool" && m.toolStatus === "running"),
+    draft: $("message").value, draftImageRevision, submitting, clipboardPending:!!clipboardRequest, dismissedError});
   if (controls !== renderedControls) {
     renderControls();
     renderedControls = controls;
@@ -318,6 +500,9 @@ function renderControls() {
   $("device-info").hidden=!state.device;
   $("device-code").textContent=state.device?.code||"";
   const restartingForUpdate=!!state.updateInstalling || !!state.updateInstallReady;
+  $("dream-entry").hidden=!signed || (state.provider||"chatgpt")!=="chatgpt";
+  $("dream").disabled=!canUseConcept("refine");
+  $("composer-plus").disabled=!signed || !connected || restartingForUpdate;
   $("message").disabled=!signed || !connected || restartingForUpdate;
   $("message").placeholder=signed?(state.busy?"Add a correction or steer STEVE…":"What are you working on?"):local?"Connect a local model to begin":"Sign in to start a conversation";
   const jobCommand = /^\/jobs(?:\s|$)/.test($("message").value.trim());
@@ -352,6 +537,7 @@ function renderControls() {
   $("debug-logging").checked=!!state.debugLogging;
   $("dfm-enabled").checked=!!state.dfmEnabled;
   $("dfm-enabled").disabled=!!state.busy || !!state.jobBusy || state.job?.status==="active";
+  $("dfm-chip").hidden=!signed || !state.dfmEnabled;
   $("rmfg-settings").hidden=!state.dfmEnabled;
   $("rmfg-status").textContent=state.rmfgError || ({connected:"Connected to RMFG",authorizing:"Approve the connection in your browser.",reconnect:"Reconnect RMFG to continue.",unchecked:"Check your saved connection or connect RMFG."}[state.rmfgState] || "Not connected");
   $("rmfg-code").hidden=!state.rmfgCode;
@@ -370,6 +556,7 @@ function renderControls() {
   $("installed-version").textContent=state.version?`STEVE ${state.version}`:"STEVE";
   $("app-version").textContent=state.version?`v${state.version}`:"";
   $("updates-badge").hidden=!update && !state.codexUpdateInfo && !state.codexPendingVersion;
+  $("settings-dot").hidden=$("updates-badge").hidden;
   $("updates-badge").textContent=state.codexPendingVersion?"Restart ready":"Available";
   $("update-status").textContent=state.updateInstallFailure||state.updateStatus||"Checks for new releases automatically.";
   $("check-updates").disabled=!!state.updateChecking;
@@ -391,23 +578,28 @@ function renderControls() {
   $("account-email").textContent=local?"Local Ollama":state.account?.email || (signed?`${providerName} account`:"Not signed in");
   const ollamaAddress=state.ollamaAddress||"127.0.0.1:11434";
   $("account-plan").textContent=local?`${ollamaAddress} · ${state.ollamaApiKeySet?"API key saved":"No sign-in needed"}`:signed?`${state.account.planType||providerName} · Connected`:`Use your ${providerName} account`;
-  $("status").textContent=clipboardRequest?"Reading clipboard image…":state.waitingForFusion?state.waitingReason:state.status;
+  // Settings rows summarize each page so the list doubles as a status check.
+  $("row-account-value").textContent=local?`Ollama · ${ollamaAddress}`:`${providerName} · ${signed?(state.account?.email||"Connected"):"Not signed in"}`;
+  const rmfgSummary={connected:"RMFG connected",authorizing:"RMFG connecting",reconnect:"RMFG needs reconnect"}[state.rmfgState]||"RMFG not connected";
+  $("row-manufacturing-value").textContent=`DFM ${state.dfmEnabled?"on":"off"}${state.dfmEnabled?` · ${rmfgSummary}`:""}`;
+  $("rmfg-badge").hidden=!state.dfmEnabled || state.rmfgState!=="reconnect";
+  $("row-updates-value").textContent=update?`STEVE ${update.version} is available`:state.codexPendingVersion?`Codex ${state.codexPendingVersion} ready · restart to use it`:`${state.version?`STEVE ${state.version}`:"STEVE"}${state.codexVersion?` · Codex ${state.codexVersion}`:""}`;
+  $("row-diagnostics-value").textContent=`Debug logging ${state.debugLogging?"on":"off"}`;
+  $("settings-version").textContent=`${state.version?`STEVE v${state.version}`:"STEVE"}${state.codexVersion?` · Codex ${state.codexVersion}`:""}`;
+  // One status line: the footer names what STEVE is doing and which tool it is using.
   const tools=state.busy && signed && state.connection==="ready" ? state.activeTools||[] : [];
   const tool=tools[0];
-  const toolPhase=state.status==="Stopping"?"Stopping":state.waitingForFusion?"Waiting":"Using";
-  $("tool-activity").hidden=!tool;
-  const toolTitle=tool?tool.title:"";
-  const toolName=tool?`${toolPhase} ${tool.name}${tools.length>1?` · +${tools.length-1} more`:""}`:"";
-  // Keep the live region stable while response tokens arrive.
-  if($("tool-title").textContent!==toolTitle) $("tool-title").textContent=toolTitle;
-  if($("tool-name").textContent!==toolName) $("tool-name").textContent=toolName;
-  $("tool-activity").title=tools.map(t=>`${t.name}: ${t.title}`).join("\n");
+  const toolLabel=tool?`${tool.name==="fusion_api_help"?"Reading docs · ":""}${tool.title}${tools.length>1?` · +${tools.length-1} more`:""}`:"";
+  const statusText=clipboardRequest?"Reading clipboard image…":state.waitingForFusion?state.waitingReason:tool?`${state.status} · ${toolLabel}`:state.status;
+  if($("status").textContent!==statusText) $("status").textContent=statusText;
+  $("status").title=tools.map(t=>`${t.name}: ${t.title}`).join("\n");
   $("task-target").hidden=!signed || !state.busy || !state.taskDocument;
-  $("task-target").textContent=state.taskDocument?`Task: ${state.taskDocument.name||"No document"} · ${state.waitingForFusion?"Waiting":"Pinned"}`:"";
+  $("task-target-label").textContent=state.taskDocument?(state.taskDocument.name||"No document"):"";
+  $("task-target-meta").textContent=state.taskDocument?(state.waitingForFusion?"Waiting":"Pinned"):"";
   $("task-target").title="This task keeps its original document and selection. It waits when another document or command is active.";
   $("preference-notice").hidden=!signed || !state.preferenceNotice;
   $("preference-notice").textContent=state.preferenceNotice||"";
-  $("status-dot").className="status-dot"+(state.busy?" busy":signed&&connected?" ready":"");
+  $("status-dot").className="status-dot"+(state.busy?(state.waitingForFusion?" waiting":" busy"):signed&&connected?" ready":"");
   $("error").hidden=!state.error || state.error===dismissedError;
   $("error-text").textContent=state.error;
   $("reconnect-row").hidden=state.connection!=="disconnected";
@@ -424,6 +616,7 @@ function renderControls() {
     renderedModels=modelsJSON;
   }
   $("model").value=state.model;
+  $("model").title=selectedModel?.name?`Model · ${selectedModel.name}`:"Model";
   const efforts=state.effortOptions||[];
   const effortsJSON=JSON.stringify([efforts,state.defaultEffort]);
   if(effortsJSON!==renderedEfforts){
@@ -433,29 +626,58 @@ function renderControls() {
     renderedEfforts=effortsJSON;
   }
   $("effort").value=state.effort||"";
-  $("thinking").hidden=!state.busy || state.status==="Writing" || state.waitingForFusion;
+  // The transcript already shows progress for a running step or a concept placeholder.
+  const runningStep=state.messages.some(m=>m.role==="tool" && m.toolStatus==="running");
+  const conceptPending=state.messages[state.messages.length-1]?.conceptStatus==="running";
+  $("thinking").hidden=!state.busy || !signed || state.status==="Writing" || state.waitingForFusion || runningStep || conceptPending;
+  $("thinking-label").textContent=tool?toolLabel:state.status;
   $("history-button").disabled=!signed || !connected || state.busy;
   if(!signed)showHistory(false);
   renderHistory();
 }
 
-const headerMenus = {"app-menu":"app-menu-button", "account-menu":"account-button"};
-function showHeaderMenu(id, open, focus = false) {
-  if(open){
-    for(const other of Object.keys(headerMenus))if(other!==id)showHeaderMenu(other,false);
-    showHistory(false);
-  }
-  $(id).hidden=!open;
-  $(headerMenus[id]).setAttribute("aria-expanded",String(open));
-  if(focus){
-    if(open)Array.from($(id).querySelectorAll("select:not(:disabled), input:not(:disabled), button:not(:disabled), summary")).find(element=>element.getClientRects().length)?.focus();
-    else $(headerMenus[id]).focus();
-  }
+// Settings is a short list of categories; each row opens its own page and Back returns to the list.
+const SETTINGS_PAGES={account:"AI provider",manufacturing:"Manufacturing",updates:"Updates",diagnostics:"Diagnostics"};
+let settingsPage="root";
+function focusFirst(container) {
+  if(!container?.querySelectorAll)return;
+  Array.from(container.querySelectorAll("select:not(:disabled), input:not(:disabled), button:not(:disabled), [tabindex]")).find(element=>element.getClientRects().length)?.focus();
+}
+function showSettingsPage(page, focus = false) {
+  settingsPage=SETTINGS_PAGES[page]?page:"root";
+  $("app-menu").dataset.page=settingsPage;
+  $("settings-root").hidden=settingsPage!=="root";
+  for(const id of Object.keys(SETTINGS_PAGES))$("settings-"+id).hidden=id!==settingsPage;
+  $("settings-back").hidden=settingsPage==="root";
+  $("settings-title").textContent=settingsPage==="root"?"Settings":SETTINGS_PAGES[settingsPage];
+  const body=$("app-menu").querySelector?.(".panel-body");
+  if(body)body.scrollTop=0;
+  if(focus)focusFirst(settingsPage==="root"?$("settings-root"):$("settings-"+settingsPage));
+}
+function settingsBack(focus = true) {
+  const page=settingsPage;
+  showSettingsPage("root",false);
+  if(focus)($("settings-root").querySelector?.(`[data-page="${page}"]`)||$("settings-root")).focus?.();
+}
+function showSettings(open, focus = false, page = "root") {
+  if(open)showHistory(false);
+  $("app-menu").hidden=!open;
+  $("app-menu-button").setAttribute("aria-expanded",String(open));
+  if(open)showSettingsPage(page,focus);
+  else if(focus)$("app-menu-button").focus();
 }
 function showHistory(open) {
   $("history-panel").hidden=!open;
   $("history-button").setAttribute("aria-expanded",String(open));
-  if(open){for(const id of Object.keys(headerMenus))showHeaderMenu(id,false);$("history-search").focus();}
+  if(open){showSettings(false);$("history-search").focus();}
+}
+function showPlusMenu(open, focus = false) {
+  $("plus-menu").hidden=!open;
+  $("composer-plus").setAttribute("aria-expanded",String(open));
+  if(focus){
+    if(open)Array.from($("plus-menu").querySelectorAll("button:not(:disabled)")).find(element=>element.getClientRects().length)?.focus();
+    else $("composer-plus").focus();
+  }
 }
 function renderHistory() {
   const query=$("history-search").value.trim().toLocaleLowerCase();
@@ -497,6 +719,7 @@ function renderJob() {
   $("job-strip").hidden = !job;
   $("job-strip-title").textContent = job?.objective || "";
   $("job-strip-status").textContent = label;
+  $("job-button-label").textContent = job ? "Manage job" : "Start a job";
   $("job-summary").textContent = job ? `${label} · ${job.objective}` : state.jobNotice || "Set an objective with a clear stopping point.";
   $("job-usage").textContent = job ? `${Number(job.tokensUsed || 0).toLocaleString()}${job.tokenBudget == null ? "" : ` / ${Number(job.tokenBudget).toLocaleString()}`} tokens · ${Math.floor((job.timeUsedSeconds || 0) / 60)} min` : "";
   $("job-target-note").textContent = job && state.jobHasTarget ? "Resuming keeps this job’s original document and selection." : "Starting or resuming uses the active Fusion document. Open the intended document first.";
@@ -542,7 +765,7 @@ function readOllamaForm() {
 }
 
 function openOllamaServer() {
-  showHeaderMenu("account-menu", false);
+  showSettings(false);
   $("ollama-host").value=state.ollamaHost||"127.0.0.1";
   $("ollama-port").value=state.ollamaPort?String(state.ollamaPort):"";
   $("ollama-url").value=state.ollamaUrl||"";
@@ -570,7 +793,26 @@ function jobBudget() {
   return budget;
 }
 
+async function copyCode(button) {
+  const code = button.closest(".code-block, .step-body")?.querySelector("code");
+  if (!code) return;
+  let copied = false;
+  try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(code.textContent); copied = true; } } catch (error) { copied = false; }
+  if (!copied) {
+    try {
+      const range = document.createRange(); range.selectNodeContents(code);
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      copied = document.execCommand("copy"); selection.removeAllRanges();
+    } catch (error) { copied = false; }
+  }
+  button.textContent = copied ? "Copied" : "Copy failed";
+  if (copied) button.dataset.copied = "true";
+  clearTimeout(button.resetTimer);
+  button.resetTimer = setTimeout(() => { button.textContent = "Copy"; delete button.dataset.copied; }, 1600);
+}
+
 $("login").onclick=()=>state.provider==="ollama"?act("accountRefresh",{refreshModels:true}):act("login");
+$("dream").onclick=()=>{showPlusMenu(false);dreamDraft();};
 $("claude-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
 $("chatgpt-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
 $("check-codex-updates").onclick=()=>act("checkCodexUpdates");
@@ -580,7 +822,7 @@ $("restart-steve").onclick=()=>act("restartRuntime");
 $("install-claude").onclick=()=>act("setupHelp",{page:"claude"});
 $("openrouter-keys").onclick=$("openrouter-credits").onclick=()=>act("setupHelp",{page:"openrouter"});
 $("openrouter-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
-$("job-button").onclick=()=>openJob();
+$("job-button").onclick=()=>{showPlusMenu(false);openJob();};
 $("job-strip").onclick=()=>openJob();
 $("job-close").onclick=()=>$("job-dialog").close();
 $("job-pause").onclick=()=>act("job",{command:"pause"});
@@ -614,7 +856,7 @@ $("ollama-form").onsubmit=(event)=>{
 $("device-login").onclick=()=>act("deviceLogin");
 $("cancel-login").onclick=()=>act("cancelLogin");
 $("refresh-account").onclick=()=>act("accountRefresh",{refreshToken:true});
-$("logout").onclick=()=>{act("logout");showHeaderMenu("account-menu",false,true);};
+$("logout").onclick=()=>{act("logout");showSettings(false,true);};
 $("reconnect").onclick=()=>act("connect");
 $("repair-steve").onclick=()=>act("setupHelp",{page:"steve"});
 $("install-codex").onclick=()=>act("setupHelp",{page:"codex"});
@@ -654,8 +896,19 @@ $("model").onchange=(event)=>act("model",{model:event.target.value});
 $("provider").onchange=(event)=>act("provider",{provider:event.target.value});
 $("welcome-provider").onchange=$("provider").onchange;
 $("effort").onchange=(event)=>act("effort",{effort:event.target.value});
-$("account-button").onclick=()=>showHeaderMenu("account-menu",$("account-menu").hidden,true);
-$("app-menu-button").onclick=()=>showHeaderMenu("app-menu",$("app-menu").hidden,true);
+$("app-menu-button").onclick=()=>showSettings($("app-menu").hidden,true);
+$("settings-close").onclick=()=>showSettings(false,true);
+$("settings-back").onclick=()=>settingsBack(true);
+document.querySelectorAll(".settings-row").forEach((row)=>row.onclick=()=>showSettingsPage(row.dataset.page,true));
+$("dfm-chip").onclick=()=>showSettings(true,true,"manufacturing");
+$("composer-plus").onclick=()=>showPlusMenu($("plus-menu").hidden,true);
+// Links open in the system browser through the bridge; the panel itself never navigates.
+$("conversation").addEventListener("click",(event)=>{
+  const link=event.target.closest("a[href]");
+  if(link){event.preventDefault();act("openLink",{url:link.getAttribute("href")});return;}
+  const copy=event.target.closest(".copy-code");
+  if(copy)copyCode(copy);
+});
 // Returning from the external browser should immediately reveal a saved sign-in.
 let lastAccountCheck=0;
 function checkAccountOnReturn(){
@@ -667,14 +920,15 @@ window.addEventListener("focus",checkAccountOnReturn);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkAccountOnReturn();});
 document.addEventListener("keydown",(event)=>{
   if(event.key!=="Escape")return;
-  for(const id of Object.keys(headerMenus))if(!$(id).hidden){showHeaderMenu(id,false,true);return;}
+  if(!$("plus-menu").hidden){showPlusMenu(false,true);return;}
+  if(!$("app-menu").hidden){if(settingsPage!=="root")settingsBack(true);else showSettings(false,true);return;}
   if(!$("history-panel").hidden){showHistory(false);$("history-button").focus();}
 });
 document.addEventListener("click",(event)=>{
-  for(const [id,button] of Object.entries(headerMenus))if(!event.target.closest(`#${id}, #${button}`))showHeaderMenu(id,false);
+  if(!$("plus-menu").hidden && !event.target.closest("#plus-menu, #composer-plus"))showPlusMenu(false);
 });
 document.addEventListener("focusin",(event)=>{
-  for(const [id,button] of Object.entries(headerMenus))if(!event.target.closest(`#${id}, #${button}`))showHeaderMenu(id,false);
+  if(!$("plus-menu").hidden && !event.target.closest("#plus-menu, #composer-plus"))showPlusMenu(false);
 });
 document.querySelectorAll(".suggestion").forEach((button)=>button.onclick=()=>{
   if(!state.account){$("login").focus();return;}
@@ -692,8 +946,8 @@ $("message").onpaste=(event)=>{
   if(hasText && !hasImage)return; // Text remains the browser's native paste operation.
   event.preventDefault();pasteClipboardImage();
 };
-$("attach-images").onclick=()=>$("image-files").click();
-if(typeof navigator!=="undefined" && /Mac/.test(navigator.platform||""))$("attach-images").title="Attach images · ⌘V to paste";
+$("attach-images").onclick=()=>{showPlusMenu(false);$("image-files").click();};
+if(typeof navigator!=="undefined" && /Mac/.test(navigator.platform||""))$("attach-hint").textContent="PNG, JPEG or WebP · ⌘V pastes a screenshot";
 $("image-files").onchange=(event)=>{const files=Array.from(event.target.files||[]);event.target.value="";attachImages(files);};
 $("close-image").onclick=()=>$("image-viewer").close();
 $("image-viewer").onclick=(event)=>{if(event.target===$("image-viewer"))$("image-viewer").close();};

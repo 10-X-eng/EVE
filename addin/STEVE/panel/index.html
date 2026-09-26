@@ -5,92 +5,95 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>STEVE · Your engineering partner</title>
-  <link rel="stylesheet" href="style.css?v=2">
-  <link rel="stylesheet" href="fusion.css?v=19">
-  <script src="images.js?v=2" defer></script>
-  <script src="panel.js?v=30" defer></script>
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="fusion.css?v=21">
+  <script src="markdown.js?v=1" defer></script>
+  <script src="images.js?v=3" defer></script>
+  <script src="panel.js?v=32" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
     <header class="topbar">
-      <button id="app-menu-button" class="brand" type="button" title="STEVE settings" aria-label="STEVE settings" aria-expanded="false" aria-controls="app-menu"><img src="mark.svg" alt="" width="32" height="32"><span><span class="wordmark">STEVE<span class="beta">EARLY ACCESS</span></span><span class="brand-subtitle">Your engineering partner</span></span><svg class="brand-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+      <div class="brand"><img src="mark.svg" alt="" width="22" height="22"><span class="wordmark">STEVE<span class="beta">EARLY ACCESS</span></span></div>
       <div class="header-actions">
-        <button id="history-button" class="icon-button" title="Chat history" aria-label="Chat history" aria-expanded="false" aria-controls="history-panel"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6M12 7v5l3 2"/></svg></button>
+        <button id="history-button" class="icon-button" title="Conversations" aria-label="Conversations" aria-expanded="false" aria-controls="history-panel"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6M12 7v5l3 2"/></svg></button>
         <button id="new-chat" class="icon-button" title="New conversation" aria-label="New conversation"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button id="account-button" class="icon-button" title="Accounts & providers" aria-label="Accounts and providers" aria-expanded="false" aria-controls="account-menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg></button>
+        <button id="app-menu-button" class="icon-button" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="app-menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span id="settings-dot" class="badge-dot" hidden></span></button>
       </div>
     </header>
-    <section id="account-menu" class="account-menu header-menu" aria-label="Accounts and providers" hidden>
-      <h2 class="menu-title">Accounts &amp; providers</h2>
-      <label class="provider-label" for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="openrouter">OpenRouter (experimental)</option><option value="ollama">Ollama (local)</option></select>
-      <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
-      <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="ollama-server" class="secondary-button" type="button">Server</button> <button id="local-refresh" class="secondary-button" type="button">Refresh models</button> <button id="local-help" class="secondary-button" type="button">Local setup</button></div>
-      <div id="claude-controls" hidden><p id="claude-version" class="sign-in-note"></p><p class="sign-in-note">Claude Code manages your account. Use <code>claude auth login</code> or <code>claude auth logout</code> in a terminal outside Fusion.</p><button id="claude-refresh" class="secondary-button">Check connection</button></div>
-      <div id="openrouter-controls" hidden><p class="sign-in-note">Sign out removes the key from this computer. To revoke it, delete the STEVE key in OpenRouter.</p><button id="openrouter-keys" class="secondary-button">OpenRouter keys ↗</button> <button id="openrouter-refresh" class="secondary-button">Refresh models</button></div>
-      <button id="logout" class="secondary-button" hidden>Sign out</button>
-      <button id="chatgpt-refresh" class="secondary-button" hidden>Refresh models</button>
-      <details id="rmfg-settings" class="settings-group" hidden>
-        <summary>RMFG sheet metal <small>Experimental</small></summary>
-        <div class="settings-content">
-          <p>Connect to let STEVE upload relevant parts for DFM checks and prepare quotes and checkout when you ask. You review and pay on RMFG.</p>
-          <p id="rmfg-status" role="status"></p>
-          <p id="rmfg-code" hidden></p>
-          <button id="rmfg-connect" class="secondary-button">Connect RMFG</button>
-          <button id="rmfg-enable-checkout" class="secondary-button" hidden>Enable quotes &amp; checkout</button>
-          <button id="rmfg-refresh" class="secondary-button">Check RMFG connection</button>
-          <button id="rmfg-cancel" class="secondary-button" hidden>Cancel sign-in</button>
-          <button id="rmfg-disconnect" class="text-button" hidden>Disconnect RMFG</button>
-        </div>
-      </details>
-    </section>
-    <section id="app-menu" class="header-menu app-menu" aria-label="STEVE settings" hidden>
-      <h2 class="menu-title">STEVE settings</h2>
-      <div class="dfm-setting">
-        <label class="debug-toggle" for="dfm-enabled"><span>Design for manufacturing <small>Experimental</small></span><input id="dfm-enabled" type="checkbox" role="switch" aria-describedby="dfm-note"></label>
-        <p id="dfm-note">Consider manufacturing while designing. Tell STEVE how the part will be made. Pause or finish your task before changing this.</p>
+    <section id="app-menu" class="panel-view settings-view" aria-label="Settings" data-page="root" hidden>
+      <div class="panel-head">
+        <button id="settings-back" class="icon-button" aria-label="Back to settings" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+        <h2 id="settings-title">Settings</h2>
+        <button id="settings-close" class="icon-button" aria-label="Close settings">×</button>
       </div>
-      <details id="updates-settings" class="settings-group">
-        <summary>Updates <span id="updates-badge" class="settings-badge" hidden>Available</span></summary>
-        <div class="settings-content">
+      <div class="panel-body">
+        <nav id="settings-root" class="settings-root" aria-label="Settings categories">
+          <span class="eyebrow">Connection</span>
+          <button class="settings-row" type="button" data-page="account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20v-2a7 7 0 0 1 14 0v2"/></svg><span class="row-copy"><span class="row-title">AI provider</span><span id="row-account-value" class="row-value"></span></span><span class="chevron" aria-hidden="true"></span></button>
+          <button class="settings-row" type="button" data-page="manufacturing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5"/></svg><span class="row-copy"><span class="row-title">Manufacturing</span><span id="row-manufacturing-value" class="row-value"></span></span><span id="rmfg-badge" class="settings-badge" hidden>Reconnect</span><span class="chevron" aria-hidden="true"></span></button>
+          <span class="eyebrow">STEVE</span>
+          <button class="settings-row" type="button" data-page="updates"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg><span class="row-copy"><span class="row-title">Updates</span><span id="row-updates-value" class="row-value"></span></span><span id="updates-badge" class="settings-badge" hidden>Available</span><span class="chevron" aria-hidden="true"></span></button>
+          <button class="settings-row" type="button" data-page="diagnostics"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="row-copy"><span class="row-title">Diagnostics</span><span id="row-diagnostics-value" class="row-value"></span></span><span class="chevron" aria-hidden="true"></span></button>
+          <p id="settings-version" class="settings-footer"></p>
+        </nav>
+        <div id="settings-account" class="settings-page" hidden>
+          <div id="account-menu" aria-label="Provider and account">
+            <div class="field"><label for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="openrouter">OpenRouter (experimental)</option><option value="ollama">Ollama (local)</option></select></div>
+            <div class="connection"><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span></div>
+            <div id="local-controls" hidden><p id="local-status" class="note"></p><div class="button-row"><button id="ollama-server" class="secondary-button" type="button">Server</button><button id="local-refresh" class="secondary-button" type="button">Refresh models</button><button id="local-help" class="secondary-button" type="button">Local setup</button></div></div>
+            <div id="claude-controls" hidden><p id="claude-version" class="note"></p><p class="note">Claude Code manages your account. Use <code>claude auth login</code> or <code>claude auth logout</code> in a terminal outside Fusion.</p><div class="button-row"><button id="claude-refresh" class="secondary-button">Check connection</button></div></div>
+            <div id="openrouter-controls" hidden><p class="note">Sign out removes the key from this computer. To revoke it, delete the STEVE key in OpenRouter.</p><div class="button-row"><button id="openrouter-keys" class="secondary-button">OpenRouter keys ↗</button><button id="openrouter-refresh" class="secondary-button">Refresh models</button></div></div>
+            <div class="button-row"><button id="chatgpt-refresh" class="secondary-button" hidden>Refresh models</button><button id="logout" class="secondary-button" hidden>Sign out</button></div>
+          </div>
+        </div>
+        <div id="settings-manufacturing" class="settings-page" hidden>
+          <label class="switch-row" for="dfm-enabled"><span>Design for manufacturing<small>Experimental · STEVE considers how the part will be made</small></span><input id="dfm-enabled" type="checkbox" role="switch" aria-describedby="dfm-note"></label>
+          <p id="dfm-note" class="note">Tell STEVE how the part will be made and it can run measured checks. Pause or finish your task before changing this.</p>
+          <div id="rmfg-settings" class="settings-subsection" hidden>
+            <h4>RMFG sheet metal <span class="settings-badge">Experimental</span></h4>
+            <p class="note">Connect to let STEVE upload relevant parts for DFM checks and prepare quotes and checkout when you ask. You review and pay on RMFG.</p>
+            <p id="rmfg-status" class="note" role="status"></p>
+            <p id="rmfg-code" class="note" hidden></p>
+            <div class="button-row">
+              <button id="rmfg-connect" class="secondary-button">Connect RMFG</button>
+              <button id="rmfg-enable-checkout" class="secondary-button" hidden>Enable quotes &amp; checkout</button>
+              <button id="rmfg-refresh" class="secondary-button">Check RMFG connection</button>
+              <button id="rmfg-cancel" class="secondary-button" hidden>Cancel sign-in</button>
+              <button id="rmfg-disconnect" class="text-button" hidden>Disconnect RMFG</button>
+            </div>
+          </div>
+        </div>
+        <div id="settings-updates" class="settings-page" hidden>
           <div class="update-settings">
             <span id="installed-version"></span>
-            <p id="update-status" role="status"></p>
-            <button id="check-updates" class="secondary-button">Check for updates</button>
-            <button id="menu-update" class="secondary-button" hidden>What’s new</button>
-            <button id="menu-update-now" class="secondary-button" hidden>Update STEVE</button>
-            <p id="download-status" role="status" hidden></p>
-            <button id="menu-download" class="secondary-button" hidden>Download update</button>
+            <p id="update-status" class="note" role="status"></p>
+            <div class="button-row"><button id="check-updates" class="secondary-button">Check for updates</button><button id="menu-update" class="secondary-button" hidden>What’s new</button><button id="menu-update-now" class="secondary-button" hidden>Update STEVE</button><button id="menu-download" class="secondary-button" hidden>Download update</button></div>
+            <p id="download-status" class="note" role="status" hidden></p>
           </div>
           <div class="update-settings">
             <span id="codex-version">Codex runtime</span>
-            <p id="codex-update-status" role="status"></p>
-            <button id="check-codex-updates" class="secondary-button">Check Codex updates</button>
-            <button id="update-codex" class="secondary-button" hidden>Update Codex</button>
-            <p class="sign-in-note">Updates independently of STEVE. After downloading, use Restart STEVE below to apply it and reopen your chat. Fusion stays open.</p>
-            <button id="bundled-codex" class="text-button" hidden>Use bundled Codex</button>
+            <p id="codex-update-status" class="note" role="status"></p>
+            <div class="button-row"><button id="check-codex-updates" class="secondary-button">Check Codex updates</button><button id="update-codex" class="secondary-button" hidden>Update Codex</button><button id="bundled-codex" class="text-button" hidden>Use bundled Codex</button></div>
+            <p class="note">Updates independently of STEVE. After downloading, use Restart STEVE below to apply it and reopen your chat. Fusion stays open.</p>
           </div>
+          <div class="menu-footer"><button id="restart-steve" class="secondary-button">Restart STEVE</button><span id="app-version"></span></div>
         </div>
-      </details>
-      <details class="settings-group">
-        <summary>Diagnostics</summary>
-        <div class="settings-content">
-          <label class="debug-toggle" for="debug-logging"><span>Debug logging</span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
-          <p id="debug-note">Saves code, tool results, and errors locally while enabled. Logs may contain design details.</p>
-          <button id="open-logs" class="secondary-button">Open logs folder</button>
+        <div id="settings-diagnostics" class="settings-page" hidden>
+          <label class="switch-row" for="debug-logging"><span>Debug logging<small>Saves code, tool results and errors locally</small></span><input id="debug-logging" type="checkbox" role="switch" aria-describedby="debug-note"></label>
+          <p id="debug-note" class="note">Logs may contain design details.</p>
+          <div class="button-row"><button id="open-logs" class="secondary-button">Open logs folder</button></div>
         </div>
-      </details>
-      <div class="menu-footer">
-        <button id="restart-steve" class="secondary-button">Restart STEVE</button>
-        <span id="app-version"></span>
       </div>
     </section>
-    <section id="history-panel" class="history-panel" aria-label="Chat history" hidden>
-      <div class="history-heading"><div><span class="eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>Your conversations</h2></div><button id="history-close" class="icon-button" aria-label="Close chat history">×</button></div>
-      <p class="history-note">Saved on this computer</p>
-      <label class="sr-only" for="history-search">Search conversations</label><input id="history-search" class="history-search" type="search" placeholder="Find a conversation…" autocomplete="off">
-      <p id="history-empty" class="history-empty">Your conversations will appear here after your first message.</p>
-      <div id="history-list" class="history-list"></div>
-      <button id="history-more" class="secondary-button" hidden>Load older conversations</button>
+    <section id="history-panel" class="panel-view" aria-label="Conversations" hidden>
+      <div class="panel-head"><h2>Conversations</h2><button id="history-close" class="icon-button" aria-label="Close conversations">×</button></div>
+      <div class="panel-body">
+        <label class="sr-only" for="history-search">Search conversations</label><input id="history-search" class="history-search" type="search" placeholder="Search conversations saved on this computer…" autocomplete="off">
+        <p id="history-empty" class="history-empty">Your conversations will appear here after your first message.</p>
+        <div id="history-list" class="history-list"></div>
+        <button id="history-more" class="secondary-button" hidden>Load older conversations</button>
+      </div>
     </section>
     <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
     <aside id="update-banner" class="update-banner" aria-label="STEVE update" hidden>
@@ -106,10 +109,9 @@
         <span class="sign-in-note">The full STEVE package includes its required runtime. Installing the desktop app alone doesn't repair STEVE.</span>
       </section>
       <section id="welcome" class="welcome">
-        <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="crosshair crosshair-one">+</div><div class="crosshair crosshair-two">+</div><img src="mark.svg" width="74" height="74" alt=""><span class="art-label">IDEA → POSSIBILITY</span></div>
-        <span class="eyebrow hero-eyebrow">ENGINEERING & VISUALIZATION EXPERT</span>
-        <h1>Good ideas.<br>A little <em>guidance.</em></h1>
-        <p class="intro">A second set of eyes for your next idea.<br>Let's work through it, together.</p>
+        <div class="welcome-mark" aria-hidden="true"><img src="mark.svg" width="30" height="30" alt=""></div>
+        <h1>Good ideas. <em>A little guidance.</em></h1>
+        <p class="intro">Describe what you want to build, inspect or check. STEVE works inside your open Fusion document.</p>
         <section id="sign-in-card" class="sign-in-card">
           <div class="card-heading"><span class="connection-dot"></span><span id="sign-in-heading">Your tools. Your AI.</span></div>
           <p id="sign-in-description">Connect your account and bring your thinking partner into Fusion.</p>
@@ -127,25 +129,24 @@
           <span id="sign-in-note" class="sign-in-note">Uses your subscription's Codex access</span>
         </section>
         <div class="suggestions">
-          <span class="eyebrow">A PLACE TO START</span>
-          <button class="suggestion" data-prompt="Create a new component with a parametric 60 mm by 40 mm plate, 5 mm thick. Add four 5 mm mounting holes with centers 8 mm from each adjacent edge. Inspect the current document first and preserve existing geometry."><span class="suggestion-icon">⌑</span><span>Make a parametric part<small>Turn an idea into geometry</small></span><span class="suggestion-arrow">↗</span></button>
-          <button class="suggestion" data-prompt="Inspect my active Fusion document and summarize its products, components, parameters, and current selection."><span class="suggestion-icon">⌘</span><span>Understand this document<small>Inspect what you're working on</small></span><span class="suggestion-arrow">↗</span></button>
-          <button class="suggestion" data-prompt="Inspect my active Fusion workspace and available APIs. Explain what you can do here, including modeling, assemblies, or manufacturing where supported."><span class="suggestion-icon">◇</span><span>Explore what's possible<small>Work across Fusion's tools</small></span><span class="suggestion-arrow">↗</span></button>
+          <span class="eyebrow">A place to start</span>
+          <button class="suggestion" data-prompt="Create a new component with a parametric 60 mm by 40 mm plate, 5 mm thick. Add four 5 mm mounting holes with centers 8 mm from each adjacent edge. Inspect the current document first and preserve existing geometry."><span class="suggestion-icon"><svg viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></svg></span><span>Make a parametric part<small>Turn an idea into geometry you can edit later</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion document and summarize its products, components, parameters, and current selection."><span class="suggestion-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg></span><span>Understand this document<small>Components, parameters and what's selected</small></span><span class="suggestion-arrow">↗</span></button>
+          <button class="suggestion" data-prompt="Inspect my active Fusion workspace and available APIs. Explain what you can do here, including modeling, assemblies, or manufacturing where supported."><span class="suggestion-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span>Explore what's possible<small>Modeling, assemblies, CAM and more</small></span><span class="suggestion-arrow">↗</span></button>
         </div>
       </section>
       <section id="conversation" class="conversation" aria-label="Conversation" hidden></section>
-      <div id="thinking" class="thinking" role="status" hidden><span></span><span></span><span></span><label>STEVE is working</label></div>
+      <div id="thinking" class="thinking" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="thinking-label">Thinking</span></div>
     </main>
     <footer class="composer-area">
       <section id="rmfg-checkout" class="supplier-checkout" aria-label="RMFG checkout" hidden>
         <div><strong>Your RMFG checkout</strong><span>Quoted part snapshots · review delivery and final pricing on RMFG.</span></div>
         <button id="rmfg-open-checkout" type="button" class="secondary-button">Open checkout ↗</button>
       </section>
-      <button id="job-strip" class="job-strip" type="button" aria-label="Manage current job" hidden><span aria-hidden="true">◎</span><span id="job-strip-title"></span><span id="job-strip-status"></span></button>
-      <div id="task-target" class="task-target" role="status" hidden></div>
-      <div id="tool-activity" class="tool-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
-        <span class="tool-activity-mark" aria-hidden="true">⌘</span>
-        <div class="tool-activity-copy"><span id="tool-title"></span><span id="tool-name"></span></div>
+      <div class="context-row">
+        <button id="job-strip" class="chip" type="button" aria-label="Manage current job" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span id="job-strip-title" class="chip-label"></span><span id="job-strip-status" class="chip-meta"></span></button>
+        <div id="task-target" class="chip" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg><span id="task-target-label" class="chip-label"></span><span id="task-target-meta" class="chip-meta"></span></div>
+        <button id="dfm-chip" class="chip" type="button" title="Design for manufacturing is on · open settings" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5"/></svg><span class="chip-label">DFM on</span></button>
       </div>
       <div id="preference-notice" class="preference-notice" hidden></div>
       <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Dismiss error">×</button></div>
@@ -157,13 +158,17 @@
         <label class="sr-only" for="message">Message STEVE</label>
         <textarea id="message" rows="1" maxlength="32000" placeholder="What are you working on?" aria-describedby="composer-note image-hint"></textarea>
         <div class="composer-bottom">
+          <button id="composer-plus" type="button" class="tool-button" title="Attach, Dream, jobs" aria-label="More options" aria-expanded="false" aria-controls="plus-menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <div id="plus-menu" class="plus-menu" role="menu" hidden>
+            <button id="attach-images" type="button" class="menu-item" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9m-6 12 8-8"/></svg><span>Attach images<small id="attach-hint">PNG, JPEG or WebP · Ctrl+V pastes a screenshot</small></span></button>
+            <div id="dream-entry" hidden><button id="dream" type="button" class="menu-item" role="menuitem" title="Generate a concept image using your Codex limits"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.2 2.2m8.4 8.4 2.2 2.2m0-12.8-2.2 2.2m-8.4 8.4-2.2 2.2M12 8l1.2 2.8L16 12l-2.8 1.2L12 16l-1.2-2.8L8 12l2.8-1.2z"/></svg><span>Dream a concept image<small>Uses your Codex image limits</small></span></button></div>
+            <button id="job-button" type="button" class="menu-item" role="menuitem" title="Set or manage a job · /jobs"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span><span id="job-button-label">Start a job</span><small>Multi-turn work toward an objective · /jobs</small></span></button>
+          </div>
           <div class="generation-options">
-            <div class="model-wrap"><span class="model-spark" aria-hidden="true">✧</span><label class="sr-only" for="model">Model</label><select id="model"><option value="">Account default</option></select></div>
-            <div class="effort-wrap"><label class="sr-only" for="effort">Reasoning effort</label><select id="effort" title="Reasoning effort"><option value="">Default</option></select></div>
+            <div class="pill-select model-select"><label class="sr-only" for="model">Model</label><select id="model"><option value="">Account default</option></select></div>
+            <div class="pill-select effort-select"><label class="sr-only" for="effort">Reasoning effort</label><select id="effort" title="Reasoning effort"><option value="">Default</option></select></div>
           </div>
           <div class="composer-actions">
-            <button id="job-button" type="button" class="attach-button" title="Set or manage a job · /jobs" aria-label="Set or manage a job">◎</button>
-            <button id="attach-images" type="button" class="attach-button" title="Attach images · Ctrl+V to paste" aria-label="Attach images"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9m-6 12 8-8"/></svg></button>
             <button id="send" class="send-button" type="submit" title="Send message" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
             <button id="stop" class="send-button stop-button" type="button" title="Stop response" aria-label="Stop response" hidden><span></span></button>
           </div>
@@ -179,7 +184,7 @@
     <div class="job-actions"><button id="confirm-update" type="button" class="primary-button">Download and install after Fusion closes</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
   </dialog>
   <dialog id="job-dialog" class="job-dialog" aria-labelledby="job-heading">
-    <div class="job-heading"><div><span class="eyebrow">KEEP WORKING TOWARD AN OUTCOME</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
+    <div class="job-heading"><div><span class="eyebrow">Keep working toward an outcome</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
     <p id="job-summary"></p><p id="job-usage" class="job-note"></p><p id="job-target-note" class="job-note"></p>
     <div class="job-actions"><button id="job-pause" type="button" class="secondary-button">Pause</button><button id="job-resume" type="button" class="secondary-button">Resume</button><button id="job-clear" type="button" class="text-button">Clear job</button></div>
     <form id="job-form">
@@ -191,7 +196,7 @@
     <details class="job-help"><summary>Slash commands</summary><p><code>/jobs &lt;objective&gt;</code> — create or replace<br><code>/jobs</code> — status and controls<br><code>/jobs edit</code> — edit objective and budget<br><code>/jobs pause</code> — pause work<br><code>/jobs resume</code> — continue<br><code>/jobs clear</code> — remove job, keep chat</p></details>
   </dialog>
   <dialog id="ollama-dialog" class="job-dialog" aria-labelledby="ollama-heading">
-    <div class="job-heading"><div><span class="eyebrow">OLLAMA SERVER</span><h2 id="ollama-heading">Ollama server</h2></div><button id="ollama-close" type="button" class="icon-button" aria-label="Close Ollama server settings">×</button></div>
+    <div class="job-heading"><div><span class="eyebrow">Ollama server</span><h2 id="ollama-heading">Ollama server</h2></div><button id="ollama-close" type="button" class="icon-button" aria-label="Close Ollama server settings">×</button></div>
     <p class="job-note">STEVE uses http. The port defaults to 11434. Add an API key only if that server requires one. Saving reconnects Ollama and reopens the current chat when the server answers.</p>
     <form id="ollama-form" autocomplete="off">
       <label for="ollama-host">Host</label>

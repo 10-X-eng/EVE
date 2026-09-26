@@ -12,7 +12,7 @@ Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your
 
 For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
 
-> **Preview 0.6.2 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.7.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What STEVE can do
 
@@ -31,18 +31,19 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 
 ### Show STEVE what you mean
 
+- **STEVE Dream (experimental).** With ChatGPT selected, choose **+ → Dream a concept image** or ask for one. Refine it in the same chat, use it as a design reference, or save the original to Downloads. Generation uses your Codex limits; no separate image API key is needed. Concepts illustrate intent; Fusion geometry and DFM checks establish dimensions and manufacturability.
 - **Selection context, automatically.** Select a face, body, sketch, or component and ask about “this.” Each request includes a snapshot of the selection and Data Panel scope.
-- **Paste reference images.** Use **Ctrl+V** (Windows) or **⌘V** (macOS) in the message box, or **Attach images**, to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
+- **Paste reference images.** Use **Ctrl+V** (Windows) or **⌘V** (macOS) in the message box, or **+ → Attach images**, to share screenshots, drawings, and visual references. Preview, enlarge, or remove attachments before sending.
 - **Images during a task.** Send an image with text, on its own, or as a correction while STEVE is already working. Up to four PNG, JPEG, or WebP images can accompany each message.
 - **Visual verification.** STEVE can capture named views and close-ups of a selected entity, then restore your camera. Images complement measurements and other API checks.
-- **Revisit earlier pictures.** STEVE can list and reopen saved attachments and viewport captures from the same chat. Images indexed by this version remain available when that chat is reopened; older captures are identified as historical rather than current model state.
+- **Revisit earlier pictures.** STEVE can list and reopen saved attachments, generated concepts and viewport captures from the same chat. Images indexed by this version remain available when that chat is reopened; older captures are identified as historical rather than current model state.
 
 ### Stay in control of the conversation
 
 - **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
-- **See tool activity and Python.** Expandable code cards show the actual Python STEVE submits to Fusion, with running, waiting, and completion states. A compact indicator also names the current Fusion or saved-image tool. Scripts appear when submitted; the runtime does not stream partial tool arguments.
+- **See what STEVE did in Fusion.** Each run of Python steps folds into one activity block ("Ran 4 steps in Fusion · 1 failed") that stays open while STEVE works and collapses when it is done. Expand any step to read the highlighted script, copy it, or see the exception a failed step raised. The status line under the message box names the current Fusion or saved-image tool. Scripts appear when submitted; the runtime does not stream partial tool arguments.
 - **Work toward a job.** Use `/jobs <objective>` for tasks that need multiple turns. Codex manages continuation, completion, and optional token budgets; STEVE provides status, edit, pause, resume, and clear controls.
-- **Update without closing Fusion.** Managed installations automatically download and verify new releases on startup and every 12 hours. Choose **Update & restart STEVE** when ready; STEVE waits for idle, replaces its add-in, and reopens the current chat while Fusion stays open. A failed startup restores the previous files. The **STEVE logo → Updates** menu also has **Check for updates** and **Open Downloads**.
+- **Update without closing Fusion.** Managed installations automatically download and verify new releases on startup and every 12 hours. Choose **Update & restart STEVE** when ready; STEVE waits for idle, replaces its add-in, and reopens the current chat while Fusion stays open. A failed startup restores the previous files. The **Settings (⚙) → Updates** menu also has **Check for updates** and **Open Downloads**.
 - **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
 - **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
 - **Return to old chats.** Browse and search local conversation history, reopen a previous session, and continue where you left off.
@@ -53,11 +54,11 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 
 STEVE has a dockable dark interface, readable Markdown and code blocks, and incremental streaming that preserves existing message elements as text arrives. Open it from Fusion's **Quick Access toolbar** across workspaces, or through Design **Utilities > Add-ins** and command search.
 
-Click the **STEVE logo → Diagnostics** for the remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
+Click the **Settings (⚙) → Diagnostics** for the remembered **Debug logging** switch and **Open logs folder** action. Optional local diagnostics record generated code, tool results, errors, and timing to help investigate failures.
 
 ### Jobs
 
-Click **◎** beside the composer or use these commands. STEVE calls each one a job; Codex still stores it with its [goal workflow](https://learn.chatgpt.com/use-cases/follow-goals):
+Choose **+ → Start a job** beside the message box or use these commands. STEVE calls each one a job; Codex still stores it with its [goal workflow](https://learn.chatgpt.com/use-cases/follow-goals):
 
 | Command | Action |
 | --- | --- |
@@ -74,7 +75,7 @@ Automatic turns keep their Fusion document and selection pinned. STEVE waits whi
 
 ### Grok / X — new in 0.3.0
 
-The **AI provider** selector is available on the sign-in card and in the account menu. Choose **Grok / X**, then **Sign in with X / Grok**, and finish the xAI browser flow. If the browser shows a code for Grok Build after approval, you can return to Fusion: STEVE completes sign-in automatically. A separate device-code option is also available. If your access comes through X, [link your X account to xAI](https://docs.x.ai/grok/faq#accounts--login).
+The **AI provider** selector is available on the sign-in card and under **Settings (⚙) → Provider & account**. Choose **Grok / X**, then **Sign in with X / Grok**, and finish the xAI browser flow. If the browser shows a code for Grok Build after approval, you can return to Fusion: STEVE completes sign-in automatically. A separate device-code option is also available. If your access comes through X, [link your X account to xAI](https://docs.x.ai/grok/faq#accounts--login).
 
 Grok uses the same Fusion Python tools, image inputs, streaming, steering, and saved chat image tools. Provider sign-ins, conversation history, and model preferences are separate; switching is disabled while a task or sign-in is running. Available models, supported effort levels, and defaults come from xAI's live catalog. STEVE remembers your effort choice for each model.
 
@@ -106,7 +107,7 @@ Choose **Ollama (local)** to use a model running on your computer. The default s
 
 Get the complete Windows package from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `STEVE-0.6.2-windows-x64.zip` package:
+With an `STEVE-0.7.0-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -117,7 +118,7 @@ With an `STEVE-0.6.2-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `STEVE-0.6.2-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `STEVE-0.7.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
 2. Save your work and quit Fusion.
@@ -134,7 +135,7 @@ STEVE checks for a saved sign-in before opening a new login. Model availability 
 
 The preview supports **Windows x64** and **macOS on Apple silicon**, and requires Fusion and an internet connection. The installers are currently unsigned. They install per user, preserve the previous managed installation during updates, and refuse to replace a STEVE folder they did not install.
 
-Codex updates independently of STEVE. Click the **STEVE logo → Updates** to see the running Codex version. STEVE checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
+Codex updates independently of STEVE. Click the **Settings (⚙) → Updates** to see the running Codex version. STEVE checks OpenAI for stable updates automatically. Choose **Update Codex** to download and verify the complete runtime in the background, then click **Restart STEVE** in the same menu to activate it and reopen your chat. Fusion stays open. Your current task keeps its existing runtime until restart. **Refresh models** reloads the ChatGPT model picker from Codex; availability depends on your account. **Use bundled Codex** selects the included runtime for the next restart if you need to recover from an update.
 
 To reload an updated development add-in, **Stop STEVE, then Run it again** in Scripts and Add-ins. Start a **New conversation** after changes to tool definitions.
 
@@ -190,7 +191,7 @@ python3 scripts/build_package.py
 python3 scripts/verify_package.py
 ```
 
-Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from **STEVE logo → Updates** without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
+Use `py -3.13` in place of `python3` on Windows. Each script targets the platform it runs on. Release builds include a reproducible Codex baseline verified against its SHA-256 digest. That build baseline does not restrict independent Codex updates: newer stable runtimes can be installed from **Settings (⚙) → Updates** without a STEVE version change. Source and release audits check for machine-specific paths. Runtime licensing is documented in [licenses](licenses/README.md).
 
 Bring a real Fusion task, a reproducible failure, or a workflow you want to improve. Include the relevant Fusion version and, when useful, reviewed debug logs with private design information removed.
 

@@ -52,6 +52,17 @@ jobs:
         run: node tests/test_panel.cjs
       - name: Test image attachments
         run: node tests/test_images.cjs
+      - name: Test Settings, streaming and Dream in Edge
+        run: |
+          npm install --prefix "$env:RUNNER_TEMP/steve-browser-tests" --no-package-lock --no-save playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
+          $env:NODE_PATH = "$env:RUNNER_TEMP/steve-browser-tests/node_modules"
+          node tests/test_menus.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Settings browser checks failed' }
+          node tests/test_streaming.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Streaming browser checks failed' }
+          node tests/test_dream.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Dream browser checks failed' }
       - name: Check actual runtime protocol without inference
         run: python scripts/smoke_runtime.py
       - name: Install complete package into a fixture and verify it

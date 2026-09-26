@@ -1,5 +1,7 @@
 # First milestone verification
 
+- 0.7.0 release candidate: 439 Python tests passed locally (11 skipped), plus panel/image fixtures and real Edge checks for Settings, streaming DOM retention and Dream. The bundled runtime smoke test passed without inference. The Windows ZIP built and passed the portability audit. Local fixture installation was blocked by the installer's running-Fusion guard; Windows/macOS CI must verify installation before publication. The redesigned Dream transcript was also inspected at 440px and 340px widths.
+
 - DFM follow-up (0.6.1): #49–#51 were merged and pulled main matched the tested integration tree. The release branch passed 383 local Python tests (11 skipped), with package installation covered separately by clean Windows/macOS CI. Local focused DFM/catalog, panel/image and 147-file portability checks passed. Live Fusion verified 24 nominal-envelope cases and three machine-definition currency cases without changing body revisions. These are scoped checks, not process qualification.
 
 - Experimental DFM (0.6.0): the merged main tree matched the final reviewed branch and passed 381 local Python tests (11 skipped), panel/image checks, a real-browser streaming check and the portability audit. Live Windows Fusion measurements and scoped manufacturing limitations are recorded in [DFM evaluation](DFM_EVALUATION.md) and [readiness](DFM_READINESS.md). Machine definitions are sourced data, not full process qualification. Live macOS DFM and an authorized RMFG supplier report remain unverified.
@@ -28,7 +30,7 @@ The implementation is a prototype with user-confirmed streaming in Fusion; remai
 
 - STEVE 0.2.0 adds update discovery and verified downloads. Tests cover preview releases, numeric version ordering, platform assets, missing checksums, drafts, unsafe metadata, offline recovery, overlapping checks, progress, cancellation, checksum mismatch, truncated downloads, existing-file preservation, and shutdown. Update checks and downloads preserve an active model turn. The Windows Known Folder API was exercised read-only. A real public v0.1.0 package was downloaded into an isolated test folder and its published SHA-256 verified. The local 0.2.0 Windows package passed installer/runtime verification with all 34 payload files matching source and checksums. Live update notices and downloads inside Fusion still need user confirmation.
 
-- Tool activity is covered by controller and panel tests: overlapping calls, operation labels without Python payloads, continued text streaming, delayed callbacks from older turns, submission failure, disconnect, waiting and stopping states, and clearing completed activity. The indicator covers STEVE's seven Fusion and saved-image tools; native Codex web-search activity is not displayed here. Live appearance inside Fusion still needs confirmation.
+- Tool activity is covered by controller and panel tests: overlapping calls, operation labels without Python payloads, continued text streaming, delayed callbacks from older turns, submission failure, disconnect, waiting and stopping states, folding finished steps into a summary, and showing a failed step's exception. The footer status line covers STEVE's seven Fusion and saved-image tools; native Codex web-search activity is not displayed here. Live appearance inside Fusion still needs confirmation.
 
 - Current local suite: 214 Python tests (the Unix permission check is skipped on Windows), plus JavaScript checks. Native Windows bitmap/PNG conversion and the asynchronous image-paste bridge are tested without reading or changing the real system clipboard. Image coverage verifies bounded native inputs, image-only sends, exact-turn image steering, previews excluded from streaming state, local cache/history reconstruction, invalid input rejection without stopping a running task, and recovery after failed delivery. JavaScript fixtures check clipboard types, attachment preparation/removal, send/steer routing, retained failed drafts, submit races, and separate preview caching. The user confirmed screenshot paste works after the native clipboard change. macOS clipboard conversion, the image viewer, and actual model interpretation remain unverified.
 - Image recall checks cover a durable conversation index, restart and history reopening, paging, deduplicated image files, cross-chat rejection, missing/corrupted images, repair on reattachment, cancellation, native image reinjection with historical labels, and cache failures after successful delivery. Reopened images stay out of streamed state and do not create duplicate index entries. These are controlled tests; model-driven recall inside Fusion still needs live verification.
@@ -49,7 +51,8 @@ The implementation is a prototype with user-confirmed streaming in Fusion; remai
 - Installer tests exercise initial installation, update backups, corrupted payload rejection, path validation, and preservation of an unmanaged existing folder. They run against workspace fixtures, not a real Fusion installation.
 - The complete generated zip was extracted and installed into a workspace fixture using the compiled installer. All payload files matched their checksums, the installed add-in matched current source, and its runtime passed startup, account/model reads, Code Mode thread creation, and actual process-exit checks. Fusion-generated local debugger settings are excluded from distribution.
 - The actual bundled Codex 0.155.1 runtime completes initialization, account/read, model/list, thread/start with Code Mode enabled, and shutdown. The smoke test and live controller now share the exact same thread-start payload. This check is unauthenticated and does not send a model request.
-- The browser design preview has been visually inspected at 440×760 and 320×600. Suggested prompts, keyboard send, Stop, account menu, preview sign-out, and literal HTML-like input were exercised against sample responses. Narrow-width inspection found and fixed an initial welcome-screen scroll position bug; the welcome now starts at the top without horizontal overflow.
+- The browser design preview has been visually inspected at 440×760 and 320×600. Suggested prompts, keyboard send, Stop, settings, preview sign-out, and literal HTML-like input were exercised against sample responses. Narrow-width inspection found and fixed an initial welcome-screen scroll position bug; the welcome now starts at the top without horizontal overflow.
+- The redesigned panel (turn grouping, activity blocks, tables and highlighted code, Settings view, **+** menu, chips, Dream cards) was rendered in headless Edge at 440×720, 440×1500 and 340×720 against a scripted bridge with a five-step bracket conversation, a running step, a failed step, a Dream concept and a pending concept. No page errors or horizontal overflow were observed. Live appearance inside Fusion's embedded browser still needs confirmation.
 
 Commands:
 
@@ -123,7 +126,7 @@ The add-in, packaging, installer, and workflow now cover macOS on Apple silicon.
 - [ ] Complete ChatGPT browser sign-in and receive a streamed reply.
 - [ ] Paste a screenshot from the macOS clipboard and attach an image file.
 - [ ] Run a query and an execute tool call; capture the viewport.
-- [ ] Open the logs folder from STEVE logo → Diagnostics and confirm Finder shows it.
+- [ ] Open the logs folder from Settings (⚙) → Diagnostics and confirm Finder shows it.
 - [ ] Stop the add-in and quit Fusion; confirm no `codex-app-server` or `codex-code-mode-host` process remains.
 - [ ] Verify the Gatekeeper path for `Install STEVE.command` on a clean Mac, including the Privacy & Security approval.
 
@@ -152,3 +155,20 @@ These tests exercise the real Autodesk lifecycle and file-swap helper. Live macO
 reload and a complete released STEVE-to-STEVE update with chat restoration still
 need user verification. Unit coverage checks payload tampering, unmanaged targets,
 rename failures, interrupted-swap recovery, idle handoff and download reuse.
+
+## STEVE Dream development checks
+
+On September 26, 2026, a real ChatGPT-signed-in Codex 0.153.4 connection generated an
+aluminum enclosure concept and refined it to green in the same STEVE controller chat.
+Both native `imageGeneration` results were decoded, cached and indexed successfully.
+No Fusion document operations were requested by the test harness.
+
+Replaying the disposable test conversation in an isolated Codex 0.155.1 home
+restored both concepts and passed its database integrity check.
+
+Unit tests cover provider gating, image validation and bounds, cross-chat file access,
+cache recovery, duplicate events, history reconstruction and non-overwriting exports.
+Real-browser checks cover generation progress, previews larger than 1 MiB, unchanged
+image nodes during later messages, refinement attachments, draft preservation, save
+actions and unsupported providers/models. Real generated concepts were visually checked
+at 440px and 340px panel widths. Live Fusion palette and macOS use still need user testing.
