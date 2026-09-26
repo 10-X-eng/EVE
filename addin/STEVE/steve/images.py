@@ -93,15 +93,15 @@ class ImageStore:
             raise ValueError("This chat's image index contains an invalid entry.")
         return catalog["images"]
 
-    def record(self, thread_id, turn_id, images, *, source="attachment", message="", document=None):
+    def record(self, thread_id, turn_id, images, *, source="attachment", message="", document=None, item_id=None):
         """Record confirmed deliveries; identical pixels remain one file across chats."""
-        if source not in ("attachment", "viewport"):
+        if source not in ("attachment", "viewport", "generated"):
             raise ValueError("Unknown chat image source.")
         entries = self._catalog(thread_id)
         recorded = []
         for image in images:
             reference = self.remember(image)
-            identity = json.dumps([thread_id, turn_id, source, reference["id"]])
+            identity = json.dumps([thread_id, turn_id, source, reference["id"]] + ([item_id] if source == "generated" else []))
             image_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
             entry = next((entry for entry in entries if entry["imageId"] == image_id), None)
             if entry is None:
@@ -110,6 +110,8 @@ class ImageStore:
                          "recordedAt": datetime.now(timezone.utc).isoformat(), "historical": source == "viewport"}
                 if document:
                     entry["document"] = {key: document[key] for key in ("id", "name") if key in document}
+                if item_id:
+                    entry["itemId"] = str(item_id)[:200]
                 entries.append(entry)
             recorded.append(self._public_entry(entry))
         encoded = json.dumps({"threadId": thread_id, "images": entries}, ensure_ascii=False).encode("utf-8")

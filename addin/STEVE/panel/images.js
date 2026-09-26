@@ -2,8 +2,16 @@
 "use strict";
 const SteveImages = (() => {
   const maxBytes = 1024 * 1024;
-  const imageURL = value => typeof value === "string" &&
-    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 1400000;
+  const validURL = (value, limit) => typeof value === "string" && value.length <= limit &&
+    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+  const imageURL = value => validURL(value, 1400000);
+  const storedImageURL = value => validURL(value, 4 * Math.ceil(8 * 1024 * 1024 / 3) + 64);
+  function storedFile(url, name) {
+    if (!storedImageURL(url)) throw new Error("The saved image is unavailable.");
+    const [header, encoded] = url.split(",");
+    const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+    return new File([bytes], name || "Concept", {type:header.slice(5, header.indexOf(";"))});
+  }
   function clipboardFile(image) {
     const prefix = "data:image/png;base64,";
     if (!image || typeof image.url !== "string" || !image.url.startsWith(prefix) || image.url.length > 28000000)
@@ -56,5 +64,5 @@ const SteveImages = (() => {
     if (!fits(url) || !imageURL(url)) throw new Error("This image is still too large. Crop it and paste it again.");
     return {name: String(file.name || "Pasted image").slice(0, 120), url, compressed};
   }
-  return {clipboardFile, prepare, imageURL};
+  return {clipboardFile, prepare, imageURL, storedImageURL, storedFile};
 })();

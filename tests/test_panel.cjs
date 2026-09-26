@@ -6,17 +6,32 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../addin/STEVE/panel/panel.js'), 'utf8');
 const context = {URLSearchParams, location:{search:''}, document:{getElementById:()=>null}};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../addin/STEVE/panel/markdown.js'), 'utf8'), context);
 vm.runInContext(source.slice(0, source.indexOf('async function bridge')), context);
 const render = context.markdown;
+const strip = html => html.replace(/<[^>]+>/g, '');
 assert.equal(render('<img src=x onerror=alert(1)>'), '<p>&lt;img src=x onerror=alert(1)&gt;</p>');
 assert.equal(render('`<script>alert(1)</script>`'), '<p><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></p>');
-assert.equal(render('```python\nprint("<hello>")'), '<pre><code>print(&quot;&lt;hello&gt;&quot;)</code></pre>');
+const fence = render('```python\nprint("<hello>")');
+assert.match(fence, /^<div class="code-block"><div class="code-tools"><span class="code-lang">Python<\/span><button type="button" class="copy-code">Copy<\/button><\/div><pre><code>/);
+assert.equal(strip(fence.slice(fence.indexOf('<pre>'))), 'print(&quot;&lt;hello&gt;&quot;)');
+assert.doesNotMatch(fence, /<script/);
 assert.equal(render('- First\n- Second\n\nThen continue.'), '<ul><li>First</li><li>Second</li></ul><p>Then continue.</p>');
 assert.equal(render('1. First\n2. Second'), '<ol><li>First</li><li>Second</li></ol>');
+assert.equal(render('- Outer\n  - Inner one\n  - Inner two\n- Next'), '<ul><li>Outer<ul><li>Inner one</li><li>Inner two</li></ul></li><li>Next</li></ul>');
 assert.equal(render('**Important** and *helpful*'), '<p><strong>Important</strong> and <em>helpful</em></p>');
 assert.equal(render('`**literal**`'), '<p><code>**literal**</code></p>');
-assert.equal(render('## Next step\n\n> A quote'), '<h3>Next step</h3><blockquote>A quote</blockquote>');
-console.log('8 panel rendering checks passed.');
+assert.equal(render('## Next step\n\n> A quote'), '<h3>Next step</h3><blockquote><p>A quote</p></blockquote>');
+assert.equal(render('| Name | Value |\n| --- | ---: |\n| `plate_w` | 60 mm |'),
+  '<div class="table-wrap"><table><thead><tr><th>Name</th><th style="text-align:right">Value</th></tr></thead><tbody><tr><td><code>plate_w</code></td><td style="text-align:right">60 mm</td></tr></tbody></table></div>');
+assert.equal(render('See [docs](https://help.autodesk.com/a?b=1 "t") and [x](javascript:alert(1)) or https://example.com/p.'),
+  '<p>See <a href="https://help.autodesk.com/a?b=1">docs</a> and [x](javascript:alert(1)) or <a href="https://example.com/p">https://example.com/p</a>.</p>');
+assert.equal(render('[evil](https://example.com/"onclick="alert(1))'), '<p>[evil](https://example.com/&quot;onclick=&quot;alert(1))</p>');
+const highlighted = render('```python\ndef run(context):\n    return {"n": 0x1F}  # <b>\n```');
+assert.match(highlighted, /<span class="tok-kw">def<\/span> <span class="tok-fn">run<\/span>/);
+assert.match(highlighted, /<span class="tok-cm"># &lt;b&gt;<\/span>/);
+assert.equal(strip(highlighted.slice(highlighted.indexOf('<pre>'))), 'def run(context):\n    return {&quot;n&quot;: 0x1F}  # &lt;b&gt;');
+console.log('Panel rendering checks passed: escaping, fences, highlighting, lists, tables and safe links.');
 
 // Test the incremental updater using a minimal DOM tree, without starting a browser.
 class TreeNode {
@@ -82,11 +97,13 @@ console.log('Incremental streaming checks passed: node retention, Markdown chang
 // History rows are text-only, searchable, and resume the selected native thread.
 const elements = new Map();
 function element() {
-  return {value: '', hidden: false, children: [], attrs: {}, textContent: '',
+  return {value: '', hidden: false, children: [], attrs: {}, textContent: '', dataset: {}, style: {},
+    classList: {toggle() {}, add() {}, remove() {}, contains() { return false; }},
     replaceChildren(...children) { this.children = children; },
     append(...children) { this.children.push(...children); },
     add(child) { this.children.push(child); },
-    setAttribute(name, value) { this.attrs[name] = value; }, focus() {}};
+    setAttribute(name, value) { this.attrs[name] = value; }, removeAttribute(name) { delete this.attrs[name]; },
+    querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {}, focus() {}};
 }
 context.document = {
   getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
@@ -182,7 +199,7 @@ console.log('Update confirmation controls passed.');
   assert.equal(elements.get('effort').value, 'ultra');
   assert.deepEqual(elements.get('effort').children.map(e=>e.value), ['', 'low', 'ultra']);
   assert.equal(elements.get('effort').children[0].text, 'Default (Low)');
-  vm.runInContext(source.slice(source.indexOf('$("model").onchange'), source.indexOf('$("account-button").onclick')), context);
+  vm.runInContext(source.slice(source.indexOf('$("model").onchange'), source.indexOf('$("app-menu-button").onclick')), context);
   elements.get('effort').onchange({target:{value:'low'}});
   assert.equal(vm.runInContext('selectedAction.action', context), 'effort');
   assert.equal(vm.runInContext('selectedAction.payload.effort', context), 'low');
@@ -192,28 +209,38 @@ console.log('Update confirmation controls passed.');
   assert.equal(elements.get('model').disabled, true);
   assert.equal(elements.get('effort').disabled, true);
   assert.equal(elements.get('task-target').hidden, false);
-  assert.equal(elements.get('task-target').textContent, 'Task: Bracket <draft> · Waiting');
+  assert.equal(elements.get('task-target-label').textContent, 'Bracket <draft>');
+  assert.equal(elements.get('task-target-meta').textContent, 'Waiting');
   assert.equal(elements.get('status').textContent, 'Waiting for Bracket');
+  assert.equal(elements.get('status-dot').className, 'status-dot waiting');
   assert.equal(elements.get('thinking').hidden, true);
   assert.equal(elements.get('stop').hidden, false);
   console.log('Effort and task UI checks passed: catalog options, selection, busy controls, target and wait status.');
+  // The footer is the single status line; it names the active tool while STEVE works.
   vm.runInContext(`state.activeTools=[{name:'fusion_query_python',title:'Inspect <faces>'},
-    {name:'fusion_api_help',title:'adsk.fusion.Sketch'}];`, context);
+    {name:'fusion_api_help',title:'adsk.fusion.Sketch'}]; state.waitingForFusion=false; state.status='Running in Fusion';`, context);
   context.renderControls();
-  assert.equal(elements.get('tool-activity').hidden, false);
-  assert.equal(elements.get('tool-title').textContent, 'Inspect <faces>');
-  assert.equal(elements.get('tool-name').textContent, 'Waiting fusion_query_python · +1 more');
-  vm.runInContext(`state.waitingForFusion=false; state.status='Writing';`, context);
+  assert.equal(elements.get('status').textContent, 'Running in Fusion · Inspect <faces> · +1 more');
+  assert.equal(elements.get('status').title, 'fusion_query_python: Inspect <faces>\nfusion_api_help: adsk.fusion.Sketch');
+  assert.equal(elements.get('thinking').hidden, false);
+  assert.equal(elements.get('thinking-label').textContent, 'Inspect <faces> · +1 more');
+  assert.equal(elements.get('task-target-meta').textContent, 'Pinned');
+  vm.runInContext(`state.messages.push({id:'python-1',role:'tool',code:'def run(context):\\n    pass',toolStatus:'running'});`, context);
   context.renderControls();
-  assert.equal(elements.get('tool-name').textContent, 'Using fusion_query_python · +1 more');
-  vm.runInContext(`state.status='Stopping';`, context);
+  assert.equal(elements.get('thinking').hidden, true, 'A running step already shows progress in the transcript');
+  vm.runInContext(`state.messages.pop(); state.activeTools=[{name:'fusion_api_help',title:'adsk.fusion.Sketch'}]; state.status='Thinking';`, context);
   context.renderControls();
-  assert.equal(elements.get('tool-name').textContent, 'Stopping fusion_query_python · +1 more');
-  vm.runInContext(`state.activeTools=[];`, context);
+  assert.equal(elements.get('status').textContent, 'Thinking · Reading docs · adsk.fusion.Sketch');
+  assert.equal(elements.get('thinking-label').textContent, 'Reading docs · adsk.fusion.Sketch');
+  vm.runInContext(`state.status='Writing';`, context);
   context.renderControls();
-  assert.equal(elements.get('tool-activity').hidden, true);
-  assert.equal(elements.get('tool-title').textContent, '');
-  console.log('Tool activity checks passed: safe labels, overlapping calls, waiting, streaming, stopping and completion.');
+  assert.equal(elements.get('thinking').hidden, true);
+  vm.runInContext(`state.activeTools=[]; state.status='Thinking';`, context);
+  context.renderControls();
+  assert.equal(elements.get('status').textContent, 'Thinking');
+  assert.equal(elements.get('thinking-label').textContent, 'Thinking');
+  assert.equal(elements.get('status').title, '');
+  console.log('Status line checks passed: safe labels, overlapping calls, running steps, docs lookups, writing and idle thinking.');
   vm.runInContext(`state.version='0.2.0'; state.updateInfo={version:'0.3.0'};
     state.updateChecking=true; state.updateStatus='Checking for updates…';`, context);
   context.renderControls();

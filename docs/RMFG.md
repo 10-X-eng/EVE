@@ -1,7 +1,7 @@
 # Optional RMFG sheet-metal DFM (experimental)
 
-Click the **STEVE logo** and turn on **Design for manufacturing**. Then open the
-**Accounts & providers** menu (person icon), expand **RMFG sheet metal**, and choose **Connect RMFG**. Approve the
+Open **Settings (⚙) → Manufacturing** and turn on **Design for manufacturing**. The
+**RMFG sheet metal** section appears below it; choose **Connect RMFG**. Approve the
 connection in your browser and return to Fusion. RMFG is a separate supplier
 account; it does not replace your AI provider. STEVE restores the saved connection
 on startup and refreshes expired access tokens automatically. **Connect RMFG**

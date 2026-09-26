@@ -21,14 +21,14 @@ START_HERE = {
         "2. Save your work and close Fusion.\n"
         "3. Double-click Install STEVE.exe and choose Install STEVE.\n"
         "4. Open Fusion. Enable STEVE in Scripts and Add-ins if it does not start automatically.\n"
-        "5. Open STEVE from the Quick Access toolbar, choose ChatGPT, Grok / X, Claude (experimental), or Ollama (local). See INSTALL.md for setup.\n\n"
+        "5. Open STEVE from the Quick Access toolbar, choose ChatGPT, Grok / X, Claude (experimental), OpenRouter (experimental), or Ollama (local). See INSTALL.md for setup.\n\n"
         "STEVE can inspect your document and run generated Python through Fusion's installed APIs.\n"
         "This is an early execution prototype; save your work before trying model changes.\n"
         "No separate Python, Node, Codex, API key, or STEVE account is required.\n"
         "Claude additionally requires Claude Code, signed in outside Fusion.\n"
         "The installer is currently unsigned.\n"
         "ChatGPT credentials are managed by Codex under %LOCALAPPDATA%\\STEVE\\codex.\n"
-        "Use the STEVE account menu to sign out.\n"
+        "Use Settings > AI provider to sign out.\n"
         "Read INSTALL.md for first-use instructions, troubleshooting, updates, and uninstalling.\n"
         "Updates preserve old add-in files under API\\STEVE-install-backups.\n"
     ),
@@ -40,13 +40,13 @@ START_HERE = {
         "   Double-clicking the installer also works once macOS lets you open it under\n"
         "   System Settings > Privacy & Security, because this preview is not signed.\n"
         "4. Open Fusion. Enable STEVE in Scripts and Add-ins if it does not start automatically.\n"
-        "5. Open STEVE from the Quick Access toolbar, choose ChatGPT, Grok / X, Claude (experimental), or Ollama (local). See INSTALL.md for setup.\n\n"
+        "5. Open STEVE from the Quick Access toolbar, choose ChatGPT, Grok / X, Claude (experimental), OpenRouter (experimental), or Ollama (local). See INSTALL.md for setup.\n\n"
         "STEVE can inspect your document and run generated Python through Fusion's installed APIs.\n"
         "This is an early execution prototype; save your work before trying model changes.\n"
         "No separate Python, Node, Codex, API key, or STEVE account is required.\n"
         "Claude additionally requires Claude Code, signed in outside Fusion.\n"
         "ChatGPT credentials are managed by Codex under ~/Library/Application Support/STEVE/codex.\n"
-        "Use the STEVE account menu to sign out.\n"
+        "Use Settings > AI provider to sign out.\n"
         "Read INSTALL.md for first-use instructions, troubleshooting, updates, and uninstalling.\n"
         "Updates preserve old add-in files under API/STEVE-install-backups.\n"
     ),
@@ -68,7 +68,7 @@ def find_compiler():
 
 def check_payload(source, target):
     suffix = executable_suffix(target)
-    required = ["STEVE.py", "STEVE.manifest", "resources/32x32.png", "panel/panel.js", "panel/fusion.css",
+    required = ["STEVE.py", "STEVE.manifest", "resources/32x32.png", "panel/panel.js", "panel/fusion.css", "panel/markdown.js", "steve/dream.py",
                 "steve/fusion_tools.py", "steve/python_runner.py", "steve/tool_protocol.py", "steve/debug_log.py",
                 "runtime/steve-runtime.json", "runtime/codex-package.json",
                 f"runtime/bin/codex-app-server{suffix}", f"runtime/bin/codex-code-mode-host{suffix}"]

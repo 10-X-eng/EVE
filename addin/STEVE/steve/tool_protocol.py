@@ -255,12 +255,12 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"url": {"type": "string", "description": "https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/<file>.htm; no query string or fragment."},
         "offset": {"type": "integer", "minimum": 0, "maximum": 2000000, "default": 0, "description": "Character offset; continue with nextOffset."}}, "required": ["url"], "additionalProperties": False}},
     {"type": "function", "name": "list_chat_images", "deferLoading": False,
-     "description": "Find earlier attachments and viewport captures in this chat. Returns imageId, source/turn metadata and nextOffset, not pixels. Use view_chat_image to see one. If an older image is absent, request reattachment.",
+     "description": "List this chat's attachments, generated concepts and viewport captures. Returns imageId, source/turn metadata and nextOffset, not pixels. Use view_chat_image to inspect one. If absent, request reattachment.",
      "inputSchema": {"type": "object", "properties": {
          "offset": {"type": "integer", "minimum": 0, "default": 0},
          "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 20}}, "additionalProperties": False}},
     {"type": "function", "name": "view_chat_image", "deferLoading": False,
-     "description": "Deliver a saved image from this chat as visual input. Use imageId from list_chat_images; other chats, paths and URLs are unsupported. Saved captures are historical, not the current viewport. Claim inspection only when imageDelivered is true.",
+     "description": "Deliver a saved chat image as visual input. Use imageId from list_chat_images; other chats, paths and URLs are unsupported. Concepts are not verified geometry; captures show past state. Claim inspection only when imageDelivered is true.",
      "inputSchema": {"type": "object", "properties": {
          "image_id": {"type": "string", "description": "imageId returned by list_chat_images."}},
          "required": ["image_id"], "additionalProperties": False}},

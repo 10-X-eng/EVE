@@ -149,6 +149,8 @@ class HTMLMessage(adsk.core.HTMLEventHandler):
                 event.returnData = json.dumps({"ok": True})
             elif event.action == "imageAssets":
                 event.returnData = json.dumps({"ok": True, "images": _controller.image_assets(payload.get("ids"))})
+            elif event.action == "saveConcept":
+                event.returnData = json.dumps({"ok": True, **_controller.save_concept(payload.get("id"))})
             else:
                 accepted = _controller.dispatch(event.action, payload, capture_context=_fusion_tools.message_context)
                 if accepted is False:
