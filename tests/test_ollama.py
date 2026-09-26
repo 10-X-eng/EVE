@@ -1,6 +1,7 @@
 """Local provider boundaries, model capability discovery, and runtime configuration."""
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -9,9 +10,21 @@ from unittest.mock import Mock, patch
 from urllib.error import URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "addin/STEVE"))
-from steve.ollama_transport import BASE_URL, MAX_METADATA, OllamaAPI, OllamaError, OllamaTransport
+from steve.ollama_transport import (API_KEY_ENV, BASE_URL, MAX_METADATA, OllamaAPI, OllamaError, OllamaSettings,
+                                    OllamaTransport)
 from steve.preferences import ProviderChoice
 from steve.transport import Transport
+
+
+class MemoryStore:
+    def __init__(self):
+        self.value = None
+
+    def read(self):
+        return None if self.value is None else dict(self.value)
+
+    def write(self, value):
+        self.value = dict(value)
 
 
 def shown(vision=True, **extra):
@@ -70,6 +83,7 @@ class OllamaTests(unittest.TestCase):
         self.assertEqual(config["model_context_window"], 16384)
         self.assertEqual(config["model_auto_compact_token_limit"], 12288)
         self.assertFalse(config["model_providers.steve_ollama.requires_openai_auth"])
+        self.assertNotIn("model_providers.steve_ollama.env_key", config)
         self.assertEqual(config["web_search"], "disabled")
         self.assertFalse(config["features.code_mode"]["enabled"])
 
@@ -133,6 +147,126 @@ class OllamaTests(unittest.TestCase):
             for provider in ("chatgpt", "grok", "ollama"):
                 choice.save(provider)
                 self.assertEqual(choice.preferences().model, provider + "-model")
+
+    def test_server_settings_keep_the_key_out_of_the_file_and_follow_the_saved_origin(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = MemoryStore()
+            settings = OllamaSettings(folder, store=store)
+            self.assertFalse(settings.explicit)
+            with self.assertRaisesRegex(ValueError, "port field"):
+                settings.save("http://10.0.0.8:11434", 80)
+            with self.assertRaisesRegex(ValueError, "port field"):
+                settings.save("10.0.0.8:11434", None)
+            with self.assertRaisesRegex(ValueError, "1 to 65535"):
+                settings.save("10.0.0.8", 0)
+            with self.assertRaisesRegex(ValueError, "spaces or control"):
+                settings.save("10.0.0.8", 11434, "secret token")
+            settings.save("Printer.LAN", "", None)
+            self.assertEqual((settings.host, settings.port, settings.api_key_set), ("printer.lan", 11434, False))
+            settings.save("::1", None)
+            self.assertEqual(settings.origin(), "http://[::1]:11434")
+            self.assertEqual(settings.label, "[::1]:11434")
+            settings.save("10.0.0.8", "22000", "  secret-token  ")
+            text = settings.path.read_text(encoding="utf-8")
+            self.assertNotIn("secret-token", text)
+            self.assertIn('"apiKeySet": true', text)
+            self.assertNotIn("secret-token", repr(settings))
+            self.assertNotIn("secret-token", json.dumps(settings.public_state()))
+            self.assertEqual(store.value, {"apiKey": "secret-token"})
+            if os.name != "nt":
+                self.assertEqual(settings.path.stat().st_mode & 0o777, 0o600)
+            reloaded = OllamaSettings(folder, store=store)
+            self.assertEqual(reloaded.api_key, "secret-token")
+            self.assertEqual(reloaded.origin(), "http://10.0.0.8:22000")
+            reloaded.save("10.0.0.8", None, "   ")
+            self.assertEqual(reloaded.api_key, "secret-token")
+            self.assertEqual(reloaded.port, 11434)
+            reloaded.save("10.0.0.8", 11434, clear_api_key=True)
+            self.assertFalse(reloaded.api_key_set)
+            self.assertEqual(reloaded.api_key, "")
+            self.assertEqual(store.value["apiKey"], "")
+            self.assertNotIn("secret-token", reloaded.path.read_text(encoding="utf-8"))
+
+            api = OllamaAPI(settings)
+            api.opener = Mock()
+            api.opener.open.return_value = io.BytesIO(b'{"version":"0.34.2"}')
+            self.assertEqual(api.request("/api/version")["version"], "0.34.2")
+            request = api.opener.open.call_args.args[0]
+            self.assertEqual(request.full_url, "http://10.0.0.8:22000/api/version")
+            self.assertEqual(request.headers["Authorization"], "Bearer secret-token")
+            api.opener.open.side_effect = URLError("offline")
+            with self.assertRaises(OllamaError) as caught:
+                api.request("/api/tags")
+            self.assertNotIn("secret-token", str(caught.exception))
+
+            plain = OllamaAPI(OllamaSettings(folder + "-plain"))
+            plain.opener = Mock()
+            plain.opener.open.return_value = io.BytesIO(b'{"version":"0.34.2"}')
+            with patch("steve.ollama_transport.BASE_URL", "http://127.0.0.1:9"):
+                plain.request("/api/version")
+            plain_request = plain.opener.open.call_args.args[0]
+            self.assertEqual(plain_request.full_url, "http://127.0.0.1:9/api/version")
+            self.assertNotIn("Authorization", plain_request.headers)
+
+            client = OllamaTransport(lambda *args: None, home=Path(folder) / "runtime", api=OllamaAPI(settings))
+            client.use(settings)
+            config = client.provider_config({"context": 8192})
+            self.assertEqual(config["model_providers.steve_ollama.base_url"], "http://10.0.0.8:22000/v1")
+            self.assertEqual(config["model_providers.steve_ollama.env_key"], API_KEY_ENV)
+            self.assertNotIn("secret-token", json.dumps(config))
+            with patch.dict(os.environ, {API_KEY_ENV: "ambient-secret"}):
+                env = client.environment()
+                self.assertEqual(os.environ[API_KEY_ENV], "ambient-secret")
+            self.assertEqual(env[API_KEY_ENV], "secret-token")
+            self.assertNotIn("ambient-secret", json.dumps({key: value for key, value in env.items() if key != API_KEY_ENV}))
+
+    def test_turn_refreshes_provider_config_when_the_server_changes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            settings = OllamaSettings(folder)
+            settings.save("127.0.0.1", 11434)
+            api = Mock()
+            api.prepare.return_value = {"model": "small", "context": 8192, "vision": True}
+            client = OllamaTransport(lambda *args: None, home=Path(folder) / "runtime", api=api)
+            client.use(settings)
+            with patch.object(Transport, "request", return_value={"thread": {"id": "thread"}}) as rpc:
+                client.request("thread/start", {"model": "small", "baseInstructions": "Fusion"})
+                self.assertEqual(rpc.call_args.args[1]["config"]["model_providers.steve_ollama.base_url"], "http://127.0.0.1:11434/v1")
+                self.assertNotIn("model_providers.steve_ollama.env_key", rpc.call_args.args[1]["config"])
+                settings.save("10.0.0.5", 11435)
+                client.request("turn/start", {"threadId": "thread", "model": "small", "input": []})
+                self.assertEqual(rpc.call_args_list[-2].args[0], "thread/resume")
+                resumed = rpc.call_args_list[-2].args[1]["config"]
+                self.assertEqual(resumed["model_providers.steve_ollama.base_url"], "http://10.0.0.5:11435/v1")
+                self.assertNotIn("secret", json.dumps(resumed))
+
+    def test_url_prefix_and_query_are_appended_without_replacing_api_routes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            settings = OllamaSettings(folder)
+            with self.assertRaisesRegex(ValueError, "Host and port"):
+                settings.save("10.0.0.8", 11434, url="http://10.0.0.8/v1")
+            with self.assertRaisesRegex(ValueError, "URL path"):
+                settings.save("10.0.0.8", 11434, url="/../secret")
+            settings.save("10.0.0.8", 11434, url="/ollama/?think=false")
+            self.assertEqual(settings.url, "/ollama?think=false")
+            self.assertEqual(settings.origin(), "http://10.0.0.8:11434/ollama")
+            self.assertEqual(settings.request_url("/api/tags"), "http://10.0.0.8:11434/ollama/api/tags?think=false")
+            self.assertEqual(settings.label, "10.0.0.8:11434/ollama?think=false")
+            stored = settings.path.read_text(encoding="utf-8")
+            self.assertIn('"/ollama?think=false"', stored.replace(" ", ""))
+            api = OllamaAPI(settings)
+            api.opener = Mock()
+            api.opener.open.return_value = io.BytesIO(b'{"version":"0.34.2"}')
+            api.request("/api/version")
+            self.assertEqual(api.opener.open.call_args.args[0].full_url, "http://10.0.0.8:11434/ollama/api/version?think=false")
+            client = OllamaTransport(lambda *args: None, home=Path(folder) / "runtime", api=api)
+            client.use(settings)
+            config = client.provider_config({"context": 8192})
+            self.assertEqual(config["model_providers.steve_ollama.base_url"], "http://10.0.0.8:11434/ollama/v1")
+            self.assertEqual(config["model_providers.steve_ollama.query_params"], {"think": "false"})
+            settings.save("10.0.0.8", 11434, url="")
+            self.assertEqual(settings.url, "")
+            self.assertEqual(settings.origin(), "http://10.0.0.8:11434")
+            self.assertNotIn("model_providers.steve_ollama.query_params", client.provider_config({"context": 8192}))
 
 
 if __name__ == "__main__":

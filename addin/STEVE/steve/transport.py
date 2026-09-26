@@ -125,7 +125,7 @@ def terminate_tree(process):
 
 def runtime_environment(home):
     env = dict(os.environ)
-    for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CHATGPT_API_KEY"):
+    for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CHATGPT_API_KEY", "STEVE_OLLAMA_API_KEY"):
         env.pop(name, None)
     env["CODEX_HOME"] = str(home / "codex")
     env["RUST_LOG"] = "error"
@@ -151,6 +151,9 @@ class Transport:
     def alive(self):
         return self.process is not None and self.process.poll() is None and not self._closed
 
+    def environment(self):
+        return runtime_environment(self.home)
+
     def start(self):
         self.home.mkdir(parents=True, exist_ok=True)
         (self.home / "codex").mkdir(exist_ok=True)
@@ -162,7 +165,7 @@ class Transport:
             self.process = subprocess.Popen(
                 self.command or runtime_command(root), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
-                cwd=self.home / "workspace", env=runtime_environment(self.home),
+                cwd=self.home / "workspace", env=self.environment(),
                 **process_options(),
             )
         except OSError as exc:

@@ -34,10 +34,10 @@ class DebugLogTests(unittest.TestCase):
 
     def test_redacts_common_secrets_without_breaking_json(self):
         self.log.set_enabled(True)
-        self.log.record("runtime.stderr", message='Bearer secret-token password="secret-pass" api_key=secret-key',
-                        result={"access_token": "secret-access", "nested": ["sk-secretkey", "eyJhbGc.payload.signature"]})
+        self.log.record("runtime.stderr", message='Bearer secret-token password="secret-pass" api_key=secret-key apiKey=secret-ollama',
+                        result={"access_token": "secret-access", "apiKey": "secret-ollama", "nested": ["sk-secretkey", "eyJhbGc.payload.signature"]})
         text = self.log.path.read_text(encoding="utf-8")
-        for secret in ("secret-token", "secret-pass", "secret-key", "secret-access", "sk-secretkey", "eyJhbGc"):
+        for secret in ("secret-token", "secret-pass", "secret-key", "secret-ollama", "secret-access", "sk-secretkey", "eyJhbGc"):
             self.assertNotIn(secret, text)
         self.assertEqual(json.loads(text.splitlines()[-1])["result"]["access_token"], "[redacted]")
 

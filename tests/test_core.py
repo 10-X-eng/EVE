@@ -122,10 +122,12 @@ class TransportTests(unittest.TestCase):
         self.assertTrue((self.folder / "workspace" / "closed-cleanly.txt").is_file())
 
     def test_credentials_are_isolated_from_parent_environment(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test", "CODEX_ACCESS_TOKEN": "test", "CODEX_HOME": "elsewhere"}):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test", "CODEX_ACCESS_TOKEN": "test", "CODEX_HOME": "elsewhere", "STEVE_OLLAMA_API_KEY": "ambient-secret"}):
             env = runtime_environment(self.folder)
         self.assertNotIn("OPENAI_API_KEY", env)
         self.assertNotIn("CODEX_ACCESS_TOKEN", env)
+        self.assertNotIn("STEVE_OLLAMA_API_KEY", env)
+        self.assertNotIn("ambient-secret", json.dumps(env))
         self.assertEqual(env["CODEX_HOME"], str(self.folder / "codex"))
 
 
@@ -422,6 +424,60 @@ class ControllerTests(unittest.TestCase):
         self.controller.dispatch("accountRefresh", {"refreshModels": True})
         eventually(lambda: self.controller.snapshot()["model"] == "model-1")
         self.assertEqual(self.controller.thread_id, "thread-1")
+
+    def test_ollama_server_dialog_saves_host_port_and_key_without_publishing_the_secret(self):
+        class MemoryStore:
+            def __init__(self):
+                self.value = None
+            def read(self):
+                return None if self.value is None else dict(self.value)
+            def write(self, value):
+                self.value = dict(value)
+        store = MemoryStore()
+        self.controller.ollama._store = store
+        client = self.controller.client
+        with self.assertRaisesRegex(ValueError, "port field"):
+            self.controller.dispatch("ollamaServer", {"host": "http://10.0.0.8", "port": 80})
+        self.controller.dispatch("send", {"text": "Inspect this document"})
+        eventually(lambda: self.controller.turn_id is not None)
+        with self.assertRaisesRegex(ValueError, "Ollama server"):
+            self.controller.dispatch("ollamaServer", {"host": "10.0.0.8", "port": 11435, "apiKey": "secret-token"})
+        self.client.complete()
+        eventually(lambda: not self.controller.state["busy"])
+        self.controller.dispatch("ollamaServer", {"host": "Ollama.LAN", "port": None, "apiKey": "secret-token"})
+        eventually(lambda: self.controller.snapshot()["ollamaHost"] == "ollama.lan")
+        snapshot = json.dumps(self.controller.snapshot())
+        self.assertNotIn("secret-token", snapshot)
+        self.assertNotIn("secret-token", self.controller.ollama.path.read_text(encoding="utf-8"))
+        self.assertEqual(self.controller.snapshot()["ollamaPort"], 11434)
+        self.assertEqual(self.controller.snapshot()["ollamaAddress"], "ollama.lan:11434")
+        self.assertTrue(self.controller.snapshot()["ollamaApiKeySet"])
+        self.assertEqual(store.value["apiKey"], "secret-token")
+        self.assertIs(self.controller.client, client)
+        self.assertFalse(client.closed)
+        self.controller.dispatch("ollamaServer", {"host": "ollama.lan", "clearApiKey": True, "apiKey": "replacement-token"})
+        eventually(lambda: not self.controller.snapshot()["ollamaApiKeySet"])
+        self.assertEqual(store.value["apiKey"], "")
+        self.assertNotIn("replacement-token", json.dumps(self.controller.snapshot()))
+        self.assertNotIn("replacement-token", self.controller.ollama.path.read_text(encoding="utf-8"))
+
+        def factory(notify):
+            local = FakeClient(notify)
+            local.account = {"type": "ollama", "id": "local-ollama", "email": "Local Ollama"}
+            return local
+        self.controller.ollama_factory = factory
+        self.controller.dispatch("provider", {"provider": "ollama"})
+        eventually(lambda: self.controller.snapshot().get("account") and self.controller.snapshot()["account"].get("id") == "local-ollama")
+        self.controller.thread_id = "saved-thread"
+        self.controller.state["threadId"] = "saved-thread"
+        previous = self.controller.client
+        self.controller.dispatch("ollamaServer", {"host": "10.4.5.6", "url": "?think=false"})
+        eventually(lambda: self.controller.client is not previous and self.controller.thread_id == "saved-thread" and not self.controller.state["busy"])
+        self.assertTrue(previous.closed)
+        self.assertIsNot(self.controller.client, previous)
+        self.assertEqual(self.controller.snapshot()["ollamaAddress"], "10.4.5.6:11434?think=false")
+        self.assertEqual(self.controller.snapshot()["ollamaUrl"], "?think=false")
+        self.assertIn("Design a bracket", self.controller.snapshot()["messages"][0]["text"])
 
     def test_update_checks_and_download_do_not_interrupt_an_active_turn(self):
         release = {"version": "0.3.0", "downloadUrl": "https://github.com/10-X-eng/STEVE/releases/download/v0.3.0/STEVE-0.3.0-windows-x64.zip",

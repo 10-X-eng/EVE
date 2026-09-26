@@ -20,7 +20,8 @@ from .dfm import DfmStore
 from .rmfg_connection import RMFGConnection
 from .rmfg_service import RMFGService
 from .grok_transport import GrokTransport
-from .ollama_transport import OllamaTransport
+from .ollama_transport import (OllamaSettings, OllamaTransport, connection_status, normalize_api_key,
+                               normalize_endpoint, normalize_url_extra)
 from .claude_transport import ClaudeTransport
 from .grok_auth import login_url_allowed
 from .updates import UpdateChecker
@@ -181,12 +182,15 @@ class Controller:
         self._job_revision = 0
         self._task_context = None
         self._job_contexts = {}
+        self.ollama = OllamaSettings(self.debug.folder.parent)
         self.state = {"connection": "starting", "provider": self.provider_choice.provider, "account": None, "models": [], "model": "",
                       "effort": "", "effortOptions": [], "defaultEffort": "", "preferenceNotice": "",
                       "taskDocument": None, "waitingForFusion": False, "waitingReason": "",
                       "job": None, "jobBusy": False, "jobNotice": "", "jobHasTarget": False,
                       "messages": [], "busy": False, "loginPending": False, "device": None,
                       "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
+                      "ollamaHost": self.ollama.host, "ollamaPort": self.ollama.port, "ollamaAddress": self.ollama.label,
+                      "ollamaUrl": self.ollama.url, "ollamaApiKeySet": self.ollama.api_key_set,
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
                       "updateInstalling": False, "updateInstallReady": False, "autoInstallVersion": None,
                       "updateInstallFailure": previous_install_result(self.debug.folder.parent, VERSION),
@@ -306,6 +310,15 @@ class Controller:
             if action == 'dfm' and (self.state['busy'] or self._send_queued or self.state['jobBusy']
                                     or (self.state['job'] or {}).get('status') == 'active'):
                 raise ValueError('Finish or pause the current task before changing DFM.')
+            if action == "ollamaServer":
+                if (self.state["busy"] or self._send_queued or self.state["jobBusy"] or self.state["loginPending"]
+                        or self.state["connection"] == "starting" or self.state["codexRestarting"]
+                        or (self.state.get("job") or {}).get("status") == "active"):
+                    raise ValueError("Finish or pause the current task before changing the Ollama server.")
+                normalize_endpoint(payload.get("host"), payload.get("port"))
+                normalize_url_extra(payload.get("url"))
+                if not payload.get("clearApiKey") and payload.get("apiKey"):
+                    normalize_api_key(payload.get("apiKey"))
             if action == "job":
                 command = payload["command"]
                 if self.state["jobBusy"]:
@@ -405,7 +418,7 @@ class Controller:
                 self._handle(action, payload)
             except Exception as exc:
                 self.debug.record("controller.error", action=action,
-                                  error=type(exc).__name__ if action in ("login", "deviceLogin", "accountRefresh") else str(exc))
+                                  error=type(exc).__name__ if action in ("login", "deviceLogin", "accountRefresh", "ollamaServer") else str(exc))
                 if isinstance(exc, TimeoutError) and self.client:
                     self.client.close()
                     with self._lock:
@@ -423,7 +436,7 @@ class Controller:
                     if action in ("login", "deviceLogin"):
                         self.state["loginPending"] = False
                         self.state["device"] = None
-                    if action == "connect":
+                    if action == "connect" or action == "ollamaServer" and self.state["connection"] == "starting":
                         self.state["connection"] = "disconnected"
                         self.state["runtimeIssue"] = isinstance(exc, RuntimeUnavailable) or bool(getattr(self.client, "runtime_managed", False))
                         if self.state["runtimeIssue"]:
@@ -448,7 +461,17 @@ class Controller:
                         self.dispatch("history")
 
     def _handle(self, action, payload):
-        if action == "provider":
+        if action == "ollamaServer":
+            secret = payload.pop("apiKey", None)
+            try:
+                self.ollama.save(payload.get("host"), payload.get("port"), secret, bool(payload.get("clearApiKey")),
+                                 url=payload.get("url") or "")
+            finally:
+                secret = None
+            self._update_state({**self.ollama.public_state(), "error": ""})
+            if self.state["provider"] == "ollama":
+                self._reconnect_ollama()
+        elif action == "provider":
             if self.state["busy"] or self.state["loginPending"]:
                 return
             self.provider_choice.save(payload.get("provider"))
@@ -669,6 +692,8 @@ class Controller:
         factory = {"grok": self.grok_factory, "ollama": self.ollama_factory, "claude": self.claude_factory}.get(self.state["provider"], self.factory)
         client = factory(lambda method, params: self._notification(method, params) if self.client is client else None)
         self.client = client
+        if isinstance(client, OllamaTransport):
+            client.use(self.ollama)
         client.debug = self.debug
         client.on_request = lambda request_id, method, params: self._tool_request(client, request_id, method, params)
         try:
@@ -685,6 +710,20 @@ class Controller:
             if self.state["codexPendingVersion"] == self.state["codexVersion"] and self.state["codexVersion"]:
                 self.state.update(codexPendingVersion="", codexUpdateStatus=f"Codex {self.state['codexVersion']} is running")
         self._refresh_account(refresh_token=True)
+
+    def _reconnect_ollama(self):
+        """Restart the Ollama conversation engine so the saved server and API key take effect."""
+        thread_id = self.thread_id if self.state["account"] else None
+        account = copy.deepcopy(self.state["account"]) if thread_id else None
+        self._update_state({"status": "Connecting to Ollama", "error": ""})
+        self._connect()
+        if not thread_id or not account or self.state["account"] != account:
+            return
+        self.state["history"] = [{"id": thread_id, "title": "Current conversation", "updatedAt": 0}]
+        try:
+            self._open_history(thread_id)
+        except Exception as exc:
+            raise RuntimeError("The Ollama server was saved, but this chat could not be reopened. Open it from chat history.") from exc
 
     def _interrupt_turn(self):
         if self.turn_id and self.state["busy"]:
@@ -985,7 +1024,7 @@ class Controller:
                 self._choose_preferences()
                 if local:
                     self.state.update(error="", status="Ready" if models else "Download a local model",
-                        localStatus="Connected to localhost:11434. No sign-in needed." if models else "No local models with tool support found. Download a model, then refresh.")
+                        localStatus=connection_status(self.ollama, bool(models)))
             self.emit()
         if account and changed:
             self.dispatch("history")

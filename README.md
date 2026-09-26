@@ -82,7 +82,7 @@ The integration uses xAI OAuth and its public Grok CLI client; STEVE does not re
 
 ### Local Ollama
 
-Choose **Ollama (local)** to use a model running on your computer, with no sign-in or API key. STEVE discovers downloaded models with tool support and keeps local chats and preferences separate. Models with vision support can inspect pictures; web search is unavailable with this provider. See [local setup](docs/INSTALL.md#local-ollama) for a small Gemma configuration and the required 8K context setting.
+Choose **Ollama (local)** to use a model running on your computer. The default server is `http://127.0.0.1:11434`, with no sign-in. Choose **Server** to use another host or port, and add an API key only if that server requires one. STEVE discovers downloaded models with tool support and keeps local chats and preferences separate. Models with vision support can inspect pictures; web search is unavailable with this provider. See [local setup](docs/INSTALL.md#local-ollama) for a small Gemma configuration and the required 8K context setting.
 
 ## Try asking
 
