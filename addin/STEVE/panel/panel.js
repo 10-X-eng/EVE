@@ -312,12 +312,14 @@ function renderControls() {
   $("refresh-account").hidden=!state.loginPending;
   $("device-info").hidden=!state.device;
   $("device-code").textContent=state.device?.code||"";
-  $("message").disabled=!signed || !connected;
+  const restartingForUpdate=!!state.updateInstalling || !!state.updateInstallReady;
+  $("message").disabled=!signed || !connected || restartingForUpdate;
   $("message").placeholder=signed?(state.busy?"Add a correction or steer STEVE…":"What are you working on?"):local?"Connect a local model to begin":"Sign in to start a conversation";
   const jobCommand = /^\/jobs(?:\s|$)/.test($("message").value.trim());
   $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || !!clipboardRequest || submitting || (state.busy && !state.canSteer && !jobCommand) || !!state.jobBusy;
   const selectedModel=state.models.find(m=>m.id===state.model) || state.models.find(m=>m.isDefault);
   $("attach-images").disabled=!signed || !connected || draftImages.length>=4 || (local && selectedModel?.supportsImages===false);
+  if(restartingForUpdate){$("send").disabled=true;$("attach-images").disabled=true;}
   $("send").hidden=false;
   $("send").title=jobCommand?"Manage job":state.busy?"Steer current response":"Send message";
   $("send").setAttribute("aria-label",$("send").title);
@@ -373,11 +375,11 @@ function renderControls() {
   const download=state.updateDownload;
   const downloading=download?.state==="downloading";
   const downloaded=download?.state==="ready" && download.version===update?.version;
-  for(const id of ["update-steve-now","menu-update-now"]){$(id).hidden=!update || !!state.updateInstallReady;$(id).disabled=downloading || !!state.autoInstallVersion || !!state.updateInstalling;$(id).textContent=state.autoInstallVersion?"Downloading update…":state.updateInstalling?"Preparing update…":"Update STEVE";}
+  for(const id of ["update-steve-now","menu-update-now"]){$(id).hidden=!update || !!state.updateInstallReady;$(id).disabled=downloading || !!state.autoInstallVersion || !!state.updateInstalling || !!state.busy || !!state.jobBusy || !!state.loginPending || !!state.codexUpdating || state.job?.status==="active";$(id).textContent=state.autoInstallVersion?"Downloading update…":state.updateInstalling?"Preparing update…":"Update & restart STEVE";}
   const downloadLabel=downloading?`Downloading${download.percent==null?"…":` ${download.percent}%`}`:downloaded?"Open Downloads":"Download only";
   for(const id of ["download-update","menu-download"]){$(id).textContent=downloadLabel;$(id).disabled=downloading;}
   $("menu-download").hidden=!update;
-  const downloadNote=state.updateInstallFailure|| (state.updateInstallReady?state.updateStatus:state.updateInstalling?"Preparing the installer…":state.updateStatus?.startsWith("Couldn’t prepare installation")?state.updateStatus:download?.state==="error"?download.message:state.autoInstallVersion?"Downloading and verifying the update. Save your work before quitting Fusion.":downloaded?"Verified in Downloads. Choose Update STEVE to apply it after Fusion closes.":"Update STEVE downloads and installs after Fusion closes; Download only saves the ZIP.");
+  const downloadNote=state.updateInstallFailure|| (state.updateInstallReady?state.updateStatus:state.updateInstalling?"Verifying and preparing the update…":state.updateStatus?.startsWith("Couldn’t prepare installation")?state.updateStatus:download?.state==="error"?download.message:state.autoInstallVersion?"Downloading and verifying the update. Fusion stays open.":downloaded?"Update downloaded and verified. Update & restart STEVE when you’re ready; Fusion stays open.":"Managed installations download updates automatically. You choose when to restart STEVE.");
   $("download-status").hidden=!download;
   $("download-status").textContent=downloadNote;
   $("update-hint").textContent=downloadNote;
@@ -562,7 +564,13 @@ $("download-update").onclick=()=>act(state.updateDownload?.state==="ready" && st
 $("menu-download").onclick=$("download-update").onclick;
 $("update-steve-now").onclick=()=>$("update-confirm").showModal();
 $("menu-update-now").onclick=$("update-steve-now").onclick;
-$("confirm-update").onclick=()=>{$("update-confirm").close();act("updateSteve");};
+$("confirm-update").onclick=()=>{
+  $("update-confirm").close();
+  if($("message").value.trim() || draftImages.length || clipboardRequest || submitting){
+    state.error="Send or clear your draft before restarting STEVE. Your update is ready when you are.";dismissedError="";render();return;
+  }
+  act("updateSteve");
+};
 $("cancel-update").onclick=()=>$("update-confirm").close();
 $("update-notes").onclick=()=>act("openUpdate",{page:"notes"});
 $("dismiss-update").onclick=()=>{dismissedUpdate=state.updateInfo?.version||"";renderedControls="";render();};

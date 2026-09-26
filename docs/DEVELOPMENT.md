@@ -104,6 +104,30 @@ All installed assets are resolved relative to the add-in. Runtime data uses the 
 
 ## Structure
 
+### In-Fusion updates
+
+The release checker downloads verified packages for managed installations; applying
+them requires the user's **Update & restart STEVE** click. Staging and per-file
+hash checks run off Fusion's thread. `update_transaction.py` prepares a sibling
+payload and a separate helper under the user's data folder. The helper is linked
+through `Application.scripts.addExisting`, stops the exact installed add-in found
+by `Scripts.itemByPath`, renames the prepared/previous directories, and calls
+`Script.run(False)`. Custom events carry stop/start work back to Fusion's main
+thread. It never cancels commands, closes documents, pumps events or quits Fusion.
+
+The controller freezes new requests only at the idle handoff. A nonce/version
+startup receipt confirms the replacement loaded; a missing receipt triggers
+rollback. The journal and temporary helper support recovery after an interrupted
+swap. Current-chat restoration checks the provider/account and leaves jobs paused.
+Source checkouts are not package-update targets. The existing external installers
+still require Fusion to close for manual installation.
+
+Autodesk references: [Scripts](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Scripts.htm),
+[stop](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Script_stop.htm),
+[run](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Script_run.htm).
+
+### Source files
+
 For diagnostics, open **STEVE logo → Diagnostics** and enable **Debug logging**. It defaults off and remembers the choice in `debug.json` under the runtime home. **Open logs folder** opens the `logs` folder there in Explorer or Finder; `steve-debug.jsonl` records UTC timestamps, correlated tool requests with generated code, results/errors, duration, transport request timing, and Codex stderr. Rotation keeps the current file and three backups at approximately 2 MiB each. Disabling logging stops new entries and preserves existing files. Authentication RPC payloads are excluded; common credential patterns in diagnostic text are redacted. Code and tool results may contain design details, so review logs before sharing. Logging is local and never automatically uploaded. This toggle controls STEVE's diagnostics, not Codex's existing session history.
 
 - `addin/STEVE/STEVE.py`: Fusion lifecycle, toolbar, palette, custom-event bridge.

@@ -1,4 +1,4 @@
-"""Stage a downloaded STEVE release for installation after Fusion exits."""
+"""Verify downloads and prepare an independent in-Fusion updater."""
 import json
 import hashlib
 from pathlib import Path, PurePosixPath
@@ -11,8 +11,27 @@ import zipfile
 
 from .updates import PLATFORMS, version_key
 from .transport import host_target
+from .update_transaction import managed, prepare
 
 MAX_EXTRACT_BYTES = 2 * 1024 * 1024 * 1024
+
+
+def prepare_live_update(package, installed, home, version):
+    return prepare(package, installed, home, version)
+
+
+def launch_live_update(app, helper):
+    """Main-thread call only. The helper runs outside the add-in being replaced."""
+    script = app.scripts.addExisting(str(helper))
+    if not script:
+        raise RuntimeError('Fusion could not start the STEVE updater. Your installed files are unchanged.')
+    try:
+        if not script.run(False):
+            raise RuntimeError('Fusion could not start the STEVE updater. Your installed files are unchanged.')
+    except Exception:
+        script.isRunOnStartup = False
+        script.unlink()
+        raise
 
 
 def _verify_staged(archive, destination):

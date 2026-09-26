@@ -1,6 +1,7 @@
 """Download a verified update into Downloads without touching the installed add-in."""
 import ctypes
 import hashlib
+import json
 from pathlib import Path
 import re
 import sys
@@ -109,8 +110,9 @@ def download_package(release, publish, cancelled, folder=None, opener=urlopen):
 
 
 class UpdateDownloader:
-    def __init__(self, publish):
+    def __init__(self, publish, home=None):
         self.publish = publish
+        self.receipt = Path(home) / 'downloaded-update.json' if home else None
         self._lock = threading.Lock()
         self._closed = threading.Event()
         self._thread = None
@@ -128,15 +130,45 @@ class UpdateDownloader:
                 self.publish({"updateDownload": {"state": "downloading", "version": release["version"], "percent": percent}})
         progress(None)
         try:
+            cached = self._cached(release)
+            if cached:
+                if not self._closed.is_set():
+                    self.publish({'updateDownload': cached})
+                return
             path = download_package(release, progress, self._closed.is_set)
             with path.open("rb") as stream:
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             result = {"state": "ready", "version": release["version"], "path": str(path), "sha256": digest}
+            if self.receipt:
+                try:
+                    self.receipt.parent.mkdir(parents=True, exist_ok=True)
+                    temporary = self.receipt.with_suffix('.tmp')
+                    temporary.write_text(json.dumps(result), encoding='utf-8')
+                    temporary.replace(self.receipt)
+                except OSError:
+                    pass  # A cache failure does not invalidate the verified download.
         except Exception as exc:
             result = {"state": "error", "version": release["version"],
                       "message": str(exc) if isinstance(exc, ValueError) else "Download failed. Check your connection and available disk space, then try again."}
         if not self._closed.is_set():
             self.publish({"updateDownload": result})
+
+    def _cached(self, release):
+        if not self.receipt:
+            return None
+        try:
+            cached = json.loads(self.receipt.read_text(encoding='utf-8'))
+            path = Path(cached['path'])
+            if (cached['version'] != release['version'] or cached['state'] != 'ready'
+                    or path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_PACKAGE_BYTES
+                    or not path.name.startswith('STEVE-' + release['version'] + '-') or path.suffix != '.zip'):
+                return None
+            with path.open('rb') as stream:
+                if hashlib.file_digest(stream, 'sha256').hexdigest() != cached['sha256']:
+                    return None
+            return cached
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
 
     def close(self):
         self._closed.set()
