@@ -103,6 +103,32 @@ class ViewportTests(unittest.TestCase):
                 self.fail('Must not capture')
         self.assertEqual(self.view.camera.viewOrientation, 'original')
 
+    def test_tiny_pin_keeps_eye_outside_large_assembly_without_widening_crop(self):
+        self.context['root'].boundingBox = Obj(minPoint=Obj(x=-100,y=-100,z=-100),
+                                              maxPoint=Obj(x=100,y=100,z=100))
+        pin = Obj(objectType='adsk::fusion::BRepBody', parentComponent=self.context['root'],
+                  boundingBox=Obj(minPoint=Obj(x=-.1,y=-.1,z=-.1), maxPoint=Obj(x=.1,y=.1,z=.1)))
+        self.context['helpers'] = FusionHelpers(self.context, [pin])
+        for direction in ((0,0,10), (0,0,-10), (10,10,10)):
+            self.view.saved.eye = Obj(**dict(zip(('x','y','z'), direction)))
+            with temporary_camera(self.view, self.context, {'selection_index':0}, self.core, lambda:False):
+                camera = self.view.camera
+                eye = (camera.eye.x, camera.eye.y, camera.eye.z)
+                self.assertTrue(any(abs(value)>100 for value in eye), eye)
+                self.assertLess(max(camera.extents), 1)
+                self.assertEqual((camera.target.x,camera.target.y,camera.target.z), (0,0,0))
+            self.assertEqual((self.view.camera.eye.x,self.view.camera.eye.y,self.view.camera.eye.z), direction)
+
+    def test_invalid_scene_bounds_fail_and_restore_original_camera(self):
+        self.context['root'].boundingBox = Obj(minPoint=Obj(x=0,y=0,z=0), maxPoint=Obj(x=1,y=1,z=float('inf')))
+        pin = Obj(objectType='adsk::fusion::BRepBody', parentComponent=self.context['root'],
+                  boundingBox=Obj(minPoint=Obj(x=0,y=0,z=0), maxPoint=Obj(x=1,y=1,z=1)))
+        self.context['helpers'] = FusionHelpers(self.context, [pin])
+        with self.assertRaisesRegex(RuntimeError, 'invalid assembly'):
+            with temporary_camera(self.view, self.context, {'selection_index':0}, self.core, lambda:False):
+                self.fail('Must not capture')
+        self.assertEqual(self.view.camera.cameraType, 'perspective')
+
     def test_unsupported_product_and_stale_selection_never_move_camera(self):
         self.context['product'].productType = 'ElectronicsProduct'
         with self.assertRaisesRegex(RuntimeError, 'Design and CAM'):

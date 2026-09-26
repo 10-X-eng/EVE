@@ -19,6 +19,7 @@ from .document_summary import design_summary, cam_summary, electronics_summary
 from .verification import Checks, snapshot, report
 from .python_helpers import FusionHelpers, helper_help
 from .viewport import temporary_camera
+from .viewport_isolation import temporary_isolation
 from .cam_guard import protect_cam_values
 from .dfm import DfmStore, DfmChecks, guide as dfm_guide, native as native_body, plan_hash, revision
 from .dfm_geometry import DfmGeometry
@@ -451,7 +452,8 @@ class FusionTools:
         self.capture_folder.mkdir(parents=True, exist_ok=True)
         path = self.capture_folder / (str(uuid4()) + ".png")
         try:
-            with temporary_camera(viewport, self.context(), job["arguments"], adsk.core, job["cancelled"]):
+            context = self.context()
+            with temporary_camera(viewport, context, job["arguments"], adsk.core, job["cancelled"]), temporary_isolation(viewport, context, job["arguments"], job["cancelled"]):
                 viewport.refresh()
                 if not viewport.saveAsImageFile(str(path), width, height):
                     raise ToolError("viewport_capture_failed", "Fusion could not render the viewport image.")
@@ -462,6 +464,7 @@ class FusionTools:
                     raise ToolError("viewport_capture_failed", "Fusion did not return a valid PNG image.")
                 return {"ok": True, "document_id": self.document_id, "width": width, "height": height,
                         "view": job["arguments"].get("view", "current"),
+                        "isolated": job["arguments"].get("isolate", False),
                         "framing": "target" if any(key in job["arguments"] for key in ("selection_index", "entity_token")) else "model",
                         "imageUrl": "data:image/png;base64," + base64.b64encode(data).decode("ascii")}
         finally:

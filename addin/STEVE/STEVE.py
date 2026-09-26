@@ -27,6 +27,8 @@ _palette_handlers = []
 _pending_state = None
 _pending_clipboard = None
 _clipboard_busy = False
+_pending_gallery = None
+_gallery_busy = False
 _pending_lock = threading.Lock()
 _event_pending = False
 _running = False
@@ -72,9 +74,13 @@ def _unbind(collection):
 
 class StateEvent(adsk.core.CustomEventHandler):
     def notify(self, args):
-        global _event_pending, _pending_clipboard, _clipboard_busy
+        global _event_pending, _pending_clipboard, _clipboard_busy, _pending_gallery, _gallery_busy
         with _pending_lock:
             state = _pending_state
+            gallery = _pending_gallery
+            _pending_gallery = None
+            if gallery is not None:
+                _gallery_busy = False
             clipboard = _pending_clipboard
             _pending_clipboard = None
             if clipboard is not None:
@@ -91,7 +97,12 @@ class StateEvent(adsk.core.CustomEventHandler):
                 _palette.sendInfoToHTML("clipboardImage", json.dumps(clipboard))
             except RuntimeError:
                 pass
-        if _controller and _fusion_tools and not _clipboard_busy and state and state.get('updateInstallReady'):
+        if gallery and _palette and _palette.isValid:
+            try:
+                _palette.sendInfoToHTML('gallery', json.dumps(gallery, ensure_ascii=False))
+            except RuntimeError:
+                pass
+        if _controller and _fusion_tools and not _clipboard_busy and not _gallery_busy and state and state.get('updateInstallReady'):
             _controller.check_update_failure()
             # Never cancel a user's command or a native operation to apply an update.
             command = _fusion_tools.command_state()
@@ -126,15 +137,41 @@ def _read_pasted_image(request_id, controller):
     _publish(controller.snapshot())
 
 
+def _gallery_request(payload, controller):
+    global _pending_gallery
+    try:
+        result = {'ok': True, **controller.gallery_request(payload)}
+    except Exception as exc:
+        result = {'ok': False, 'error': str(exc)}
+    with _pending_lock:
+        if not _running or controller is not _controller:
+            return
+        _pending_gallery = {'requestId': payload['requestId'], **result}
+    _publish(controller.snapshot())
+
+
 class HTMLMessage(adsk.core.HTMLEventHandler):
     def notify(self, args):
-        global _clipboard_busy
+        global _clipboard_busy, _gallery_busy
         try:
             event = adsk.core.HTMLEventArgs.cast(args)
             payload = json.loads(event.data or "{}")
             if not isinstance(payload, dict):
                 raise ValueError("Invalid STEVE message.")
-            if event.action == "clipboardImage":
+            if event.action == 'gallery':
+                request_id = payload.get('requestId')
+                if not isinstance(request_id, str) or not 1 <= len(request_id) <= 80:
+                    raise ValueError('Invalid gallery request.')
+                if _gallery_busy:
+                    raise ValueError('The gallery is busy. Try again in a moment.')
+                _gallery_busy = True
+                try:
+                    threading.Thread(target=_gallery_request, args=(payload, _controller), daemon=True).start()
+                except Exception:
+                    _gallery_busy = False
+                    raise
+                event.returnData = json.dumps({'ok': True, 'pending': True})
+            elif event.action == "clipboardImage":
                 request_id = payload.get("requestId")
                 if set(payload) != {"requestId"} or not isinstance(request_id, str) or not 1 <= len(request_id) <= 80:
                     raise ValueError("Invalid paste request.")
@@ -260,7 +297,7 @@ def run(context):
 
 
 def stop(context):
-    global _running, _controller, _palette, _want_visible, _event_pending, _fusion_tools, _pending_clipboard, _clipboard_busy
+    global _running, _controller, _palette, _want_visible, _event_pending, _fusion_tools, _pending_clipboard, _clipboard_busy, _pending_gallery, _gallery_busy
     _running = False
     _update_wake_stop.set()
     _want_visible = False
@@ -292,3 +329,5 @@ def stop(context):
     _event_pending = False
     _pending_clipboard = None
     _clipboard_busy = False
+    _pending_gallery = None
+    _gallery_busy = False

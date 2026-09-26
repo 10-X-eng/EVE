@@ -1,6 +1,6 @@
 # STEVE
 
-### Your engineering partner inside Autodesk Fusion
+## Your engineering partner inside Autodesk Fusion
 
 **Describe what you want. Build it inside Autodesk Fusion.**
 
@@ -8,11 +8,23 @@ STEVE is an AI engineering assistant that lives in Fusion. Ask it to create a pa
 
 STEVE writes and runs Python through Fusion's installed API. It can inspect your actual document, make changes, and check the result through queries and viewport images. Its reach includes sketches, solid modeling, assemblies, parameters, manufacturing, and other capabilities exposed by Autodesk's API.
 
+### Shared image gallery
+
+Click the image icon in the top bar to browse, import, rename or attach images. Existing
+attachments, viewport captures and Dream concepts appear automatically. Turn on
+**Available to STEVE** for references it may find across conversations; images start off.
+Turning access off stops future gallery lookup, while pictures already sent stay in their
+chats. Start a new chat after updating for STEVE's gallery tools; manual Attach also works
+in older chats. Everything is stored locally in STEVE's shared `images` folder.
+
+After updating, **New in STEVE** shows a short, dismissible summary. Reopen it anytime
+from **Settings → Updates → What’s new in this version**; it works offline.
+
 Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your xAI account’s Grok access, **Claude (experimental)** through your Claude Code subscription login, **OpenRouter (experimental)** for pay-per-use models from many companies, or **Ollama (local)** for a downloaded model on your computer. The Windows and macOS packages include the conversation runtime, so you can get started without a separate Python, Node.js, or Codex installation. Claude additionally requires the official Claude Code client; OpenRouter requires an account with credits; Ollama requires its local app. You never copy an API key, and no separate STEVE account is required.
 
 For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
 
-> **Preview 0.7.1 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
+> **Preview 0.8.0 · Windows and macOS.** Sign-in and streaming chat have been reported working in Fusion on Windows. The macOS (Apple silicon) package passes the same automated checks, including its bundled runtime, and has been reported working in Fusion on one Mac; its itemized live checks are still being confirmed. See [verification status](docs/VERIFICATION.md) for what has been tested.
 
 ## What STEVE can do
 
@@ -107,7 +119,7 @@ Choose **Ollama (local)** to use a model running on your computer. The default s
 
 Get the complete Windows package from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). If no release is listed yet, developers can [build the package](docs/DEVELOPMENT.md). GitHub's **Source code** download does not include the runtime or installer.
 
-With an `STEVE-0.7.1-windows-x64.zip` package:
+With an `STEVE-0.8.0-windows-x64.zip` package:
 
 1. Extract the entire zip into a folder.
 2. Save your work and close Fusion.
@@ -118,7 +130,7 @@ With an `STEVE-0.7.1-windows-x64.zip` package:
 
 ## Install the macOS preview
 
-Get `STEVE-0.7.1-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
+Get `STEVE-0.8.0-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-eng/STEVE/releases). It is built for Apple silicon Macs. GitHub's **Source code** download does not include the runtime or installer.
 
 1. Double-click the zip to extract it. Keep the extracted folder together, including `Install STEVE.command`, `SHA256SUMS`, and the `STEVE` folder.
 2. Save your work and quit Fusion.

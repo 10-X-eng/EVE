@@ -5,17 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>STEVE · Your engineering partner</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <link rel="stylesheet" href="fusion.css?v=21">
   <script src="markdown.js?v=1" defer></script>
   <script src="images.js?v=3" defer></script>
-  <script src="panel.js?v=33" defer></script>
+  <script src="gallery.js?v=1" defer></script>
+  <script src="panel.js?v=34" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
     <header class="topbar">
       <div class="brand"><img src="mark.svg" alt="" width="22" height="22"><span class="wordmark">STEVE</span></div>
       <div class="header-actions">
+        <button id="gallery-button" class="icon-button gallery-toggle" title="Image gallery" aria-label="Image gallery" aria-expanded="false" aria-controls="gallery-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 5 5"/></svg><span aria-hidden="true">⌄</span></button>
         <button id="history-button" class="icon-button" title="Conversations" aria-label="Conversations" aria-expanded="false" aria-controls="history-panel"><svg viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6M12 7v5l3 2"/></svg></button>
         <button id="new-chat" class="icon-button" title="New conversation" aria-label="New conversation"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
         <button id="app-menu-button" class="icon-button" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="app-menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span id="settings-dot" class="badge-dot" hidden></span></button>
@@ -67,6 +69,7 @@
         <div id="settings-updates" class="settings-page" hidden>
           <div class="update-settings">
             <span id="installed-version"></span>
+            <button id="installed-release-notes" class="text-button" type="button" hidden>What’s new in this version</button>
             <p id="update-status" class="note" role="status"></p>
             <div class="button-row"><button id="check-updates" class="secondary-button">Check for updates</button><button id="menu-update" class="secondary-button" hidden>What’s new</button><button id="menu-update-now" class="secondary-button" hidden>Update STEVE</button><button id="menu-download" class="secondary-button" hidden>Download update</button></div>
             <p id="download-status" class="note" role="status" hidden></p>
@@ -86,6 +89,20 @@
         </div>
       </div>
     </section>
+    <section id="gallery-panel" class="panel-view gallery-view" aria-label="Image gallery" hidden>
+      <div class="panel-head"><h2>Image gallery</h2><button id="gallery-close" class="icon-button" aria-label="Close image gallery">×</button></div>
+      <div class="panel-body">
+        <p class="note">Your images, across conversations. Turn on <strong>Available to STEVE</strong> to let it find an image in any chat. Attach sends it only to your current draft.</p>
+        <div class="button-row"><button id="gallery-import" class="secondary-button">Import images</button><button id="gallery-refresh" class="secondary-button">Refresh</button><button id="gallery-folder" class="text-button">Open folder</button></div>
+        <input id="gallery-files" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <label class="sr-only" for="gallery-search">Search images</label><input id="gallery-search" class="history-search" type="search" maxlength="160" placeholder="Search image names…" autocomplete="off">
+        <p id="gallery-status" class="note" role="status"></p>
+        <p id="gallery-empty" class="note" hidden></p>
+        <div id="gallery-grid" class="gallery-grid"></div>
+        <button id="gallery-more" class="secondary-button" hidden>Load more</button>
+        <p class="note gallery-footnote">Existing and new images start with access off. Turning off or removing an image stops future gallery lookup; images already sent remain in those chats. Remove keeps the cached file for chat history.</p>
+      </div>
+    </section>
     <section id="history-panel" class="panel-view" aria-label="Conversations" hidden>
       <div class="panel-head"><h2>Conversations</h2><button id="history-close" class="icon-button" aria-label="Close conversations">×</button></div>
       <div class="panel-body">
@@ -96,6 +113,9 @@
       </div>
     </section>
     <div id="preview-banner" class="preview-banner" hidden>DESIGN PREVIEW · SAMPLE CONTENT</div>
+    <aside id="release-notice" class="release-notice" aria-label="STEVE release notes" hidden>
+      <span id="release-notice-title"></span><button id="show-release-notes" class="text-button" type="button">What’s new</button><button id="dismiss-release-notes" class="icon-button" type="button" aria-label="Dismiss release notes">×</button>
+    </aside>
     <aside id="update-banner" class="update-banner" aria-label="STEVE update" hidden>
       <div><strong id="update-title"></strong><span id="update-hint">Download and install without a terminal.</span></div>
       <div class="update-actions"><button id="update-steve-now">Update STEVE</button><button id="download-update">Download only</button><button id="update-notes">What’s new</button><button id="dismiss-update" aria-label="Dismiss update notice" title="Remind me next time STEVE starts">×</button></div>
@@ -178,6 +198,10 @@
     </footer>
   </div>
   <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
+  <dialog id="release-notes-dialog" class="job-dialog" aria-labelledby="release-notes-heading">
+    <h2 id="release-notes-heading"></h2><ul id="release-notes-items"></ul><p id="release-notes-note" class="note"></p>
+    <button id="close-release-notes" class="primary-button" type="button">Got it</button>
+  </dialog>
   <dialog id="update-confirm" class="job-dialog" aria-labelledby="update-confirm-heading">
     <h2 id="update-confirm-heading">Update &amp; restart STEVE?</h2>
     <p>STEVE will now restart to install the update. Fusion and your documents will stay open. The panel will briefly close, then reopen with your current chat. Your sign-in and saved chats are kept. If work is still running, STEVE waits for it to finish before restarting.</p>

@@ -33,6 +33,8 @@ from .app_update import stage_update, prepare_live_update, previous_install_resu
 from .version import VERSION
 from .jobs import job_command, validate_job
 from .images import ImageStore, validate_images, MAX_STORED_IMAGE_BYTES
+from .gallery import Gallery
+from .release_notes import ReleaseNotes, highlights
 from .dream import DREAM_INSTRUCTIONS, concept_message
 from .tool_protocol import INSTRUCTIONS, TOOLS, ToolError, tool_failure, tool_response, validate_call
 
@@ -168,6 +170,8 @@ class Controller:
         self.preferences = self.provider_choice.preferences()
         self.dfm = getattr(fusion_tools, 'dfm', None) or DfmStore(self.debug.folder.parent)
         self.images = ImageStore(self.debug.folder.parent)
+        self.gallery = Gallery(self.images)
+        self.release_notes = ReleaseNotes(self.debug.folder.parent)
         if self.fusion_tools is not None:
             self.fusion_tools.debug = self.debug
             self.fusion_tools.on_wait = self._fusion_wait
@@ -202,6 +206,7 @@ class Controller:
                       "accountChecked": False, "localStatus": "", "providerVersion": "", "error": "", "status": "Checking your account", "version": VERSION,
                       "ollamaHost": self.ollama.host, "ollamaPort": self.ollama.port, "ollamaAddress": self.ollama.label,
                       "ollamaUrl": self.ollama.url, "ollamaApiKeySet": self.ollama.api_key_set,
+                      "releaseNotes": highlights(), "releaseNotesUnread": self.release_notes.unread(),
                       "updateInfo": None, "updateChecking": False, "updateStatus": "", "updateDownload": None,
                       "updateInstalling": False, "updateInstallReady": False, "autoInstallVersion": None,
                       "updateInstallFailure": previous_install_result(self.debug.folder.parent, VERSION),
@@ -434,6 +439,29 @@ class Controller:
             allowed = {image["id"] for message in self.state["messages"] for image in message.get("images", [])}
         return {image_id: self.images.read(image_id) for image_id in ids if image_id in allowed}
 
+    def gallery_request(self, payload):
+        """UI-only gallery management; runs on a worker, never exposes management to the model."""
+        action = payload.get('action')
+        with self._lock:
+            if self._closed or self._update_handoff:
+                raise ValueError('STEVE is restarting. Reopen the gallery after it starts.')
+        if action == 'list':
+            return self.gallery.list(query=payload.get('query', ''), offset=payload.get('offset', 0))
+        if action == 'import':
+            return self.gallery.import_images(payload.get('images'))
+        if action == 'asset':
+            metadata, url = self.gallery.read(payload.get('imageId'))
+            return {'image': {**metadata, 'url': url}}
+        if action == 'change':
+            return self.gallery.change(payload.get('imageId'), name=payload.get('name'), enabled=payload.get('enabled'))
+        if action == 'remove':
+            return self.gallery.change(payload.get('imageId'), remove=True)
+        if action == 'openFolder':
+            self.images.folder.mkdir(parents=True, exist_ok=True)
+            open_folder(self.images.folder)
+            return {}
+        raise ValueError('Choose a gallery action.')
+
     def save_concept(self, image_id):
         """Export only a generated image visible in the current chat, without overwriting files."""
         with self._lock:
@@ -574,6 +602,11 @@ class Controller:
             with self._lock:
                 self.state.update(provider=self.provider_choice.provider, account=None, models=[], model="", effort="", effortOptions=[])
             self._connect()
+        elif action == 'acknowledgeReleaseNotes':
+            self.release_notes.acknowledge(payload.get('version'))
+            with self._lock:
+                self.state['releaseNotesUnread'] = False
+            self.emit()
         elif action == "checkUpdates":
             self.updates.request()
         elif action == "checkCodexUpdates":
@@ -1033,6 +1066,8 @@ class Controller:
                         "fusion_capture_viewport": "Capture model view",
                         "list_chat_images": "Find pictures in this chat",
                         "view_chat_image": "Reopen saved picture",
+                        "list_gallery_images": "Search image gallery",
+                        "view_gallery_image": "View gallery image",
                         "fusion_rmfg": "RMFG sheet-metal check",
                         "rmfg_materials": "Read RMFG material catalog",
                         "rmfg_checkout": "Prepare RMFG checkout",
@@ -1046,9 +1081,9 @@ class Controller:
                 self.emit()
                 self.rmfg_service.submit(tool, arguments, complete, cancelled)
                 return
-            if tool in ("list_chat_images", "view_chat_image"):
+            if tool in ("list_chat_images", "view_chat_image", "list_gallery_images", "view_gallery_image"):
                 with self._lock:
-                    self.state["status"] = "Looking up chat images" if tool == "list_chat_images" else "Reopening saved image"
+                    self.state["status"] = "Searching image gallery" if tool == "list_gallery_images" else "Looking up chat images" if tool == "list_chat_images" else "Reopening saved image"
                 self.emit()
                 self._commands.put(("chatImageTool", {"client": client, "threadId": params.get("threadId"),
                     "turnId": requested_turn, "tool": tool, "arguments": arguments,
@@ -1340,6 +1375,17 @@ class Controller:
         try:
             if payload["cancelled"]():
                 raise ToolError("inactive_request", "This image request is no longer active.")
+            if payload['tool'] == 'list_gallery_images':
+                result = {'ok': True, **self.gallery.list(**payload['arguments'], enabled_only=True)}
+                if payload['cancelled']():
+                    raise ToolError('inactive_request', 'This image request is no longer active.')
+                payload['complete'](result)
+                return
+            if payload['tool'] == 'view_gallery_image':
+                metadata, url = self.gallery.read(payload['arguments']['image_id'], enabled_only=True)
+                self._deliver_image({**payload, 'imageUrl': url, 'savedImage': metadata,
+                                     'result': {'ok': True, **metadata}})
+                return
             if payload["tool"] == "list_chat_images":
                 result = {"ok": True, **self.images.list_chat(payload["threadId"], **payload["arguments"])}
                 if payload["cancelled"]():
@@ -1355,7 +1401,8 @@ class Controller:
             self._deliver_image({**payload, "imageUrl": url, "savedImage": metadata,
                                  "result": {"ok": True, **metadata}})
         except Exception as exc:
-            payload["complete"](tool_failure(exc, code="chat_image_index_unavailable" if isinstance(exc, (OSError, ValueError)) else None))
+            payload["complete"](tool_failure(exc, code=("gallery_image_unavailable" if payload['tool'] in ('list_gallery_images', 'view_gallery_image')
+                else "chat_image_index_unavailable") if isinstance(exc, (OSError, ValueError)) else None))
 
     def _deliver_image(self, payload):
         # Use native image input: nested tool-output images can fail
@@ -1364,8 +1411,15 @@ class Controller:
         try:
             if payload["cancelled"]():
                 raise ToolError("inactive_request", "The image request's turn is no longer active.")
+            with self._lock:
+                model = next((model for model in self.state['models'] if model['id'] == self.state['model']), {})
+            if model.get('supportsImages') is False:
+                raise ValueError('The selected model cannot receive images. Choose a vision-capable model.')
+            if payload.get('tool') == 'view_gallery_image':
+                # Recheck after queued work; a disabled/removed item must not be delivered from a stale list.
+                _, payload['imageUrl'] = self.gallery.read(payload['arguments']['image_id'], enabled_only=True)
             saved = payload.get("savedImage")
-            label = SAVED_IMAGE_PREFIX + "\n" + json.dumps(saved, ensure_ascii=False) if saved else VIEWPORT_PREFIX + "\n" + json.dumps({key: payload["result"][key] for key in ("view", "framing") if key in payload["result"]})
+            label = SAVED_IMAGE_PREFIX + "\n" + json.dumps(saved, ensure_ascii=False) if saved else VIEWPORT_PREFIX + "\n" + json.dumps({key: payload["result"][key] for key in ("view", "framing", "isolated") if key in payload["result"]})
             payload["client"].request("turn/steer", {"threadId": payload["threadId"],
                 "expectedTurnId": payload["turnId"], "input": [
                     {"type": "text", "text": label, "text_elements": []},

@@ -126,3 +126,24 @@ class UpdateTransactionTests(unittest.TestCase):
         (self.package / 'install-result.txt').write_text('Installation failed: old attempt')
         self.prepare()
         self.assertFalse((self.package / 'install-result.txt').read_text().startswith('Installation failed:'))
+
+    def test_gallery_permissions_and_chat_images_survive_activation_and_rollback(self):
+        from steve.images import ImageStore
+        from steve.gallery import Gallery
+        from test_gallery import picture
+        images = ImageStore(self.home)
+        images.record('old-chat', 'turn', [picture(0), picture(1)])
+        gallery = Gallery(images)
+        gallery.migrate()
+        gallery.change(picture(0)['id'], enabled=True)
+        gallery.change(picture(1)['id'], remove=True)
+        preserved = {p: p.read_bytes() for p in images.folder.rglob('*') if p.is_file()}
+        transaction = self.prepare()
+        transaction.activate()
+        reopened = Gallery(ImageStore(self.home))
+        self.assertEqual(reopened.list(enabled_only=True)['total'], 1)
+        transaction.rollback()
+        self.assertEqual(Gallery(ImageStore(self.home)).list()['total'], 1)
+        for path, raw in preserved.items():
+            self.assertEqual(path.read_bytes(), raw)
+        self.assertEqual(len(images.list_chat('old-chat')['images']), 2)

@@ -68,7 +68,7 @@ def find_compiler():
 
 def check_payload(source, target):
     suffix = executable_suffix(target)
-    required = ["STEVE.py", "STEVE.manifest", "resources/32x32.png", "panel/panel.js", "panel/fusion.css", "panel/markdown.js", "steve/dream.py",
+    required = ["STEVE.py", "STEVE.manifest", "resources/32x32.png", "panel/panel.js", "panel/fusion.css", "panel/markdown.js", "panel/gallery.js", "steve/dream.py", "steve/gallery.py", "steve/release_notes.py", "steve/viewport_isolation.py",
                 "steve/fusion_tools.py", "steve/python_runner.py", "steve/tool_protocol.py", "steve/debug_log.py",
                 "runtime/steve-runtime.json", "runtime/codex-package.json",
                 f"runtime/bin/codex-app-server{suffix}", f"runtime/bin/codex-code-mode-host{suffix}"]

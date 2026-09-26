@@ -5,6 +5,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 MAX_IMAGES = 4
 MAX_IMAGE_BYTES = 1024 * 1024
@@ -51,9 +52,12 @@ class ImageStore:
         self.folder.mkdir(parents=True, exist_ok=True)
         path = self.folder / (image["id"] + PREFIXES[prefix])
         if self.read(image["id"]) != image["url"]:
-            temporary = path.with_suffix(path.suffix + ".tmp")
-            temporary.write_bytes(base64.b64decode(image["url"][len(prefix):]))
-            temporary.replace(path)
+            temporary = path.with_name('.image-' + uuid4().hex + '.tmp')
+            try:
+                temporary.write_bytes(base64.b64decode(image["url"][len(prefix):]))
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
         return {"id": image["id"], "name": image["name"]}
 
     def read(self, image_id):
@@ -62,6 +66,8 @@ class ImageStore:
         for prefix, suffix in PREFIXES.items():
             path = self.folder / (image_id + suffix)
             try:
+                if path.is_symlink():
+                    continue
                 with path.open("rb") as source:
                     data = source.read(MAX_STORED_IMAGE_BYTES + 1)
                 if len(data) <= MAX_STORED_IMAGE_BYTES and hashlib.sha256(data).hexdigest() == image_id:

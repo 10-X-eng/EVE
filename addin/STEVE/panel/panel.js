@@ -552,6 +552,9 @@ function renderControls() {
   $("rmfg-disconnect").hidden=state.rmfgState!=="connected";
   $("rmfg-disconnect").disabled=!!state.rmfgBusy;
   $("open-logs").title=state.debugLogPath || "Open local debug logs";
+  $("release-notice").hidden=!state.releaseNotes || !state.releaseNotesUnread;
+  $("release-notice-title").textContent=state.releaseNotes?`New in STEVE ${state.releaseNotes.version}`:"";
+  $("installed-release-notes").hidden=!state.releaseNotes;
   const update=state.updateInfo;
   $("installed-version").textContent=state.version?`STEVE ${state.version}`:"STEVE";
   $("app-version").textContent=state.version?`v${state.version}`:"";
@@ -708,6 +711,9 @@ function renderHistory() {
 }
 
 window.fusionJavaScriptHandler={handle(action,data){
+  if(action==="gallery"){
+    try{SteveGallery.receive(JSON.parse(data));}catch(error){return "FAILED";}
+  }
   if(action==="clipboardImage"){
     try{finishClipboardImage(JSON.parse(data));}catch(error){return "FAILED";}
   }
@@ -878,6 +884,18 @@ $("check-updates").onclick=()=>{dismissedUpdate="";act("checkUpdates");};
 $("menu-update").onclick=()=>act("openUpdate",{page:"notes"});
 $("download-update").onclick=()=>act(state.updateDownload?.state==="ready" && state.updateDownload.version===state.updateInfo?.version?"openDownloads":"downloadUpdate");
 $("menu-download").onclick=$("download-update").onclick;
+function openReleaseNotes(){
+  const notes=state.releaseNotes;if(!notes)return;
+  $("release-notes-heading").textContent=`STEVE ${notes.version} — ${notes.title}`;
+  $("release-notes-items").replaceChildren(...notes.items.map(text=>{const item=document.createElement("li");item.textContent=text;return item;}));
+  $("release-notes-note").textContent=notes.note||"";
+  $("release-notes-dialog").showModal();
+  act("acknowledgeReleaseNotes",{version:notes.version});
+}
+$("show-release-notes").onclick=openReleaseNotes;
+$("installed-release-notes").onclick=openReleaseNotes;
+$("dismiss-release-notes").onclick=()=>{if(state.releaseNotes)act("acknowledgeReleaseNotes",{version:state.releaseNotes.version});};
+$("close-release-notes").onclick=()=>$("release-notes-dialog").close();
 $("update-steve-now").onclick=()=>$("update-confirm").showModal();
 $("menu-update-now").onclick=$("update-steve-now").onclick;
 $("confirm-update").onclick=()=>{
@@ -1006,3 +1024,12 @@ async function initialize(){
   state.error="Open STEVE from the Fusion toolbar. This panel connects through the Fusion add-in.";render();
 }
 initialize();
+
+SteveGallery.init({bridge,openImage,
+  beforeOpen:()=>{showSettings(false);showHistory(false);showPlusMenu(false);},
+  context:()=>JSON.stringify([state.provider,state.threadId,draftImageRevision]),
+  canAttach:()=>!!state.account && state.connection==='ready' && !submitting && !clipboardRequest &&
+    !state.updateInstalling && !state.updateInstallReady && draftImages.length<4 &&
+    state.models?.find(model=>model.id===state.model)?.supportsImages!==false,
+  attach:file=>attachImages([file])
+});

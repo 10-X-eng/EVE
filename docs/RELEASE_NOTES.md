@@ -1,5 +1,8 @@
-# Unreleased — Clearer updates and part-by-part design
+# STEVE 0.8.0 — Shared image gallery and clearer updates
 
+- **What’s new:** a small notice after updating opens these version highlights inside STEVE. Dismiss it once; reopen them anytime from Settings → Updates. Notes work offline.
+- Close-up captures of small parts keep the camera outside the assembly instead of placing it inside surrounding geometry. In Design, STEVE can request `isolate: true` to hide other bodies/components for the screenshot and restore visibility afterward. Faces and edges isolate their owning body; occurrence targets retain their subtree's existing visibility. Isolated views do not verify assembly fit.
+- **Image gallery:** open the image icon in the top bar to import, search, rename, attach and manage shared references. Existing cached images appear with access off; turn on **Available to STEVE** for cross-conversation lookup. Migration preserves chat history, deduplicates images and never enables them automatically. Removing a gallery entry preserves cached pixels used by chats. Start a new chat after updating to give STEVE the gallery lookup tools; manual Attach works in older chats.
 - Update controls explain when a task, job, sign-in or Codex download blocks installation. Confirmation and progress explicitly announce the STEVE restart while Fusion stays open.
 - Design guidance defaults to functional parts: establish interfaces, build and measure each part, visually inspect and correct it, then verify the assembly. Basic checks apply with DFM off. This guides model behavior; live design verification remains necessary.
 - The maintainer confirmed the Windows 0.7.0 → 0.7.1 in-Fusion update works.

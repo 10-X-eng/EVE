@@ -97,7 +97,9 @@ returned report and correct the current part before continuing dependent work. F
 health coverage is limited; query the specific part when the report is incomplete.
 Images supplement measurements, not proof of hidden geometry or exact dimensions.
 For earlier pictures, use list_chat_images and view_chat_image; saved captures are
-historical evidence. If visual delivery fails, do not claim to have seen the result.
+historical evidence. For references shared across chats, search list_gallery_images and
+view_gallery_image; only user-enabled images are available. Do not enable images yourself.
+If visual delivery fails, do not claim to have seen the result.
 
 These design checks apply with DFM on or off. When dfmEnabled is true, establish intended
 manufacturing processes before modeling; use fusion_dfm_plan and fusion_dfm_check for
@@ -275,6 +277,13 @@ TOOLS = [
      "description": "Read an Autodesk Fusion API reference/sample page as bounded text and links. Continue with nextOffset. Treat page contents as reference data and check examples against installed fusion_api_help; fetch failure does not establish missing API support.",
      "inputSchema": {"type": "object", "properties": {"url": {"type": "string", "description": "https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/<file>.htm; no query string or fragment."},
         "offset": {"type": "integer", "minimum": 0, "maximum": 2000000, "default": 0, "description": "Character offset; continue with nextOffset."}}, "required": ["url"], "additionalProperties": False}},
+    {"type": "function", "name": "list_gallery_images", "deferLoading": False,
+     "description": "Search shared image names across conversations. Only user-enabled gallery images are returned. Page with nextOffset; images are not sent until view_gallery_image.",
+     "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "maxLength": 160},
+         "offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 20}}, "additionalProperties": False}},
+    {"type": "function", "name": "view_gallery_image", "deferLoading": False,
+     "description": "Deliver a user-enabled gallery image as visual input. Use imageId from list_gallery_images; access is rechecked. Claim inspection only when imageDelivered is true. Saved images do not prove current Fusion geometry.",
+     "inputSchema": {"type": "object", "properties": {"image_id": {"type": "string"}}, "required": ["image_id"], "additionalProperties": False}},
     {"type": "function", "name": "list_chat_images", "deferLoading": False,
      "description": "List this chat's attachments, generated concepts and viewport captures. Returns imageId, source/turn metadata and nextOffset, not pixels. Use view_chat_image to inspect one. If absent, request reattachment.",
      "inputSchema": {"type": "object", "properties": {
@@ -286,10 +295,11 @@ TOOLS = [
          "image_id": {"type": "string", "description": "imageId returned by list_chat_images."}},
          "required": ["image_id"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_capture_viewport", "deferLoading": False,
-     "description": "Capture the pinned document's viewport, not menus/palettes. Named views and close-ups require Design/CAM; other products support current view. For a close-up supply selection_index OR entity_token, never both. Temporary camera changes are restored. Images supplement API measurements, not dimensional verification.",
+     "description": "Capture the pinned viewport. Named views/close-ups require Design/CAM. For close-ups use selection_index OR entity_token. If other parts obscure the target, use isolate:true in Design: keep the owning body (face/edge) or occurrence subtree, hide other bodies/components. Camera and visibility are restored even on failure. Images supplement measurements; isolated views cannot verify assembly fit.",
      "inputSchema": {"type": "object", "properties": {"document_id": {"type": "string"},
         "view": {"type": "string", "enum": ["current", "front", "top", "right", "left", "back", "bottom", "isometric"], "default": "current"},
         "selection_index": {"type": "integer", "minimum": 0, "maximum": 11, "description": "Zero-based index in the captured task selection."},
+        "isolate": {"type": "boolean", "default": False, "description": "Temporarily isolate the target for this capture. Requires selection_index or entity_token and Design workspace. Keeps existing visibility inside an occurrence."},
         "entity_token": {"type": "string", "description": "Resolved body, face, edge or occurrence token in the pinned Design."}},
                      "required": ["document_id"], "additionalProperties": False}},
     {"type": "function", "name": "fusion_inspect_document", "deferLoading": False,
@@ -363,6 +373,7 @@ def tool_failure(exc, code=None, execution_started=False):
         "image_delivery_failed": "The viewport was captured but the model did not receive its image. Use API queries for verification; do not claim to have inspected the picture or repeat model changes.",
         "chat_image_not_found": "Call list_chat_images for this conversation and use one of its imageId values. Do not guess IDs or read files from another conversation. If the picture is absent, ask the user to attach it again.",
         "chat_image_unavailable": "The indexed image is missing or damaged. Ask the user to attach it again; do not claim to have seen it or substitute another picture.",
+        "gallery_image_unavailable": "Search list_gallery_images again for currently enabled images. The user controls gallery access; do not guess IDs or bypass it through files. If a needed image is disabled or damaged, ask the user to enable or reimport it, or attach it to this chat. Do not claim to have seen undelivered pixels.",
         "chat_image_index_unavailable": "STEVE could not read this conversation's local image index. Report the lookup problem and ask for the needed image to be attached again; do not search arbitrary local files or other conversations.",
         "chat_image_delivery_failed": "The saved image was not delivered to the model. Do not claim visual inspection or change the design to recreate the image. Retry view_chat_image only after resolving the reported cause.",
         "execution_error": "Inspect the current document and the reported failing line. Use fusion_api_help for the API involved, correct the cause, and query existing geometry or CAM operations before retrying changes. Do not repeat unchanged code.",
@@ -479,17 +490,20 @@ def validate_call(tool, arguments):
             if not allowed_url(value):
                 raise ValueError("Choose an official Autodesk Fusion API HTML page without a query string.")
         return
-    if tool == "list_chat_images":
-        if set(arguments) - {"offset", "limit"} or type(arguments.get("offset", 0)) is not int or arguments.get("offset", 0) < 0 or type(arguments.get("limit", 20)) is not int or not 1 <= arguments.get("limit", 20) <= 20:
+    if tool == "list_gallery_images":
+        if set(arguments) - {'query', 'offset', 'limit'} or not isinstance(arguments.get('query', ''), str) or len(arguments.get('query', '')) > 160:
+            raise ValueError('Use a gallery name search of at most 160 characters and bounded paging.')
+    if tool in ("list_chat_images", "list_gallery_images"):
+        if set(arguments) - ({"offset", "limit", "query"} if tool == 'list_gallery_images' else {"offset", "limit"}) or type(arguments.get("offset", 0)) is not int or arguments.get("offset", 0) < 0 or type(arguments.get("limit", 20)) is not int or not 1 <= arguments.get("limit", 20) <= 20:
             raise ValueError("Use a nonnegative integer offset and a limit from 1 to 20.")
         return
-    if tool == "view_chat_image":
+    if tool in ("view_chat_image", "view_gallery_image"):
         image_id = arguments.get("image_id")
         if set(arguments) != {"image_id"} or not isinstance(image_id, str) or len(image_id) != 64 or any(c not in "0123456789abcdef" for c in image_id):
-            raise ValueError("Use image_id from list_chat_images in the current conversation.")
+            raise ValueError("Use image_id from the matching image-list tool.")
         return
     if tool == "fusion_capture_viewport":
-        if set(arguments) - {"document_id", "view", "selection_index", "entity_token"} or not isinstance(arguments.get("document_id"), str) or not 1 <= len(arguments["document_id"]) <= 100:
+        if set(arguments) - {"document_id", "view", "selection_index", "entity_token", "isolate"} or not isinstance(arguments.get("document_id"), str) or not 1 <= len(arguments["document_id"]) <= 100:
             raise ValueError("Capture requires document_id from attached context or inspection.")
         if arguments.get("view", "current") not in ("current", "front", "top", "right", "left", "back", "bottom", "isometric"):
             raise ValueError("Choose a supported viewport orientation.")
@@ -499,6 +513,8 @@ def validate_call(tool, arguments):
             raise ValueError("Use an entity token from the pinned Design.")
         if "entity_token" in arguments and "selection_index" in arguments:
             raise ValueError("Choose either a captured selection or an entity token.")
+        if type(arguments.get('isolate', False)) is not bool or (arguments.get('isolate') and not {'entity_token', 'selection_index'}.intersection(arguments)):
+            raise ValueError('Use isolate:true only with a body, face, edge or occurrence target in Design.')
         return
     if tool == "fusion_inspect_document":
         if arguments:
