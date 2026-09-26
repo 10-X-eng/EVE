@@ -8,7 +8,7 @@ STEVE is an AI engineering assistant that lives in Fusion. Ask it to create a pa
 
 STEVE writes and runs Python through Fusion's installed API. It can inspect your actual document, make changes, and check the result through queries and viewport images. Its reach includes sketches, solid modeling, assemblies, parameters, manufacturing, and other capabilities exposed by Autodesk's API.
 
-Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your xAI account’s Grok access, **Claude (experimental)** through your Claude Code subscription login, or **Ollama (local)** for a downloaded model on your computer. The Windows and macOS packages include the conversation runtime, so you can get started without a separate Python, Node.js, or Codex installation. Claude additionally requires the official Claude Code client; Ollama requires its local app. No API key or separate STEVE account is required.
+Choose **ChatGPT** for your subscription’s Codex access, **Grok / X** for your xAI account’s Grok access, **Claude (experimental)** through your Claude Code subscription login, **OpenRouter (experimental)** for pay-per-use models from many companies, or **Ollama (local)** for a downloaded model on your computer. The Windows and macOS packages include the conversation runtime, so you can get started without a separate Python, Node.js, or Codex installation. Claude additionally requires the official Claude Code client; OpenRouter requires an account with credits; Ollama requires its local app. You never copy an API key, and no separate STEVE account is required.
 
 For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `claude auth login` in a terminal outside Fusion, then choose **Claude (experimental)** in STEVE and **Check connection**. Already signed in? STEVE checks automatically. Your account's models and effort choices appear in the composer. See [Claude setup and limitations](docs/INSTALL.md#claude-subscription-experimental).
 
@@ -42,7 +42,7 @@ For Claude, [install Claude Code](https://code.claude.com/docs/en/setup), run `c
 - **Steer while it works.** Add a dimension, correct an assumption, or send another reference without waiting for the response to finish. A separate **Stop** button cancels pending work.
 - **See tool activity and Python.** Expandable code cards show the actual Python STEVE submits to Fusion, with running, waiting, and completion states. A compact indicator also names the current Fusion or saved-image tool. Scripts appear when submitted; the runtime does not stream partial tool arguments.
 - **Work toward a job.** Use `/jobs <objective>` for tasks that need multiple turns. Codex manages continuation, completion, and optional token budgets; STEVE provides status, edit, pause, resume, and clear controls.
-- **Get notified about updates.** STEVE checks for new releases on startup and every 12 hours while running. Choose **Update STEVE** to download and verify the latest complete release, then install automatically after you save your work and quit Fusion. No terminal command is needed. **Download only** remains available, and the **STEVE logo → Updates** menu also has **Check for updates**.
+- **Update without closing Fusion.** Managed installations automatically download and verify new releases on startup and every 12 hours. Choose **Update & restart STEVE** when ready; STEVE waits for idle, replaces its add-in, and reopens the current chat while Fusion stays open. A failed startup restores the previous files. The **STEVE logo → Updates** menu also has **Check for updates** and **Open Downloads**.
 - **Keep the intended target.** A task retains its original document, product, selection, and Data Panel scope. Later clicks do not silently redirect it. The panel shows which document the task belongs to.
 - **Switch documents without losing the task.** Pending Fusion calls wait when another document or one of your commands is active, then resume when the target document is active and your command has finished.
 - **Return to old chats.** Browse and search local conversation history, reopen a previous session, and continue where you left off.
@@ -80,6 +80,10 @@ Grok uses the same Fusion Python tools, image inputs, streaming, steering, and s
 
 The integration uses xAI OAuth and its public Grok CLI client; STEVE does not require an API key or operate an inference service. xAI controls account eligibility and access. Browser sign-in is user-confirmed on Windows. The local runtime/tool loop and effort forwarding pass automated tests; live Grok modeling and macOS sign-in still need verification.
 
+### OpenRouter (experimental)
+
+Choose **OpenRouter (experimental)**, then **Sign in with OpenRouter**, and approve access in your browser. OpenRouter creates a key labeled STEVE in your account; STEVE stores it in the macOS Keychain or Windows' per-user encryption, and you never copy it. The model picker lists OpenRouter models with tool calling and at least 64K context, grouped by company, with each model's effort levels. Usage is billed to your OpenRouter credits. Tool-calling quality varies by model, and web search is unavailable. See [OpenRouter setup](docs/INSTALL.md#openrouter-experimental).
+
 ### Local Ollama
 
 Choose **Ollama (local)** to use a model running on your computer. The default server is `http://127.0.0.1:11434`, with no sign-in. Choose **Server** to use another host or port, and add an API key only if that server requires one. STEVE discovers downloaded models with tool support and keeps local chats and preferences separate. Models with vision support can inspect pictures; web search is unavailable with this provider. See [local setup](docs/INSTALL.md#local-ollama) for a small Gemma configuration and the required 8K context setting.
@@ -109,7 +113,7 @@ With an `STEVE-0.6.2-windows-x64.zip` package:
 3. Double-click **Install STEVE.exe**, then choose **Install STEVE**.
 4. Open Fusion. In **Scripts and Add-ins**, enable STEVE if it has not started automatically.
 5. Open **STEVE** from the **Quick Access toolbar**.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](docs/INSTALL.md#local-ollama).
+6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [local Ollama setup](docs/INSTALL.md#local-ollama).
 
 ## Install the macOS preview
 
@@ -120,7 +124,7 @@ Get `STEVE-0.6.2-macos-arm64.zip` from [STEVE Releases](https://github.com/10-X-
 3. Open Terminal, type `bash ` (with a trailing space), drag **Install STEVE.command** into the window, and press Return. Double-clicking the installer also works once macOS lets you open it under **System Settings > Privacy & Security**, because this preview is not signed.
 4. Open Fusion. In **Scripts and Add-ins**, enable STEVE if it has not started automatically.
 5. Open **STEVE** from the **Quick Access toolbar**.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [local Ollama setup](docs/INSTALL.md#local-ollama).
+6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [local Ollama setup](docs/INSTALL.md#local-ollama).
 
 **Upgrading from an earlier name?** Download this release manually. The installer replaces the previous managed add-in folder, and STEVE transfers your saved data on first run with a backup. Older update checkers cannot discover the renamed repository's release.
 
@@ -156,7 +160,7 @@ See the [execution bridge](docs/FUSION_EXECUTION.md) for tool contracts, Undo be
 
 ## Your account and data
 
-Conversation content, attached images, and requested Fusion tool results travel through the local Codex runtime to OpenAI. STEVE does not operate an AI proxy or manage separate AI billing. Codex manages authentication locally; STEVE does not copy credentials from another installation or inherit API keys from the environment.
+Conversation content, attached images, and requested Fusion tool results travel through the local Codex runtime to your selected provider: OpenAI for ChatGPT, xAI for Grok, Anthropic for Claude, OpenRouter and the model's provider for OpenRouter, or your own computer for Ollama. STEVE does not operate an AI proxy or manage separate AI billing. Codex manages authentication locally; STEVE does not copy credentials from another installation or inherit API keys from the environment.
 
 History, preferences, image caches, and optional logs live under the current user's STEVE data folder: `%LOCALAPPDATA%\STEVE` on Windows and `~/Library/Application Support/STEVE` on macOS. History is local to STEVE and does not sync with the ChatGPT website. Signing out hides conversations without deleting local files. Debug logs may contain design details and are never automatically uploaded by STEVE.
 

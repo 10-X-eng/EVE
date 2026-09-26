@@ -21,6 +21,7 @@ from steve.controller import Controller, CONTEXT_PREFIX
 from steve.debug_log import DebugLog
 from steve.grok_transport import GrokGateway, GrokTransport
 from steve.ollama_transport import OllamaTransport
+from steve.openrouter_transport import OpenRouterGateway, OpenRouterTransport
 from steve.preferences import ProviderChoice
 from steve.transport import runtime_command, RuntimeUnavailable
 
@@ -46,6 +47,9 @@ class DfmProviderRuntimeTests(unittest.TestCase):
 
     def test_ollama_toggle_preserves_plan_and_blocks_disabled_tools(self):
         self.conversation('ollama')
+
+    def test_openrouter_toggle_preserves_plan_and_blocks_disabled_tools(self):
+        self.conversation('openrouter')
 
     def conversation(self, provider):
         with tempfile.TemporaryDirectory() as folder, ExitStack() as stack:
@@ -126,6 +130,14 @@ class DfmProviderRuntimeTests(unittest.TestCase):
                     client.auth.account = lambda **_: {'type': 'grok', 'email': 'fixture@example.com'}
                     client.auth.models = lambda: catalog
                     client.auth.access_token = lambda **_: 'fixture-token'
+                    return client
+            elif provider == 'openrouter':
+                stack.enter_context(patch('steve.openrouter_transport.OpenRouterGateway', side_effect=lambda auth: OpenRouterGateway(auth, opener=upstream)))
+                def factory(notify):
+                    client = OpenRouterTransport(notify, home=home)
+                    client.auth.account = lambda **_: {'type': 'openrouter', 'email': 'STEVE'}
+                    client.auth.models = lambda: catalog
+                    client.auth.api_key = lambda: 'fixture-key'
                     return client
             else:
                 gateway = GrokGateway(Obj(access_token=lambda **_: 'fixture-token'), opener=upstream)

@@ -10,14 +10,14 @@ class ProviderChoice:
         self.provider = "chatgpt"
         try:
             selected = json.loads(self.path.read_text(encoding="utf-8")).get("provider")
-            if selected in ("chatgpt", "grok", "ollama", "claude"):
+            if selected in ("chatgpt", "grok", "ollama", "claude", "openrouter"):
                 self.provider = selected
         except (OSError, ValueError, AttributeError):
             pass
 
     def save(self, provider):
-        if provider not in ("chatgpt", "grok", "ollama", "claude"):
-            raise ValueError("Choose ChatGPT, Grok, Claude, or local Ollama.")
+        if provider not in ("chatgpt", "grok", "ollama", "claude", "openrouter"):
+            raise ValueError("Choose ChatGPT, Grok, Claude, OpenRouter, or local Ollama.")
         self.home.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({"provider": provider}), encoding="utf-8")

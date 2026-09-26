@@ -28,6 +28,16 @@ Model discovery reads `capabilities.reasoning_effort` and `capabilities.default_
 
 ChatGPT keeps its existing data paths. Grok has a separate `grok-runtime` home and explicit history provider filter; selection and model preferences are remembered separately. A provider change cannot interrupt a running task, and stale events from the closed runtime are ignored. Tests use fake xAI responses, not real credentials or paid inference. `test_grok_runtime.py` exercises the actual bundled runtime through a tool call, response, history listing, process restart, and continuation.
 
+## OpenRouter provider
+
+`openrouter_auth.py` implements OpenRouter's [OAuth PKCE flow](https://openrouter.ai/docs/guides/overview/auth/oauth): it opens `https://openrouter.ai/auth` with an S256 challenge, `key_label=STEVE`, and a `localhost` callback on a random port. OpenRouter has no `state` parameter, so the callback path contains a random token; other paths are rejected before any exchange. The code is exchanged at `POST /api/v1/auth/keys` for a user-owned API key. `GET /api/v1/key` supplies the account label and credit summary; a 401 there forgets the key. The key and that public summary are stored with `SecureStore` (macOS Keychain, Windows DPAPI). Sign out forgets the local key; OpenRouter has no revoke call for it, so the UI links to OpenRouter's key settings.
+
+Model discovery reads the public [models API](https://openrouter.ai/docs/guides/overview/models) with `supported_parameters=tools` and `sort=most-popular`. It keeps text-output models with at least 64K context, excluding `:batch` variants and expired models. The most popular remaining model is the default; the catalog is grouped by vendor in the picker. `architecture.input_modalities` decides image support, and `reasoning.supported_efforts`/`default_effort` supply the effort choices.
+
+`OpenRouterTransport` uses Codex's custom Responses provider (`steve_openrouter`) with its own `openrouter-runtime` home and history filter. Code Mode and web search are disabled. OpenRouter's [Responses API](https://openrouter.ai/docs/api/reference/responses/overview) is stateless and rejects `store: true` and `previous_response_id`; Codex sends `store: false` and full input, which fits. Each thread's `model_context_window` comes from the model's `context_length`, and auto-compaction starts at 80% of it, capped at 200K tokens because every request resends the history. A turn with a different model reapplies these settings through `thread/resume` first. Turns and steering with images are rejected for text-only models, which also covers viewport captures.
+
+The random-path loopback gateway forwards only Responses requests, adds the key and OpenRouter's app attribution headers at request time, removes `client_metadata` (local installation and session identifiers), and drops the `content: null` field from replayed reasoning items. Reasoning items stay in the input so models that need their earlier reasoning during tool loops keep it. 401, 402, 403 and 429 responses become short explanations without upstream bodies; other upstream errors pass through. Tests use fake OpenRouter responses; `test_openrouter_runtime.py` exercises the bundled runtime through a tool call, reasoning replay, history, restart and a model switch.
+
 ## Local setup
 
 `OllamaTransport` connects the bundled runtime directly to Ollama's [Responses API](https://docs.ollama.com/api/openai-compatibility). The default endpoint is `http://127.0.0.1:11434`. **Server** in the panel saves a host, optional port, optional path or query, and optional API key under the `ollama` data folder. The path is a prefix on both discovery and `/v1`. The query is appended to discovery requests and sent to Codex as `query_params`. The key is stored in the system credential store and passed to the conversation runtime as `STEVE_OLLAMA_API_KEY`; thread config records only that variable name. There is no web search and no Code Mode for this provider. Discovery uses `/api/version`, `/api/tags`, and `/api/show`; cloud and non-tool models are excluded. Before a turn, `/api/generate` loads the selected model with its saved settings and `/api/ps` supplies the actual context allocation. The adapter recognizes a reused parent runner for configured model aliases, caps context at the model's reported limit, and reserves at least 2048 tokens or 25% for output. A model/context change refreshes the runtime's thread configuration. Vision checks also apply to steering and tool-delivered images. All provider files use the platform's STEVE data directory, with an `ollama-runtime` home and `ollama` preferences folder.
@@ -103,6 +113,30 @@ Codex persists new conversations under STEVE's runtime home. The history drawer 
 All installed assets are resolved relative to the add-in. Runtime data uses the current user's `LOCALAPPDATA` or `~/Library/Application Support`, and the installers use Windows' ApplicationData special folder or `$HOME`. Compiler discovery uses PATH or SystemRoot; no drive letter or developer profile is assumed. The package build audits source and the complete zip, including binaries, for the current checkout/profile paths, literal absolute paths in text, and local debugger/bytecode artifacts.
 
 ## Structure
+
+### In-Fusion updates
+
+The release checker downloads verified packages for managed installations; applying
+them requires the user's **Update & restart STEVE** click. Staging and per-file
+hash checks run off Fusion's thread. `update_transaction.py` prepares a sibling
+payload and a separate helper under the user's data folder. The helper is linked
+through `Application.scripts.addExisting`, stops the exact installed add-in found
+by `Scripts.itemByPath`, renames the prepared/previous directories, and calls
+`Script.run(False)`. Custom events carry stop/start work back to Fusion's main
+thread. It never cancels commands, closes documents, pumps events or quits Fusion.
+
+The controller freezes new requests only at the idle handoff. A nonce/version
+startup receipt confirms the replacement loaded; a missing receipt triggers
+rollback. The journal and temporary helper support recovery after an interrupted
+swap. Current-chat restoration checks the provider/account and leaves jobs paused.
+Source checkouts are not package-update targets. The existing external installers
+still require Fusion to close for manual installation.
+
+Autodesk references: [Scripts](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Scripts.htm),
+[stop](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Script_stop.htm),
+[run](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Script_run.htm).
+
+### Source files
 
 For diagnostics, open **STEVE logo → Diagnostics** and enable **Debug logging**. It defaults off and remembers the choice in `debug.json` under the runtime home. **Open logs folder** opens the `logs` folder there in Explorer or Finder; `steve-debug.jsonl` records UTC timestamps, correlated tool requests with generated code, results/errors, duration, transport request timing, and Codex stderr. Rotation keeps the current file and three backups at approximately 2 MiB each. Disabling logging stops new entries and preserves existing files. Authentication RPC payloads are excluded; common credential patterns in diagnostic text are redacted. Code and tool results may contain design details, so review logs before sharing. Logging is local and never automatically uploaded. This toggle controls STEVE's diagnostics, not Codex's existing session history.
 

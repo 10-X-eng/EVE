@@ -1,3 +1,9 @@
+# Unreleased — OpenRouter provider (experimental)
+
+- **OpenRouter:** choose **OpenRouter (experimental)** and **Sign in with OpenRouter**. OpenRouter creates a key labeled STEVE in your account; STEVE stores it in the macOS Keychain or Windows' per-user encryption. Usage is paid from your OpenRouter credits.
+- **Model choice:** models with tool calling and at least 64K context appear grouped by company, with each model's effort levels. **Most popular** is the default.
+- **Limits:** web search is unavailable for OpenRouter, and text-only models cannot receive images. Tool-calling quality varies by model. Live OpenRouter sign-in and inference still need verification; see [verification status](VERIFICATION.md).
+
 # STEVE 0.6.2 — RMFG checkout and simpler settings
 
 This update brings sheet-metal checks, quotes and cart preparation into the conversation, and makes STEVE's settings easier to find.

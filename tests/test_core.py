@@ -511,7 +511,7 @@ class ControllerTests(unittest.TestCase):
 
     def test_install_update_requires_matching_verified_download_and_stages_on_worker(self):
         self.controller.state["updateInfo"] = {"version": "0.5.0"}
-        with patch("steve.controller.stage_update") as stage, patch("steve.controller.launch_update") as launch:
+        with patch("steve.controller.stage_update") as stage, patch("steve.controller.prepare_live_update", return_value=Path('/helper')) as launch:
             self.controller.dispatch("installUpdate")
             eventually(lambda: "Download" in self.controller.snapshot()["updateStatus"])
             stage.assert_not_called()
@@ -522,16 +522,17 @@ class ControllerTests(unittest.TestCase):
             self.assertEqual(stage.call_args.args[:2], (Path("/verified.zip"), "0.5.0"))
             self.assertEqual(stage.call_args.args[3], ROOT / "addin")
             self.assertEqual(stage.call_args.kwargs["expected_digest"], "a" * 64)
-            launch.assert_called_once_with(Path("/staged"))
-            self.assertIn("quit Fusion", self.controller.snapshot()["updateStatus"])
-            self.assertIn("Restart Fusion", self.controller.snapshot()["updateStatus"])
+            launch.assert_called_once_with(Path('/staged'), ROOT / 'addin/STEVE', self.controller.debug.folder.parent, '0.5.0')
+            eventually(lambda: self.controller.snapshot()['updateInstallReady'])
+            self.assertIn("idle", self.controller.snapshot()["updateStatus"])
+            self.assertEqual(self.controller._prepared_update, Path('/helper'))
 
     def test_one_click_update_downloads_then_installs_only_matching_verified_release(self):
         release = {"version": "0.5.0"}
         self.controller.state["updateInfo"] = release
         with patch.object(self.controller.downloader, "request") as download, \
              patch("steve.controller.stage_update", return_value=Path("/staged")) as stage, \
-             patch("steve.controller.launch_update") as launch:
+                patch("steve.controller.prepare_live_update", return_value=Path('/helper')) as launch:
             self.controller.dispatch("updateSteve")
             eventually(lambda: download.called)
             download.assert_called_once_with(release)
@@ -545,7 +546,7 @@ class ControllerTests(unittest.TestCase):
 
     def test_one_click_update_does_not_queue_install_after_download_failure(self):
         self.controller.state["updateInfo"] = {"version": "0.5.0"}
-        with patch.object(self.controller.downloader, "request"), patch("steve.controller.launch_update") as launch:
+        with patch.object(self.controller.downloader, "request"), patch("steve.controller.prepare_live_update") as launch:
             self.controller.dispatch("updateSteve")
             eventually(lambda: self.controller.snapshot()["autoInstallVersion"] == "0.5.0")
             self.controller._update_state({"updateDownload": {"state": "error", "version": "0.5.0", "message": "checksum failed"}})
@@ -561,7 +562,7 @@ class ControllerTests(unittest.TestCase):
             finish.wait(2)
             return Path("/staged")
         try:
-            with patch("steve.controller.stage_update", side_effect=stage), patch("steve.controller.launch_update"):
+            with patch("steve.controller.stage_update", side_effect=stage), patch("steve.controller.prepare_live_update"):
                 self.controller.dispatch("installUpdate")
                 self.assertTrue(started.wait(2))
                 self.controller.dispatch("stop")
@@ -569,6 +570,39 @@ class ControllerTests(unittest.TestCase):
                 self.assertTrue(self.controller.state["updateInstalling"])
         finally:
             finish.set()
+
+    def test_release_check_downloads_automatically_without_installing(self):
+        release = {'version': '0.7.0'}
+        with patch('steve.controller.managed', return_value=True), patch.object(self.controller.downloader, 'request') as download:
+            self.controller._release_checked({'updateInfo': release})
+            self.controller._release_checked({'updateInfo': release})
+            download.assert_called_once_with(release)
+        self.assertIsNone(self.controller.state['autoInstallVersion'])
+        self.assertIsNone(self.controller._prepared_update)
+        with patch('steve.controller.managed', return_value=False), patch.object(self.controller.downloader, 'request') as download:
+            self.controller._release_checked({'updateInfo': {'version': '0.8.0'}})
+            download.assert_not_called()
+
+    def test_prepared_update_waits_for_work_and_freezes_new_requests_at_handoff(self):
+        eventually(lambda: not self.controller._commands.unfinished_tasks and not self.controller.state['rmfgBusy'])
+        self.controller._prepared_update = Path('/helper')
+        for flag in ('busy', 'jobBusy', 'rmfgBusy', 'loginPending', 'codexUpdating'):
+            self.controller.state[flag] = True
+            self.assertIsNone(self.controller.take_prepared_update())
+            self.controller.state[flag] = False
+        self.controller.state['job'] = {'status': 'active'}
+        self.assertIsNone(self.controller.take_prepared_update())
+        self.controller.state['job'] = None
+        self.controller._send_queued = True
+        self.assertIsNone(self.controller.take_prepared_update())
+        self.controller._send_queued = False
+        helper, resume = self.controller.take_prepared_update()
+        self.assertEqual(helper, Path('/helper'))
+        self.assertEqual(resume['provider'], 'chatgpt')
+        self.assertFalse(self.controller.dispatch('send', {'text': 'Do not start during replacement'}))
+        self.assertFalse(self.controller.dispatch('rmfgConnect'))
+        self.controller.update_launch_failed('fixture')
+        self.assertFalse(self.controller._update_handoff)
 
     def test_tool_activity_tracks_code_and_overlapping_calls_without_stale_completions(self):
         pending = []
