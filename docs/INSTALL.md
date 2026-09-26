@@ -1,6 +1,6 @@
 # Install STEVE for Autodesk Fusion
 
-STEVE 0.6.2 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, API key, or STEVE account is required.
+STEVE 0.6.2 is a preview for Windows x64 and macOS on Apple silicon. You need Autodesk Fusion and either a ChatGPT account with Codex access, an xAI account with Grok access, a Claude subscription signed into Claude Code, an OpenRouter account with credits, or a local Ollama installation with a compatible downloaded model. Cloud providers and package/model downloads require an internet connection. Each complete package includes Codex; no separate Python, Node.js, or STEVE account is required, and you never copy an API key.
 
 Download the package for your computer from the [STEVE releases page](https://github.com/10-X-eng/STEVE/releases): `STEVE-0.6.2-windows-x64.zip` or `STEVE-0.6.2-macos-arm64.zip`. Use the packaged zip, not GitHub's **Source code** download, which does not include the runtime. If no release is listed, a maintainer must build the package first.
 
@@ -11,7 +11,7 @@ Download the package for your computer from the [STEVE releases page](https://gi
 3. Open **Install STEVE.exe** and click **Install STEVE**. Installation is for your current Windows account and does not need administrator access. This preview's installer is unsigned.
 4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). See [OpenRouter setup](#openrouter-experimental) for its credits and model choice. Existing STEVE sign-in is checked automatically.
 
 To verify the download, run `Get-FileHash .\STEVE-0.6.2-windows-x64.zip -Algorithm SHA256` in PowerShell from the download folder and compare it with the accompanying `.zip.sha256` file.
 
@@ -23,7 +23,7 @@ To verify the download, run `Get-FileHash .\STEVE-0.6.2-windows-x64.zip -Algorit
    Double-clicking **Install STEVE.command** also works, but because this preview is not signed, macOS blocks it the first time. Open **System Settings > Privacy & Security**, choose **Open Anyway** next to the message about the installer, and confirm.
 4. Open Fusion. Open **Scripts and Add-ins** (Design workspace: **Utilities > Add-ins**), select the **Add-ins** tab, select **STEVE**, and click **Run**. Enable **Run on Startup** if you want STEVE available every time you open Fusion.
 5. Click **STEVE** in the **Quick Access toolbar** at the top of Fusion. It is also available through command search.
-6. Choose **ChatGPT** or **Grok / X** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). Existing STEVE sign-in is checked automatically.
+6. Choose **ChatGPT**, **Grok / X**, or **OpenRouter (experimental)** and sign in, or follow [Claude subscription setup](#claude-subscription-experimental) or [local Ollama setup](#local-ollama). See [OpenRouter setup](#openrouter-experimental) for its credits and model choice. Existing STEVE sign-in is checked automatically.
 
 To verify the download, run `shasum -a 256 STEVE-0.6.2-macos-arm64.zip` in Terminal from the download folder and compare it with the accompanying `.zip.sha256` file. The bundled Codex binaries are signed and notarized by OpenAI.
 
@@ -53,6 +53,20 @@ STEVE uses the unmodified Claude Code client and its own account store. It does 
 This experimental integration supports STEVE's Fusion tools, streamed replies, images, steering, history, and jobs. Claude web search is not connected yet; installed Fusion API documentation remains available. STEVE uses a conservative 200K conversation window. It keeps Claude conversations and signed replay data under its local `claude-runtime` directory, separate from the other providers; these may contain design information and do not appear in the Claude website's chat history. The transport adapts [Hermes's MIT-licensed Claude subscription client](https://github.com/NousResearch/hermes-plugin-claude-subscription-directsdk); attribution ships with the add-in.
 
 If setup fails, update with `claude update`, verify `claude auth status`, then check the connection again. STEVE searches PATH and the standard native install directory (`~/.local/bin`). For a custom installation, set `STEVE_CLAUDE_COMMAND` to the executable before launching Fusion; `STEVE_CLAUDE_CONFIG_DIR` selects a separately CLI-managed account directory. API keys and alternate Anthropic backend overrides are rejected on this subscription path, with the conflicting variable names shown in the UI. The adapter relies on version-sensitive Claude Code replay behavior; Windows Claude Code 2.1.260 has been exercised locally. Native Fusion and macOS confirmation remain preview checks.
+
+## OpenRouter (experimental)
+
+OpenRouter gives one account access to models from many companies, paid per use from your OpenRouter credits.
+
+1. Create an [OpenRouter](https://openrouter.ai) account and add credits. Free models have low daily request limits.
+2. In STEVE, select **OpenRouter (experimental)** under **AI provider** and choose **Sign in with OpenRouter**. Approve access in your browser, then return to Fusion. OpenRouter creates an API key labeled **STEVE** in your account and sends it back to STEVE; you never copy it. STEVE keeps the key in the macOS Keychain or, on Windows, encrypted for your user account.
+3. Choose a model. The picker lists models that support tool calling and have at least 64K context, grouped by company. **Most popular** uses the most popular of these on OpenRouter. Effort choices come from each model's OpenRouter listing. Start with a document inspection before asking for changes.
+
+Model quality varies widely. Fusion work depends on reliable tool calling and Python, so smaller or older models may fail where frontier models succeed. Each request resends the conversation, so long chats cost more; STEVE compacts a chat once it reaches 80% of the model's context or 200K tokens, whichever is smaller. Check prices and your usage on OpenRouter.
+
+Text-only models cannot receive attachments or viewport images; STEVE explains this before sending. Web search is not connected for OpenRouter; installed Fusion API documentation remains available. Chats, history, and model choices are kept separately from the other providers under the `openrouter-runtime` and `openrouter` folders. OpenRouter forwards requests to the model's provider under your OpenRouter privacy settings; restrict providers there if needed.
+
+**Sign out** removes the key from this computer only. To revoke it, delete the **STEVE** key under [OpenRouter keys](https://openrouter.ai/settings/keys); **OpenRouter keys ↗** in the account menu opens that page. If OpenRouter rejects the saved key, STEVE asks you to sign in again. Out-of-credit and rate-limit errors are shown in the chat; add credits or wait, then resend.
 
 ## Local Ollama
 
@@ -105,7 +119,7 @@ For a development checkout, use **Stop**, then **Run** in Scripts and Add-ins af
 - **STEVE is not listed:** use the add-in folder selection in Scripts and Add-ins to select the `STEVE` folder under `%APPDATA%\Autodesk\Autodesk Fusion 360\API\AddIns` (Windows) or `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns` (macOS), then Run.
 - **macOS says the installer cannot be opened:** run it through Terminal as described above, or allow it under System Settings > Privacy & Security.
 - **Installer reports an unmanaged STEVE folder:** preserve or rename your existing manually installed folder before installing. The installer will not overwrite it.
-- **Sign-in does not finish:** return to STEVE and choose **Check again**, or use the device-code sign-in option. Use an account with access to the selected provider: Codex access for ChatGPT, or Grok access for xAI.
+- **Sign-in does not finish:** return to STEVE and choose **Check again**, or use the device-code sign-in option. Use an account with access to the selected provider: Codex access for ChatGPT, or Grok access for xAI. For OpenRouter, finish the approval page in the browser that opened; OpenRouter has no device-code option.
 - **Codex setup needed:** after a Codex update, try **Use bundled Codex**, then **Restart STEVE** in the STEVE logo menu first. If the bundled runtime is damaged, extract and reinstall the complete STEVE package for your platform. Installing Codex separately does not replace STEVE's required bundled files. If STEVE reports that Codex lost its run permission, run the installer again instead of copying the `STEVE` folder by hand.
 - **An operation fails:** enable **Debug logging** under **STEVE logo → Diagnostics**, reproduce the problem, then choose **Open logs folder**. Review logs for private design information before sharing them.
 

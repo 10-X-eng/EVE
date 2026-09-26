@@ -281,6 +281,7 @@ function renderControls() {
   const connected=state.connection==="ready" && !state.codexRestarting;
   const local=state.provider==="ollama";
   const claude=state.provider==="claude";
+  const openrouter=state.provider==="openrouter";
   const signed=!!state.account && (!(local || claude) || state.models.length>0);
   const hasMessages=state.messages.length>0 && signed;
   $("app").classList.toggle("signed-out",!signed);
@@ -290,15 +291,18 @@ function renderControls() {
   $("sign-in-card").hidden=signed;
   $("login").disabled=!connected || !state.accountChecked || state.loginPending;
   const grok=state.provider==="grok";
-  const providerName=local?"Ollama":grok?"Grok / X":claude?"Claude":"ChatGPT";
+  const providerName=local?"Ollama":grok?"Grok / X":claude?"Claude":openrouter?"OpenRouter":"ChatGPT";
   for(const id of ["provider","welcome-provider"]){$(id).value=state.provider||"chatgpt";$(id).disabled=!!state.busy || !!state.jobBusy || !!state.loginPending || state.connection==="starting";}
-  $("login").textContent=claude?(!state.accountChecked?"Checking Claude Code…":"Check connection"):local?(!state.accountChecked?"Checking Ollama…":"Refresh models"):state.loginPending?"Signing in…":!state.accountChecked?"Checking your account…":grok?"Sign in with X / Grok ↗":"Sign in with ChatGPT ↗";
+  $("login").textContent=claude?(!state.accountChecked?"Checking Claude Code…":"Check connection"):local?(!state.accountChecked?"Checking Ollama…":"Refresh models"):state.loginPending?"Signing in…":!state.accountChecked?"Checking your account…":grok?"Sign in with X / Grok ↗":openrouter?"Sign in with OpenRouter ↗":"Sign in with ChatGPT ↗";
   $("sign-in-heading").textContent=local?"Your tools. Your local model.":"Your tools. Your AI.";
   $("sign-in-description").textContent=claude?(state.localStatus||"Sign in to Claude Code outside Fusion, then check the connection here."):local?(state.localStatus||"Start Ollama and choose a downloaded model. No sign-in needed."):"Connect your account and bring your thinking partner into Fusion.";
-  $("sign-in-note").textContent=claude?"Experimental · Uses the account signed into Claude Code and its subscription limits. Web search is unavailable.":local?"Runs on this computer. Choose a model with tool support and at least 8K context. Web search is unavailable.":grok?"Uses your xAI account’s Grok access. Link your X account at grok.com if needed.":"Uses your subscription's Codex access";
+  $("sign-in-note").textContent=claude?"Experimental · Uses the account signed into Claude Code and its subscription limits. Web search is unavailable.":local?"Runs on this computer. Choose a model with tool support and at least 8K context. Web search is unavailable.":grok?"Uses your xAI account’s Grok access. Link your X account at grok.com if needed.":openrouter?"Experimental · Pay per use with your OpenRouter credits. Tool-calling quality varies by model. Web search is unavailable.":"Uses your subscription's Codex access";
   $("claude-controls").hidden=!claude;
   $("claude-version").textContent=state.providerVersion?`Claude Code ${state.providerVersion}`:"Claude Code · Version unavailable";
   $("claude-links").hidden=!claude;
+  $("openrouter-links").hidden=!openrouter;
+  $("openrouter-controls").hidden=!openrouter || !signed;
+  $("openrouter-refresh").disabled=state.busy || !!state.jobBusy || !connected;
   $("claude-refresh").disabled=state.busy || !connected;
   $("local-controls").hidden=!local;
   $("local-links").hidden=!local;
@@ -306,7 +310,7 @@ function renderControls() {
   $("local-refresh").disabled=state.busy || !connected;
   $("login-wait").hidden=!state.loginPending;
   $("grok-login-note").hidden=!grok || signed || !state.loginPending || !!state.device;
-  $("device-login").hidden=local || claude || state.loginPending;
+  $("device-login").hidden=local || claude || openrouter || state.loginPending;
   $("device-login").disabled=!connected || !state.accountChecked;
   $("cancel-login").hidden=!state.loginPending;
   $("refresh-account").hidden=!state.loginPending;
@@ -318,7 +322,7 @@ function renderControls() {
   const jobCommand = /^\/jobs(?:\s|$)/.test($("message").value.trim());
   $("send").disabled=!signed || !connected || (!$("message").value.trim() && !draftImages.length) || draftImages.some(item=>!item.url) || !!clipboardRequest || submitting || (state.busy && !state.canSteer && !jobCommand) || !!state.jobBusy;
   const selectedModel=state.models.find(m=>m.id===state.model) || state.models.find(m=>m.isDefault);
-  $("attach-images").disabled=!signed || !connected || draftImages.length>=4 || (local && selectedModel?.supportsImages===false);
+  $("attach-images").disabled=!signed || !connected || draftImages.length>=4 || ((local || openrouter) && selectedModel?.supportsImages===false);
   if(restartingForUpdate){$("send").disabled=true;$("attach-images").disabled=true;}
   $("send").hidden=false;
   $("send").title=jobCommand?"Manage job":state.busy?"Steer current response":"Send message";
@@ -330,7 +334,7 @@ function renderControls() {
   $("effort").disabled=!signed || state.busy || !!state.jobBusy || !(state.effortOptions||[]).length;
   $("logout").hidden=local || claude || !signed;
   $("logout").disabled=state.busy || !!state.jobBusy;
-  $("chatgpt-refresh").hidden=local || grok || claude;
+  $("chatgpt-refresh").hidden=local || grok || claude || openrouter;
   $("chatgpt-refresh").disabled=state.busy || !!state.jobBusy || !connected;
   $("codex-version").textContent=state.codexVersion?`Codex ${state.codexVersion}`:"Codex runtime";
   $("codex-update-status").textContent=state.codexPendingVersion?`Codex ${state.codexPendingVersion} is ready. Restart STEVE to use it and refresh models.`:state.codexUpdateStatus||"Checks OpenAI for updates automatically.";
@@ -407,8 +411,14 @@ function renderControls() {
   $("reconnect-row").hidden=state.connection!=="disconnected";
   const modelsJSON=JSON.stringify([state.provider,state.models]);
   if(modelsJSON!==renderedModels){
-    $("model").replaceChildren(new Option(local?"Local default":"Account default",""));
-    state.models.forEach((model)=>$("model").add(new Option(model.name,model.id)));
+    $("model").replaceChildren(new Option(local?"Local default":openrouter?"Most popular":"Account default",""));
+    const groups=new Map();
+    state.models.forEach((model)=>{
+      const option=new Option(model.name,model.id);
+      if(!model.group){$("model").add(option);return;}
+      if(!groups.has(model.group)){const group=document.createElement("optgroup");group.label=model.group;groups.set(model.group,group);$("model").append(group);}
+      groups.get(model.group).append(option);
+    });
     renderedModels=modelsJSON;
   }
   $("model").value=state.model;
@@ -525,6 +535,8 @@ $("update-codex").onclick=()=>act("updateCodex");
 $("bundled-codex").onclick=()=>act("useBundledCodex");
 $("restart-steve").onclick=()=>act("restartRuntime");
 $("install-claude").onclick=()=>act("setupHelp",{page:"claude"});
+$("openrouter-keys").onclick=$("openrouter-credits").onclick=()=>act("setupHelp",{page:"openrouter"});
+$("openrouter-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
 $("job-button").onclick=()=>openJob();
 $("job-strip").onclick=()=>openJob();
 $("job-close").onclick=()=>$("job-dialog").close();

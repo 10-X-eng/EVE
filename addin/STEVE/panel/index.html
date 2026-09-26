@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css?v=2">
   <link rel="stylesheet" href="fusion.css?v=18">
   <script src="images.js?v=2" defer></script>
-  <script src="panel.js?v=28" defer></script>
+  <script src="panel.js?v=29" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -22,10 +22,11 @@
     </header>
     <section id="account-menu" class="account-menu header-menu" aria-label="Accounts and providers" hidden>
       <h2 class="menu-title">Accounts &amp; providers</h2>
-      <label class="provider-label" for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="ollama">Ollama (local)</option></select>
+      <label class="provider-label" for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="openrouter">OpenRouter (experimental)</option><option value="ollama">Ollama (local)</option></select>
       <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
       <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="local-refresh" class="secondary-button">Refresh models</button> <button id="local-help" class="secondary-button">Local setup</button></div>
       <div id="claude-controls" hidden><p id="claude-version" class="sign-in-note"></p><p class="sign-in-note">Claude Code manages your account. Use <code>claude auth login</code> or <code>claude auth logout</code> in a terminal outside Fusion.</p><button id="claude-refresh" class="secondary-button">Check connection</button></div>
+      <div id="openrouter-controls" hidden><p class="sign-in-note">Sign out removes the key from this computer. To revoke it, delete the STEVE key in OpenRouter.</p><button id="openrouter-keys" class="secondary-button">OpenRouter keys ↗</button> <button id="openrouter-refresh" class="secondary-button">Refresh models</button></div>
       <button id="logout" class="secondary-button" hidden>Sign out</button>
       <button id="chatgpt-refresh" class="secondary-button" hidden>Refresh models</button>
       <details id="rmfg-settings" class="settings-group" hidden>
@@ -112,7 +113,7 @@
         <section id="sign-in-card" class="sign-in-card">
           <div class="card-heading"><span class="connection-dot"></span><span id="sign-in-heading">Your tools. Your AI.</span></div>
           <p id="sign-in-description">Connect your account and bring your thinking partner into Fusion.</p>
-          <label class="sr-only" for="welcome-provider">AI provider</label><select id="welcome-provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="ollama">Ollama (local)</option></select>
+          <label class="sr-only" for="welcome-provider">AI provider</label><select id="welcome-provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="openrouter">OpenRouter (experimental)</option><option value="ollama">Ollama (local)</option></select>
           <button id="login" class="primary-button">Sign in with ChatGPT <span aria-hidden="true">↗</span></button>
           <div id="login-wait" hidden><span class="small-spinner"></span><span>Finish signing in in your browser</span></div>
           <span id="grok-login-note" class="sign-in-note" hidden>If the browser shows a code for Grok Build, you don't need to copy it. STEVE completes sign-in automatically. Return to Fusion after approving access.</span>
@@ -121,6 +122,7 @@
           <button id="cancel-login" class="text-button" hidden>Cancel sign-in</button>
           <button id="refresh-account" class="text-button" hidden>I've signed in — check again</button>
           <div id="local-links" hidden><button id="install-ollama" class="text-button">Install Ollama ↗</button><button id="local-setup" class="text-button">Local setup ↗</button></div>
+          <div id="openrouter-links" hidden><button id="openrouter-credits" class="text-button">OpenRouter keys and credits ↗</button></div>
           <div id="claude-links" hidden><button id="install-claude" class="text-button">Install Claude Code ↗</button></div>
           <span id="sign-in-note" class="sign-in-note">Uses your subscription's Codex access</span>
         </section>
