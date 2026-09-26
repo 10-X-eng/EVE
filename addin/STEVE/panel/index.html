@@ -6,9 +6,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>STEVE · Your engineering partner</title>
   <link rel="stylesheet" href="style.css?v=2">
-  <link rel="stylesheet" href="fusion.css?v=18">
+  <link rel="stylesheet" href="fusion.css?v=19">
   <script src="images.js?v=2" defer></script>
-  <script src="panel.js?v=29" defer></script>
+  <script src="panel.js?v=30" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -24,7 +24,7 @@
       <h2 class="menu-title">Accounts &amp; providers</h2>
       <label class="provider-label" for="provider">AI provider</label><select id="provider" class="provider-select"><option value="chatgpt">ChatGPT</option><option value="grok">Grok / X</option><option value="claude">Claude (experimental)</option><option value="openrouter">OpenRouter (experimental)</option><option value="ollama">Ollama (local)</option></select>
       <span class="eyebrow">YOUR CONNECTION</span><strong id="account-email">Not signed in</strong><span id="account-plan">Use your ChatGPT account</span>
-      <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="local-refresh" class="secondary-button">Refresh models</button> <button id="local-help" class="secondary-button">Local setup</button></div>
+      <div id="local-controls" hidden><p id="local-status" class="sign-in-note"></p><button id="ollama-server" class="secondary-button" type="button">Server</button> <button id="local-refresh" class="secondary-button" type="button">Refresh models</button> <button id="local-help" class="secondary-button" type="button">Local setup</button></div>
       <div id="claude-controls" hidden><p id="claude-version" class="sign-in-note"></p><p class="sign-in-note">Claude Code manages your account. Use <code>claude auth login</code> or <code>claude auth logout</code> in a terminal outside Fusion.</p><button id="claude-refresh" class="secondary-button">Check connection</button></div>
       <div id="openrouter-controls" hidden><p class="sign-in-note">Sign out removes the key from this computer. To revoke it, delete the STEVE key in OpenRouter.</p><button id="openrouter-keys" class="secondary-button">OpenRouter keys ↗</button> <button id="openrouter-refresh" class="secondary-button">Refresh models</button></div>
       <button id="logout" class="secondary-button" hidden>Sign out</button>
@@ -121,7 +121,7 @@
           <button id="device-login" class="text-button">Use a device code instead</button>
           <button id="cancel-login" class="text-button" hidden>Cancel sign-in</button>
           <button id="refresh-account" class="text-button" hidden>I've signed in — check again</button>
-          <div id="local-links" hidden><button id="install-ollama" class="text-button">Install Ollama ↗</button><button id="local-setup" class="text-button">Local setup ↗</button></div>
+          <div id="local-links" hidden><button id="install-ollama" class="text-button" type="button">Install Ollama ↗</button><button id="local-setup" class="text-button" type="button">Local setup ↗</button><button id="ollama-server-welcome" class="text-button" type="button">Server</button></div>
           <div id="openrouter-links" hidden><button id="openrouter-credits" class="text-button">OpenRouter keys and credits ↗</button></div>
           <div id="claude-links" hidden><button id="install-claude" class="text-button">Install Claude Code ↗</button></div>
           <span id="sign-in-note" class="sign-in-note">Uses your subscription's Codex access</span>
@@ -189,6 +189,24 @@
       <button id="job-save" type="submit" class="primary-button">Start job</button>
     </form>
     <details class="job-help"><summary>Slash commands</summary><p><code>/jobs &lt;objective&gt;</code> — create or replace<br><code>/jobs</code> — status and controls<br><code>/jobs edit</code> — edit objective and budget<br><code>/jobs pause</code> — pause work<br><code>/jobs resume</code> — continue<br><code>/jobs clear</code> — remove job, keep chat</p></details>
+  </dialog>
+  <dialog id="ollama-dialog" class="job-dialog" aria-labelledby="ollama-heading">
+    <div class="job-heading"><div><span class="eyebrow">OLLAMA SERVER</span><h2 id="ollama-heading">Ollama server</h2></div><button id="ollama-close" type="button" class="icon-button" aria-label="Close Ollama server settings">×</button></div>
+    <p class="job-note">STEVE uses http. The port defaults to 11434. Add an API key only if that server requires one. Saving reconnects Ollama and reopens the current chat when the server answers.</p>
+    <form id="ollama-form" autocomplete="off">
+      <label for="ollama-host">Host</label>
+      <input id="ollama-host" type="text" required maxlength="253" autocomplete="off" spellcheck="false" placeholder="127.0.0.1">
+      <label for="ollama-port">Port <span class="job-note">(optional)</span></label>
+      <input id="ollama-port" type="text" inputmode="numeric" maxlength="5" autocomplete="off" spellcheck="false" placeholder="11434">
+      <label for="ollama-url">URL path <span class="job-note">(optional)</span></label>
+      <input id="ollama-url" type="text" maxlength="512" autocomplete="off" spellcheck="false" placeholder="/prefix or ?think=false">
+      <p class="job-note">Added after the host and port. STEVE still calls /api and /v1 under a prefix. A query such as ?think=false is for a gateway that turns reasoning off on the URL. Put secrets in the API key field.</p>
+      <label for="ollama-key">API key <span class="job-note">(optional)</span></label>
+      <input id="ollama-key" type="password" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="Leave blank unless the server requires one">
+      <p id="ollama-key-note" class="job-note"></p>
+      <label class="ollama-clear" id="ollama-clear-row" for="ollama-clear-key" hidden><input id="ollama-clear-key" type="checkbox"> Remove saved API key</label>
+      <button id="ollama-save" type="submit" class="primary-button">Save server</button>
+    </form>
   </dialog>
 </body>
 </html>

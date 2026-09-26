@@ -308,6 +308,7 @@ function renderControls() {
   $("local-links").hidden=!local;
   $("local-status").textContent=state.localStatus||"Checking local Ollama…";
   $("local-refresh").disabled=state.busy || !connected;
+  syncOllamaServer();
   $("login-wait").hidden=!state.loginPending;
   $("grok-login-note").hidden=!grok || signed || !state.loginPending || !!state.device;
   $("device-login").hidden=local || claude || openrouter || state.loginPending;
@@ -388,7 +389,8 @@ function renderControls() {
   $("download-status").textContent=downloadNote;
   $("update-hint").textContent=downloadNote;
   $("account-email").textContent=local?"Local Ollama":state.account?.email || (signed?`${providerName} account`:"Not signed in");
-  $("account-plan").textContent=local?"localhost:11434 · No sign-in needed":signed?`${state.account.planType||providerName} · Connected`:`Use your ${providerName} account`;
+  const ollamaAddress=state.ollamaAddress||"127.0.0.1:11434";
+  $("account-plan").textContent=local?`${ollamaAddress} · ${state.ollamaApiKeySet?"API key saved":"No sign-in needed"}`:signed?`${state.account.planType||providerName} · Connected`:`Use your ${providerName} account`;
   $("status").textContent=clipboardRequest?"Reading clipboard image…":state.waitingForFusion?state.waitingReason:state.status;
   const tools=state.busy && signed && state.connection==="ready" ? state.activeTools||[] : [];
   const tool=tools[0];
@@ -511,6 +513,47 @@ function renderJob() {
   $("job-save").textContent = job ? "Save and start" : "Start job";
 }
 
+function syncOllamaServer() {
+  const locked=!!state.busy || !!state.jobBusy || state.job?.status==="active" || state.connection==="starting" || !!state.codexRestarting;
+  $("ollama-server").disabled=locked;
+  $("ollama-server-welcome").disabled=locked;
+  $("ollama-save").disabled=locked;
+  $("ollama-clear-row").hidden=!state.ollamaApiKeySet;
+  $("ollama-key-note").textContent=state.ollamaApiKeySet?"A key is saved on this computer. Leave the field blank to keep it, or remove it.":"Leave the key blank unless this server requires one.";
+  $("ollama-server").title=state.ollamaAddress?`Ollama server ${state.ollamaAddress}`:"Ollama host, port, and optional API key";
+}
+
+function readOllamaForm() {
+  const host=String($("ollama-host").value||"").trim();
+  const portText=String($("ollama-port").value??"").trim();
+  const url=String($("ollama-url").value||"").trim();
+  if(!host || /\s|[/\\]/.test(host) || host.includes("://")) throw new Error("Enter a host name or IP address, and put the port in the port field.");
+  if(url.includes("://") || /\s/.test(url)) throw new Error("Enter a path or query, such as /ollama or ?think=false. Host and port stay in their own fields.");
+  if(url && !url.startsWith("/") && !url.startsWith("?")) throw new Error("Start the URL path with / or ?, such as /ollama or ?think=false.");
+  let port=null;
+  if(portText){
+    if(!/^[0-9]+$/.test(portText) || Number(portText)<1 || Number(portText)>65535) throw new Error("Enter a port from 1 to 65535, or leave it blank for 11434.");
+    port=Number(portText);
+  }
+  const payload={host, port, url, clearApiKey:!!$("ollama-clear-key").checked};
+  const apiKey=$("ollama-key").value;
+  if(!payload.clearApiKey && apiKey) payload.apiKey=apiKey;
+  return payload;
+}
+
+function openOllamaServer() {
+  showHeaderMenu("account-menu", false);
+  $("ollama-host").value=state.ollamaHost||"127.0.0.1";
+  $("ollama-port").value=state.ollamaPort?String(state.ollamaPort):"";
+  $("ollama-url").value=state.ollamaUrl||"";
+  $("ollama-key").value="";
+  $("ollama-clear-key").checked=false;
+  syncOllamaServer();
+  const dialog=$("ollama-dialog");
+  if(!dialog.open && typeof dialog.showModal==="function") dialog.showModal();
+  if(typeof $("ollama-host").focus==="function") $("ollama-host").focus();
+}
+
 function openJob(edit = false) {
   $("job-objective").value = state.job?.objective || "";
   $("job-budget").value = state.job?.tokenBudget ?? "";
@@ -554,6 +597,20 @@ $("job-form").onsubmit=(event)=>{
 $("local-refresh").onclick=()=>act("accountRefresh",{refreshModels:true});
 $("install-ollama").onclick=()=>act("setupHelp",{page:"ollama"});
 $("local-help").onclick=$("local-setup").onclick=()=>act("setupHelp",{page:"local"});
+$("ollama-server").onclick=$("ollama-server-welcome").onclick=()=>openOllamaServer();
+$("ollama-close").onclick=()=>$("ollama-dialog").close();
+$("ollama-form").onsubmit=(event)=>{
+  event.preventDefault();
+  let payload;
+  try { payload=readOllamaForm(); }
+  catch(error) { state.error=error.message; dismissedError=""; render(); return; }
+  return bridge("ollamaServer", payload).then(()=>{
+    $("ollama-key").value="";
+    $("ollama-clear-key").checked=false;
+    const dialog=$("ollama-dialog");
+    if(typeof dialog.close==="function") dialog.close();
+  }).catch((error)=>{ state.error=error.message; dismissedError=""; render(); });
+};
 $("device-login").onclick=()=>act("deviceLogin");
 $("cancel-login").onclick=()=>act("cancelLogin");
 $("refresh-account").onclick=()=>act("accountRefresh",{refreshToken:true});

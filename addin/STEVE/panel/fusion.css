@@ -188,11 +188,13 @@ html, html body {
 #job-summary { font-size:12px; line-height:1.6; overflow-wrap:anywhere; max-height:110px; overflow:auto; }
 .job-note { color:#a5b6ac; font-size:11px; line-height:1.5; }
 .job-actions { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
-#job-form { display:flex; flex-direction:column; gap:8px; }
-#job-form label { font-size:12px; color:#d5dfd7; }
-#job-objective, #job-budget { box-sizing:border-box; width:100%; background:#101916; border:1px solid #4a6053; border-radius:8px; padding:10px; color:#e3e8df; font:12px/1.5 inherit; }
+#job-form, #ollama-form { display:flex; flex-direction:column; gap:8px; }
+#job-form label, #ollama-form label { font-size:12px; color:#d5dfd7; }
+#job-objective, #job-budget, #ollama-host, #ollama-port, #ollama-url, #ollama-key { box-sizing:border-box; width:100%; background:#101916; border:1px solid #4a6053; border-radius:8px; padding:10px; color:#e3e8df; font:12px/1.5 inherit; }
 #job-objective { resize:vertical; min-height:86px; max-height:180px; }
-#job-form .primary-button { width:100%; }
+#job-form .primary-button, #ollama-form .primary-button { width:100%; }
+.ollama-clear { display:flex; align-items:center; gap:8px; }
+.ollama-clear input { margin:0; }
 .job-help { border-top:1px solid #35483f; margin-top:18px; padding-top:12px; font-size:11px; line-height:1.9; color:#a5b6ac; }
 .job-help summary { cursor:pointer; }
 .job-help code { color:#b9dcc8; }

@@ -18,13 +18,13 @@ def redact(text):
     text = re.sub(r"(?i)(bearer\s+)[\w.\-]+", r"\1[redacted]", text)
     text = re.sub(r"\bsk-[A-Za-z0-9_-]+", "[redacted]", text)
     text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[redacted]", text)
-    return re.sub(r'(?i)((?:access_token|refresh_token|id_token|api_key|authorization|password)[\s"\x27]*[:=][\s"\x27]*)([^\s,"\x27}]+)',
+    return re.sub(r'(?i)((?:access_token|refresh_token|id_token|api[_-]?key|authorization|password)[\s"\x27]*[:=][\s"\x27]*)([^\s,"\x27}]+)',
                   r"\1[redacted]", text)
 
 
 def clean(value):
     if isinstance(value, dict):
-        return {str(key): "[redacted]" if re.fullmatch(r"(?i)(access_token|refresh_token|id_token|api_key|authorization|password)", str(key)) else clean(item)
+        return {str(key): "[redacted]" if re.fullmatch(r"(?i)(access_token|refresh_token|id_token|api[_-]?key|authorization|password)", str(key)) else clean(item)
                 for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [clean(item) for item in value]

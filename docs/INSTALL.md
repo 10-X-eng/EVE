@@ -70,7 +70,7 @@ Text-only models cannot receive attachments or viewport images; STEVE explains t
 
 ## Local Ollama
 
-1. Install [Ollama](https://ollama.com/download) and start its app. STEVE connects to `http://127.0.0.1:11434` on your computer; no account or API key is needed.
+1. Install [Ollama](https://ollama.com/download) and start its app. STEVE connects to `http://127.0.0.1:11434` on your computer by default; no account or API key is needed. Choose **Server** on the Ollama card, or in **Accounts & providers**, to use another host, an optional port, an optional path or query, or an optional API key for a server on your network. STEVE uses http, and it sends the key only when you save one. A path is a prefix before `/api` and `/v1`. A query such as `?think=false` is appended for a gateway that uses the URL to turn reasoning off.
 2. Download a model with tool support. For a modest GPU, a starting point is `ollama pull gemma4:e2b-it-qat`. Model quality and speed depend on the model and your hardware.
 3. Give the model at least 8K context. To keep the original model unchanged, save a plain-text file named `Modelfile` containing:
 
