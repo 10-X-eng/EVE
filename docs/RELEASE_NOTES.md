@@ -1,3 +1,9 @@
+# Unreleased — Clearer updates and part-by-part design
+
+- Update controls explain when a task, job, sign-in or Codex download blocks installation. Confirmation and progress explicitly announce the STEVE restart while Fusion stays open.
+- Design guidance defaults to functional parts: establish interfaces, build and measure each part, visually inspect and correct it, then verify the assembly. Basic checks apply with DFM off. This guides model behavior; live design verification remains necessary.
+- The maintainer confirmed the Windows 0.7.0 → 0.7.1 in-Fusion update works.
+
 # STEVE 0.7.1 — Cleaner top bar
 
 - Removed the Early Access badge from the top bar.

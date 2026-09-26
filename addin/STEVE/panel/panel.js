@@ -567,11 +567,16 @@ function renderControls() {
   const download=state.updateDownload;
   const downloading=download?.state==="downloading";
   const downloaded=download?.state==="ready" && download.version===update?.version;
-  for(const id of ["update-steve-now","menu-update-now"]){$(id).hidden=!update || !!state.updateInstallReady;$(id).disabled=downloading || !!state.autoInstallVersion || !!state.updateInstalling || !!state.busy || !!state.jobBusy || !!state.loginPending || !!state.codexUpdating || state.job?.status==="active";$(id).textContent=state.autoInstallVersion?"Downloading update…":state.updateInstalling?"Preparing update…":"Update & restart STEVE";}
+  const updateBlocker=state.job?.status==="active"?"Pause or finish the current job before updating STEVE. Fusion can stay open.":
+    state.jobBusy?"Wait for the job operation to finish before updating STEVE. Fusion can stay open.":
+    state.busy?"STEVE is still working. Let the current task finish before updating. Fusion can stay open.":
+    state.loginPending?"Finish or cancel sign-in before updating STEVE.":
+    state.codexUpdating?"Wait for the Codex update to finish before updating STEVE.":"";
+  for(const id of ["update-steve-now","menu-update-now"]){$(id).hidden=!update || !!state.updateInstallReady;$(id).disabled=downloading || !!state.autoInstallVersion || !!state.updateInstalling || !!updateBlocker;$(id).title=updateBlocker;$(id).textContent=state.autoInstallVersion?"Downloading update…":state.updateInstalling?"Preparing update…":"Update & restart STEVE";}
   const downloadLabel=downloading?`Downloading${download.percent==null?"…":` ${download.percent}%`}`:downloaded?"Open Downloads":"Download only";
   for(const id of ["download-update","menu-download"]){$(id).textContent=downloadLabel;$(id).disabled=downloading;}
   $("menu-download").hidden=!update;
-  const downloadNote=state.updateInstallFailure|| (state.updateInstallReady?state.updateStatus:state.updateInstalling?"Verifying and preparing the update…":state.updateStatus?.startsWith("Couldn’t prepare installation")?state.updateStatus:download?.state==="error"?download.message:state.autoInstallVersion?"Downloading and verifying the update. Fusion stays open.":downloaded?"Update downloaded and verified. Update & restart STEVE when you’re ready; Fusion stays open.":"Managed installations download updates automatically. You choose when to restart STEVE.");
+  const downloadNote=state.updateInstallFailure|| (state.updateInstallReady?state.updateStatus:state.updateInstalling?"Preparing to restart STEVE… Fusion and your documents will stay open.":state.updateStatus?.startsWith("Couldn’t prepare installation")?state.updateStatus:download?.state==="error"?download.message:state.autoInstallVersion?"Downloading and verifying the update. Fusion stays open.":updateBlocker?updateBlocker:downloaded?"Update downloaded and verified. Update & restart STEVE when you’re ready; Fusion stays open.":"Managed installations download updates automatically. You choose when to restart STEVE.");
   $("download-status").hidden=!download;
   $("download-status").textContent=downloadNote;
   $("update-hint").textContent=downloadNote;

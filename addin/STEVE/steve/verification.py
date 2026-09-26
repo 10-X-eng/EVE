@@ -87,5 +87,6 @@ def report(before, after, checks, execution_ok, healthy_state):
             "unclassifiedProblems": unclassified[:20],
             "detailsTruncated": any(len(items) > 20 for items in (created, changed, deleted, new_problems, existing_problems)),
             "checks": checks, "unavailable": after.get("unavailable"),
-            "guidance": "Execution success is not design verification. Report failed or missing checks; query current state "
-                        "before correcting partial work. No automatic replay or rollback. Only listed checks were evaluated."}
+            "guidance": "Execution success is not design verification. Query the current part for failed or missing checks, "
+                        "correct discrepancies, and recheck before building dependent parts. Report unresolved gaps. "
+                        "No automatic replay or rollback. Only listed checks were evaluated."}

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="fusion.css?v=21">
   <script src="markdown.js?v=1" defer></script>
   <script src="images.js?v=3" defer></script>
-  <script src="panel.js?v=32" defer></script>
+  <script src="panel.js?v=33" defer></script>
 </head>
 <body>
   <div id="app" class="app signed-out">
@@ -180,8 +180,8 @@
   <dialog id="image-viewer" class="image-viewer"><button id="close-image" type="button" aria-label="Close image">×</button><img id="expanded-image" alt="Reference image"></dialog>
   <dialog id="update-confirm" class="job-dialog" aria-labelledby="update-confirm-heading">
     <h2 id="update-confirm-heading">Update &amp; restart STEVE?</h2>
-    <p>STEVE will verify the downloaded update, wait for its work and Fusion commands to finish, then restart itself. Fusion and your documents stay open. Your account data and saved chats are kept, and the current chat reopens. If the new version cannot start, the previous files are restored.</p>
-    <div class="job-actions"><button id="confirm-update" type="button" class="primary-button">Download and install after Fusion closes</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
+    <p>STEVE will now restart to install the update. Fusion and your documents will stay open. The panel will briefly close, then reopen with your current chat. Your sign-in and saved chats are kept. If work is still running, STEVE waits for it to finish before restarting.</p>
+    <div class="job-actions"><button id="confirm-update" type="button" class="primary-button">Update &amp; restart STEVE</button><button id="cancel-update" type="button" class="secondary-button">Cancel</button></div>
   </dialog>
   <dialog id="job-dialog" class="job-dialog" aria-labelledby="job-heading">
     <div class="job-heading"><div><span class="eyebrow">Keep working toward an outcome</span><h2 id="job-heading">Your job</h2></div><button id="job-close" type="button" class="icon-button" aria-label="Close job controls">×</button></div>
