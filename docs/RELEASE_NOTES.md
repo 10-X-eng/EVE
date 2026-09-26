@@ -1,3 +1,14 @@
+# STEVE 0.7.1 — Cleaner top bar
+
+- Removed the Early Access badge from the top bar.
+- Published a patch release for live verification of the in-Fusion updater introduced in 0.7.0.
+
+## Update from 0.7.0 without closing Fusion
+
+In an installed, managed copy of STEVE 0.7.0, open **Settings → Updates → Check for updates**. Wait for 0.7.1 to download, then choose **Update & restart STEVE** and confirm when idle. Fusion should stay open while STEVE restarts. Verify that Settings shows **0.7.1**, the top-bar badge is gone, and your document and conversation remain available.
+
+This release provides the package for that live test; it does not claim the test has already passed. Source checkouts must be updated manually. Versions through 0.6.2 require the packaged installer once before in-Fusion updates are available.
+
 # STEVE 0.7.0 — Redesigned panel, Dream, providers and in-Fusion updates
 
 - **Readable replies:** replies now render tables, links, nested and task lists, and fenced code with syntax highlighting, a language label and **Copy**. Links open in your browser.
