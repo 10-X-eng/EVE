@@ -1,6 +1,7 @@
 """Downloads are verified and isolated from installed files and existing downloads."""
 import hashlib
 import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -53,6 +54,21 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(original.read_bytes(), b"existing user file")
         self.assertTrue(self.progress)
         self.assertFalse(list(self.folder.glob("*.part")))
+
+    def test_restart_reuses_verified_download_without_network_and_tampering_redownloads(self):
+        path = self.folder / self.filename
+        path.write_bytes(self.data)
+        cached = {'state': 'ready', 'version': '0.3.0', 'path': str(path),
+                  'sha256': hashlib.sha256(self.data).hexdigest()}
+        (self.folder / 'downloaded-update.json').write_text(json.dumps(cached))
+        states = []
+        downloader = UpdateDownloader(states.append, home=self.folder)
+        with patch('steve.downloads.download_package') as download:
+            downloader._run(self.release)
+            download.assert_not_called()
+            self.assertEqual(states[-1]['updateDownload'], cached)
+        path.write_bytes(b'tampered')
+        self.assertIsNone(downloader._cached(self.release))
 
     def test_bad_checksum_or_truncated_stream_leaves_no_zip_or_partial_file(self):
         self.data += b"tampered"
